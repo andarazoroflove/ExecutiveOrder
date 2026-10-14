@@ -640,8 +640,6 @@ public:
     bool IsHoldingDownBack() const { return m_isHoldingDownBack; }
     const AttackData& GetCurrentAttack() const { return m_currentAttack; }
     int GetSpecialIndex() const { return m_specialIndex; }
-    float GetSuperMeter() const { return m_superMeter; }
-    void AddSuperMeter(float amt) { m_superMeter = std::clamp(m_superMeter + amt, 0.0f, 100.0f); }
     int GetComboCount() const { return m_comboCount; }
     void AddComboHit() { m_comboCount++; m_comboResetTimer = 50; }
     void ResetCombo() { m_comboCount = 0; m_comboResetTimer = 0; }
@@ -695,7 +693,6 @@ private:
     float m_pushbackVel = 0.0f;
     bool m_hitConnected = false;
     int m_armor = 0;
-    float m_superMeter = 0.0f;
     int m_comboCount = 0;
     int m_comboResetTimer = 0;
     int m_lastFrameAdvantage = 0;
@@ -890,8 +887,9 @@ private:
 // ============================================================================
 // CHAMPIONSHIP EDITION (CE) UPGRADE SUITE:
 // - 12-Part Articulated Hierarchical Character Rig & 5-Node Verlet Tie Physics
-// - 3-Tone CPS-1 Shading, Motion-Blur Smear Arcs & Bruised HUD Portraits
-// - Super Meter Bar, 30-Frame Super-Flash Cut-In, Graphic Stamps & Callouts
+// - CPS-1 3-Tone Silhouette Rim, Specular Bevels & Afterimage Shadow Trails
+// - Dynamic Stage Searchlights, Paparazzi Flashes, Weather & Perspective Floor
+// - Upgraded CPS-1 HUD with Live Bruised Portraits & Red-Damage Drain Trails
 // - F1 Live Hitbox/Hurtbox/Pushbox & Frame-Advantage Debug Overlay
 // ============================================================================
 #include <cstdlib>
@@ -903,7 +901,17 @@ static bool s_debugHitboxes = false;
 static bool s_forceProceduralRig = false;
 static int  s_superFlashTimer = 0;
 static int  s_superFlashPlayer = 0;
-static std::string s_superFlashMove = "OMNIBUS BILL SUPER!";
+static std::string s_superFlashMove = "TOTAL VETO FLURRY!";
+static float s_p1TrailHp = 100.0f;
+static float s_p2TrailHp = 100.0f;
+
+struct CEAfterimage {
+    Vector2 pos;
+    bool facingRight = true;
+    FighterState state = FSTATE_IDLE;
+    int frame = 0;
+    int life = 0;
+};
 
 struct CEStamp {
     Vector2 pos;
@@ -944,7 +952,7 @@ struct CEVerletTie {
     void Update(Vector2 anchor, Vector2 charVel, bool facingRight) {
         if (!inited) {
             for (int i = 0; i < 5; i++) {
-                nodes[i] = Vector2{ anchor.x, anchor.y + i * 3.5f };
+                nodes[i] = Vector2{ anchor.x, anchor.y + i * 4.2f };
                 prev[i] = nodes[i];
             }
             inited = true;
@@ -955,9 +963,9 @@ struct CEVerletTie {
             Vector2 cur = nodes[i];
             Vector2 vx = Vector2{ (cur.x - prev[i].x) * 0.84f, (cur.y - prev[i].y) * 0.84f };
             prev[i] = cur;
-            float flutter = sinf((float)GetTime() * 14.0f + i * 1.3f) * 0.22f;
-            nodes[i].x += vx.x - charVel.x * 0.30f + (facingRight ? -0.15f : 0.15f) + flutter;
-            nodes[i].y += vx.y + 0.42f;
+            float flutter = sinf((float)GetTime() * 16.0f + i * 1.3f) * 0.35f;
+            nodes[i].x += vx.x - charVel.x * 0.38f + (facingRight ? -0.22f : 0.22f) + flutter;
+            nodes[i].y += vx.y + 0.45f;
         }
         for (int iter = 0; iter < 3; iter++) {
             nodes[0] = anchor;
@@ -965,7 +973,7 @@ struct CEVerletTie {
                 float dx = nodes[i + 1].x - nodes[i].x;
                 float dy = nodes[i + 1].y - nodes[i].y;
                 float dist = sqrtf(dx * dx + dy * dy);
-                float rest = 3.6f;
+                float rest = 4.2f;
                 if (dist > 0.001f) {
                     float diff = (dist - rest) / dist;
                     if (i == 0) {
@@ -985,15 +993,16 @@ struct CEVerletTie {
     void Draw(Color tieCol, Color trimCol) const {
         if (!inited) return;
         for (int i = 0; i < 4; i++) {
-            float w = (i == 3) ? 4.2f : 3.0f;
-            DrawLineEx(nodes[i], nodes[i + 1], w + 1.5f, Color{ 12, 12, 18, 230 });
+            float w = (i == 3) ? 4.8f : 3.4f;
+            DrawLineEx(nodes[i], nodes[i + 1], w + 1.8f, Color{ 10, 10, 16, 235 });
             DrawLineEx(nodes[i], nodes[i + 1], w, tieCol);
         }
-        DrawCircleV(nodes[4], 2.2f, trimCol);
+        DrawCircleV(nodes[4], 2.5f, trimCol);
     }
 };
 
 static CEVerletTie s_ties[2];
+static std::vector<CEAfterimage> s_afterimages[2];
 static std::vector<CEStamp> s_stamps;
 static std::vector<CEParticle> s_particles;
 static std::vector<CECalloutBanner> s_banners;
@@ -1005,10 +1014,14 @@ inline void ResetRoundFX() {
     s_stamps.clear();
     s_particles.clear();
     s_banners.clear();
+    s_afterimages[0].clear();
+    s_afterimages[1].clear();
     s_superFlashTimer = 0;
     s_firstStrikeAwarded = false;
     s_prevP1Hits = 0;
     s_prevP2Hits = 0;
+    s_p1TrailHp = 100.0f;
+    s_p2TrailHp = 100.0f;
 }
 
 inline void PushBanner(int playerIndex, const char* text, const char* sub, Color col) {
@@ -1031,31 +1044,31 @@ inline void PushBanner(int playerIndex, const char* text, const char* sub, Color
 }
 
 inline void SpawnImpactJuice(Vector2 pos, bool heavy, bool isSpecial, const char* stampText) {
-    int sweatCount = heavy ? 8 : 4;
+    int sweatCount = heavy ? 10 : 5;
     for (int i = 0; i < sweatCount; i++) {
         CEParticle p{};
         p.pos = pos;
         float ang = -PI_F * 0.85f + ((float)(rand() % 100) / 100.0f) * PI_F * 0.7f;
-        float spd = 1.6f + ((float)(rand() % 100) / 100.0f) * 3.0f;
-        p.vel = Vector2{ cosf(ang) * spd, sinf(ang) * spd - 1.2f };
-        p.color = Color{ 130, 225, 255, 240 };
-        p.size = 2.0f;
-        p.maxFrames = 24 + (rand() % 10);
+        float spd = 1.8f + ((float)(rand() % 100) / 100.0f) * 3.4f;
+        p.vel = Vector2{ cosf(ang) * spd, sinf(ang) * spd - 1.4f };
+        p.color = Color{ 130, 230, 255, 245 };
+        p.size = 2.2f;
+        p.maxFrames = 26 + (rand() % 12);
         p.isPaper = false;
         p.alive = true;
         s_particles.push_back(p);
     }
     if (heavy || isSpecial) {
-        int docs = isSpecial ? 7 : 4;
+        int docs = isSpecial ? 9 : 5;
         for (int i = 0; i < docs; i++) {
             CEParticle p{};
             p.pos = pos;
-            p.vel = Vector2{ ((float)(rand() % 100) / 50.0f - 1.0f) * 3.2f, -2.0f - ((float)(rand() % 100) / 100.0f) * 2.5f };
-            p.color = (i % 2 == 0) ? Color{ 250, 245, 225, 255 } : Color{ 255, 215, 60, 255 };
-            p.size = 4.5f;
+            p.vel = Vector2{ ((float)(rand() % 100) / 50.0f - 1.0f) * 3.6f, -2.4f - ((float)(rand() % 100) / 100.0f) * 2.8f };
+            p.color = (i % 2 == 0) ? Color{ 255, 250, 230, 255 } : Color{ 255, 215, 50, 255 };
+            p.size = 5.0f;
             p.rot = (float)(rand() % 360);
-            p.rotVel = ((float)(rand() % 100) / 50.0f - 1.0f) * 9.0f;
-            p.maxFrames = 42 + (rand() % 18);
+            p.rotVel = ((float)(rand() % 100) / 50.0f - 1.0f) * 10.0f;
+            p.maxFrames = 45 + (rand() % 18);
             p.isPaper = true;
             p.alive = true;
             s_particles.push_back(p);
@@ -1063,11 +1076,11 @@ inline void SpawnImpactJuice(Vector2 pos, bool heavy, bool isSpecial, const char
     }
     if (stampText != nullptr && stampText[0] != '\0') {
         CEStamp st{};
-        st.pos = Vector2{ pos.x, pos.y - 18.0f };
+        st.pos = Vector2{ pos.x, pos.y - 20.0f };
         st.text = stampText;
-        st.color = isSpecial ? Color{ 255, 50, 50, 255 } : Color{ 255, 215, 40, 255 };
+        st.color = isSpecial ? Color{ 255, 55, 55, 255 } : Color{ 255, 220, 40, 255 };
         st.frame = 0;
-        st.maxFrames = 32;
+        st.maxFrames = 34;
         st.alive = true;
         s_stamps.push_back(st);
     }
@@ -1093,8 +1106,7 @@ inline void DrawLimb3Tone(Vector2 a, Vector2 b, float rA, float rB, Color baseCo
     DrawLineEx(hA, hB, std::max(1.0f, rAvg * 0.55f), hiCol);
 }
 
-// Articulated 12-Part Hierarchical Character Rig (Head, Jaw/Mouth, Hair/Accessory,
-// Torso, Pelvis, UpperArm_L/R, Forearm_L/R, Hand_L/R, Thigh_L/R, Calf_L/R, Foot_L/R)
+// Articulated 12-Part Hierarchical Character Rig (F3 Mode / Fallback)
 inline void DrawArticulated12PartRig(const Fighter& f) {
     Vector2 pos = f.GetPosition();
     bool fr = f.IsFacingRight();
@@ -1115,7 +1127,6 @@ inline void DrawArticulated12PartRig(const Fighter& f) {
     Vector2 torso{ pelvis.x + dir * (st == FSTATE_ATTACK ? 4.0f : 1.0f), pelvis.y - 18.0f + crouchDrop * 0.3f };
     Vector2 head{ torso.x + dir * 2.0f, torso.y - 12.0f };
 
-    // Legs (Thigh_L/R, Calf_L/R, Foot_L/R)
     Vector2 hipL{ pelvis.x - dir * 4.0f, pelvis.y };
     Vector2 hipR{ pelvis.x + dir * 4.0f, pelvis.y };
     Vector2 kneeL{ hipL.x - dir * 4.0f - walkPhase * 6.0f, pos.y - 12.0f };
@@ -1132,7 +1143,6 @@ inline void DrawArticulated12PartRig(const Fighter& f) {
         }
     }
 
-    // Arms (UpperArm_L/R, Forearm_L/R, Hand_L/R)
     Vector2 shL{ torso.x - dir * 6.0f, torso.y + 2.0f };
     Vector2 shR{ torso.x + dir * 6.0f, torso.y + 2.0f };
     Vector2 elbL{ shL.x - dir * 5.0f, shL.y + 9.0f };
@@ -1150,7 +1160,6 @@ inline void DrawArticulated12PartRig(const Fighter& f) {
         }
     }
 
-    // Back limbs
     DrawLimb3Tone(hipL, kneeL, 4.5f, 3.8f, suit);
     DrawLimb3Tone(kneeL, footL, 3.6f, 3.0f, suit);
     DrawLimb3Tone(footL, Vector2{ footL.x + dir * 5.0f, footL.y }, 3.0f, 2.5f, shoes);
@@ -1158,20 +1167,15 @@ inline void DrawArticulated12PartRig(const Fighter& f) {
     DrawLimb3Tone(elbL, handL, 3.0f, 2.6f, suit);
     DrawCircleV(handL, 3.2f, skin);
 
-    // Pelvis & Torso
     DrawLimb3Tone(pelvis, torso, 7.5f, 9.0f, suit);
 
-    // Front leg
     DrawLimb3Tone(hipR, kneeR, 4.8f, 4.0f, suit);
     DrawLimb3Tone(kneeR, footR, 3.8f, 3.2f, suit);
     DrawLimb3Tone(footR, Vector2{ footR.x + dir * 5.5f, footR.y }, 3.2f, 2.6f, shoes);
 
-    // Head, Jaw/Mouth & Facial Expression
     DrawCircleV(head, 8.5f, Color{ 12, 12, 18, 255 });
     DrawCircleV(head, 7.2f, skin);
-    // Hair / Hat accessory
     DrawRectangle((int)(head.x - 7), (int)(head.y - 8), 14, 4, trim);
-    // Eye & Jaw
     DrawCircle((int)(head.x + dir * 3.5f), (int)(head.y - 1.5f), (st == FSTATE_HITSTUN) ? 2.5f : 1.5f, WHITE);
     DrawCircle((int)(head.x + dir * 4.0f), (int)(head.y - 1.5f), 1.0f, BLACK);
     if (st == FSTATE_ATTACK || st == FSTATE_SPECIAL || st == FSTATE_HITSTUN) {
@@ -1180,10 +1184,77 @@ inline void DrawArticulated12PartRig(const Fighter& f) {
         DrawLine((int)(head.x + dir * 1.5f), (int)(head.y + 3.0f), (int)(head.x + dir * 5.0f), (int)(head.y + 2.5f), Color{ 40, 25, 20, 255 });
     }
 
-    // Front arm
     DrawLimb3Tone(shR, elbR, 4.0f, 3.4f, suit);
     DrawLimb3Tone(elbR, handR, 3.2f, 2.8f, suit);
     DrawCircleV(handR, 3.6f, skin);
+}
+
+// Upgraded Championship Edition Stage Atmosphere (Searchlights, Paparazzi Flashes,
+// Drifting Cherry Blossoms / Subpoenas / Embers & Perspective Floor Grid Lines)
+inline void DrawStageUpgrades(StageId stageId, float camX, float time) {
+    // 1. Sweeping Tactical Sky / Arena Searchlights
+    for (int b = 0; b < 2; b++) {
+        float pivotX = (b == 0) ? 75.0f : (SCREEN_WIDTH - 75.0f);
+        float sway = sinf(time * (1.3f + b * 0.4f) + b * 2.2f) * 95.0f;
+        Color beamCol = (stageId == STAGE_CONGRESSIONAL_FLOOR || stageId == STAGE_PENTAGON_ALTAR)
+            ? Color{ 255, 215, 90, 22 }
+            : Color{ 160, 225, 255, 22 };
+        DrawTriangle(
+            Vector2{ pivotX, (float)GROUND_Y },
+            Vector2{ pivotX + sway - 28.0f, 0.0f },
+            Vector2{ pivotX + sway + 28.0f, 0.0f },
+            beamCol
+        );
+    }
+
+    // 2. Animated Press Corps / Crowd Paparazzi Camera Flashes
+    for (int c = 0; c < 10; c++) {
+        float flashPhase = fmodf(time * 3.4f + c * 1.37f, 2.4f);
+        if (flashPhase < 0.08f) {
+            float fx = fmodf(c * 47.0f - camX * 0.45f + 800.0f, (float)SCREEN_WIDTH);
+            float fy = 108.0f + (c % 3) * 12.0f;
+            DrawCircle((int)fx, (int)fy, 9, Color{ 255, 255, 240, 170 });
+            DrawCircle((int)fx, (int)fy, 4, WHITE);
+            DrawLine((int)fx - 12, (int)fy, (int)fx + 12, (int)fy, WHITE);
+            DrawLine((int)fx, (int)fy - 12, (int)fx, (int)fy + 12, WHITE);
+        }
+    }
+
+    // 3. 3D Perspective Floor Depth Lines & Stage Horizon Rim
+    int gy = (int)GROUND_Y;
+    DrawLine(0, gy, SCREEN_WIDTH, gy, Color{ 255, 225, 110, 95 });
+    for (int r = 1; r <= 4; r++) {
+        int ry = gy + r * 6;
+        if (ry < SCREEN_HEIGHT) {
+            DrawLine(0, ry, SCREEN_WIDTH, ry, Color{ 255, 255, 255, (unsigned char)(18 + r * 6) });
+        }
+    }
+    float floorScroll = fmodf(-camX, 32.0f);
+    for (int i = -4; i < 18; i++) {
+        float topX = i * 32.0f + floorScroll;
+        float distFromCenter = (topX - SCREEN_WIDTH * 0.5f);
+        float botX = SCREEN_WIDTH * 0.5f + distFromCenter * 1.48f;
+        DrawLine((int)topX, gy, (int)botX, SCREEN_HEIGHT, Color{ 255, 255, 255, 32 });
+    }
+
+    // 4. Drifting Stage WeatherParticles (Cherry Blossoms, Subpoenas, Embers)
+    for (int p = 0; p < 16; p++) {
+        float px = fmodf(p * 37.0f + time * (16.0f + (p % 4) * 4.0f) - camX * 0.6f + 1600.0f, (float)SCREEN_WIDTH);
+        float py = fmodf(p * 23.0f + time * (18.0f + (p % 3) * 5.0f), GROUND_Y - 8.0f);
+        if (stageId == STAGE_REFLECTING_POOL || stageId == STAGE_FLORIDA_KEYS) {
+            // Drifting Cherry Blossom Petals
+            DrawCircle((int)px, (int)py, 2.0f, Color{ 255, 185, 215, 210 });
+            DrawPixel((int)px + 1, (int)py, WHITE);
+        } else if (stageId == STAGE_CONGRESSIONAL_FLOOR || stageId == STAGE_PRESS_BRIEFING || stageId == STAGE_WTC_PLAZA) {
+            // Fluttering Legal Subpoenas / Press Notes
+            float sway = sinf(time * 5.0f + p) * 3.0f;
+            DrawRectangle((int)(px + sway), (int)py, 4, 3, Color{ 250, 245, 220, 195 });
+        } else {
+            // Rising Arcade Embers
+            float ey = GROUND_Y - py;
+            DrawCircle((int)px, (int)ey, 1.5f, (p % 2 == 0) ? Color{ 255, 190, 50, 200 } : Color{ 255, 90, 30, 190 });
+        }
+    }
 }
 
 inline void UpdateAndTrackFighters(Fighter& p1, Fighter& p2) {
@@ -1194,26 +1265,55 @@ inline void UpdateAndTrackFighters(Fighter& p1, Fighter& p2) {
         s_forceProceduralRig = !s_forceProceduralRig;
     }
 
-    // 1.25x BGM Tempo when either fighter drops below 30% HP
+    // Smooth Red-Life Damage Trail on HUD
+    if (s_p1TrailHp > (float)p1.GetHealth()) {
+        s_p1TrailHp = std::max((float)p1.GetHealth(), s_p1TrailHp - 0.35f);
+    } else {
+        s_p1TrailHp = (float)p1.GetHealth();
+    }
+    if (s_p2TrailHp > (float)p2.GetHealth()) {
+        s_p2TrailHp = std::max((float)p2.GetHealth(), s_p2TrailHp - 0.35f);
+    } else {
+        s_p2TrailHp = (float)p2.GetHealth();
+    }
+
+    // 1.25x BGM Tempo Overdrive when either fighter drops below 30% HP
     bool critical = (p1.GetHealth() > 0 && p1.GetHealth() < 30) || (p2.GetHealth() > 0 && p2.GetHealth() < 30);
     AudioEngine::SetCriticalTempo(critical);
 
     // Update Verlet Neckties / Ribbons
-    s_ties[0].Update(Vector2{ p1.GetPosition().x + (p1.IsFacingRight() ? 2.0f : -2.0f), p1.GetPosition().y - (p1.IsCrouching() ? 28.0f : 42.0f) }, p1.GetVelocity(), p1.IsFacingRight());
-    s_ties[1].Update(Vector2{ p2.GetPosition().x + (p2.IsFacingRight() ? 2.0f : -2.0f), p2.GetPosition().y - (p2.IsCrouching() ? 28.0f : 42.0f) }, p2.GetVelocity(), p2.IsFacingRight());
+    s_ties[0].Update(Vector2{ p1.GetPosition().x + (p1.IsFacingRight() ? 3.0f : -3.0f), p1.GetPosition().y - (p1.IsCrouching() ? 30.0f : 44.0f) }, p1.GetVelocity(), p1.IsFacingRight());
+    s_ties[1].Update(Vector2{ p2.GetPosition().x + (p2.IsFacingRight() ? 3.0f : -3.0f), p2.GetPosition().y - (p2.IsCrouching() ? 30.0f : 44.0f) }, p2.GetVelocity(), p2.IsFacingRight());
+
+    // Record CPS-1 Afterimage Ghost Trails on Specials & Jumps
+    const Fighter* fighters[2] = { &p1, &p2 };
+    for (int i = 0; i < 2; i++) {
+        for (auto& ai : s_afterimages[i]) ai.life--;
+        s_afterimages[i].erase(std::remove_if(s_afterimages[i].begin(), s_afterimages[i].end(), [](const CEAfterimage& a) { return a.life <= 0; }), s_afterimages[i].end());
+        const Fighter& f = *fighters[i];
+        if ((f.GetState() == FSTATE_SPECIAL || f.GetState() == FSTATE_JUMP || (f.GetState() == FSTATE_ATTACK && f.GetCurrentAttack().isHeavy)) && (f.GetStateFrame() % 3 == 0)) {
+            CEAfterimage ghost{};
+            ghost.pos = f.GetPosition();
+            ghost.facingRight = f.IsFacingRight();
+            ghost.state = f.GetState();
+            ghost.frame = f.GetStateFrame();
+            ghost.life = 9;
+            s_afterimages[i].push_back(ghost);
+        }
+    }
 
     // Check Super Flash Trigger
     if (p1.PopSuperFlashTrigger()) {
-        s_superFlashTimer = 30;
+        s_superFlashTimer = 24;
         s_superFlashPlayer = 0;
-        s_superFlashMove = "OMNIBUS BILL SUPER!";
-        PushBanner(0, "OMNIBUS SUPER!", p1.GetName().c_str(), Color{ 255, 215, 40, 255 });
+        s_superFlashMove = "TOTAL VETO FLURRY!";
+        PushBanner(0, "SUPER COMBO!", p1.GetName().c_str(), Color{ 255, 215, 40, 255 });
     }
     if (p2.PopSuperFlashTrigger()) {
-        s_superFlashTimer = 30;
+        s_superFlashTimer = 24;
         s_superFlashPlayer = 1;
-        s_superFlashMove = "OMNIBUS BILL SUPER!";
-        PushBanner(1, "OMNIBUS SUPER!", p2.GetName().c_str(), Color{ 255, 215, 40, 255 });
+        s_superFlashMove = "TOTAL VETO FLURRY!";
+        PushBanner(1, "SUPER COMBO!", p2.GetName().c_str(), Color{ 255, 215, 40, 255 });
     }
 
     // Check 2-in-1 Cancel & Reversal Callouts
@@ -1242,7 +1342,7 @@ inline void UpdateAndTrackFighters(Fighter& p1, Fighter& p2) {
             PushBanner(0, buf, p1.GetCurrentAttack().name.c_str(), Color{ 255, 190, 40, 255 });
         }
         bool isSpec = (p1.GetState() == FSTATE_SPECIAL);
-        SpawnImpactJuice(Vector2{ p2.GetPosition().x, p2.GetPosition().y - 36.0f }, p1.GetCurrentAttack().isHeavy, isSpec, isSpec ? "VETO!" : nullptr);
+        SpawnImpactJuice(Vector2{ p2.GetPosition().x, p2.GetPosition().y - 36.0f }, p1.GetCurrentAttack().isHeavy, isSpec, isSpec ? "VETO!" : (p1.GetCurrentAttack().isHeavy ? "SMACK!" : nullptr));
     }
     if (c2 > s_prevP2Hits && c2 >= 1) {
         if (!s_firstStrikeAwarded) {
@@ -1255,7 +1355,7 @@ inline void UpdateAndTrackFighters(Fighter& p1, Fighter& p2) {
             PushBanner(1, buf, p2.GetCurrentAttack().name.c_str(), Color{ 255, 120, 60, 255 });
         }
         bool isSpec = (p2.GetState() == FSTATE_SPECIAL);
-        SpawnImpactJuice(Vector2{ p1.GetPosition().x, p1.GetPosition().y - 36.0f }, p2.GetCurrentAttack().isHeavy, isSpec, isSpec ? "REDACTED!" : nullptr);
+        SpawnImpactJuice(Vector2{ p1.GetPosition().x, p1.GetPosition().y - 36.0f }, p2.GetCurrentAttack().isHeavy, isSpec, isSpec ? "REDACTED!" : (p2.GetCurrentAttack().isHeavy ? "OBJECTION!" : nullptr));
     }
     s_prevP1Hits = c1;
     s_prevP2Hits = c2;
@@ -1288,28 +1388,39 @@ inline void UpdateAndTrackFighters(Fighter& p1, Fighter& p2) {
 
 inline void DrawFighterWorldOverlays(const Fighter& f) {
     int idx = (f.GetPlayerIndex() == 0) ? 0 : 1;
-    // Draw Dynamic Verlet Necktie / Stole Trail
+    // 1. Dynamic Verlet Necktie / Stole Trail
     s_ties[idx].Draw(f.GetSecondaryColor(), Color{ 255, 220, 60, 255 });
 
-    // Motion-Blur Smear Arcs during Active Frames
+    // 2. Bold CPS-1 Motion-Blur Smear Slash Arcs during Active Attack Frames
     if (f.GetState() == FSTATE_ATTACK || f.GetState() == FSTATE_SPECIAL) {
         int su = f.GetCurrentAttack().startupFrames;
         int ac = f.GetCurrentAttack().activeFrames;
         int fr = f.GetStateFrame();
         if (fr >= su && fr < su + ac) {
             float dir = f.IsFacingRight() ? 1.0f : -1.0f;
-            Vector2 center{ f.GetPosition().x + dir * (f.GetCurrentAttack().reachX * 0.55f), f.GetPosition().y + f.GetCurrentAttack().reachY };
-            Color arcCol = f.IsSuperMoveActive() ? Color{ 255, 80, 220, 210 } : (f.GetCurrentAttack().isHeavy ? Color{ 255, 195, 50, 195 } : Color{ 170, 235, 255, 175 });
-            for (int i = 0; i < 4; i++) {
-                float off = (float)i * 2.5f * dir;
-                DrawCircleLines((int)(center.x + off), (int)center.y, 10.0f + i * 2.5f, arcCol);
-            }
+            Vector2 pStart{ f.GetPosition().x + dir * 10.0f, f.GetPosition().y - 36.0f };
+            Vector2 pEnd{ f.GetPosition().x + dir * (f.GetCurrentAttack().reachX + 10.0f), f.GetPosition().y + f.GetCurrentAttack().reachY };
+            Color smearOuter = (f.GetState() == FSTATE_SPECIAL) ? Color{ 255, 70, 40, 230 } : (f.GetCurrentAttack().isHeavy ? Color{ 255, 195, 40, 230 } : Color{ 120, 230, 255, 210 });
+            DrawLineEx(Vector2{ pStart.x, pStart.y - 6.0f }, Vector2{ pEnd.x, pEnd.y - 2.0f }, 5.5f, smearOuter);
+            DrawLineEx(pStart, pEnd, 3.0f, WHITE);
+            DrawCircleLines((int)pEnd.x, (int)pEnd.y, f.GetCurrentAttack().isHeavy ? 14.0f : 9.0f, smearOuter);
+        }
+    }
+
+    // 3. Dynamic Hitstun / Knockdown Dizzy Stars & Shock Bursts
+    if (f.GetState() == FSTATE_HITSTUN || f.GetState() == FSTATE_KNOCKDOWN_AIR || f.GetState() == FSTATE_KNOCKDOWN_GROUND) {
+        float t = (float)GetTime() * 9.0f;
+        for (int s = 0; s < 3; s++) {
+            float ang = t + s * (2.0f * PI_F / 3.0f);
+            float sx = f.GetPosition().x + cosf(ang) * 14.0f;
+            float sy = f.GetPosition().y - 64.0f + sinf(ang) * 4.5f;
+            DrawCircle((int)sx, (int)sy, 2.5f, Color{ 255, 235, 60, 255 });
+            DrawPixel((int)sx, (int)sy, WHITE);
         }
     }
 }
 
 inline void DrawWorldParticlesAndDebug(const Fighter& p1, const Fighter& p2) {
-    // Sweat & Paper Confetti Particles
     for (const auto& p : s_particles) {
         if (!p.alive) continue;
         if (p.isPaper) {
@@ -1319,18 +1430,16 @@ inline void DrawWorldParticlesAndDebug(const Fighter& p1, const Fighter& p2) {
         }
     }
 
-    // Graphic Stamps ("VETO!", "REDACTED!")
     for (const auto& st : s_stamps) {
         if (!st.alive) continue;
         int tw = MeasureText(st.text.c_str(), 10);
         int bx = (int)st.pos.x - tw / 2 - 4;
         int by = (int)st.pos.y - 6;
-        DrawRectangle(bx, by, tw + 8, 13, Color{ 15, 10, 15, 220 });
+        DrawRectangle(bx, by, tw + 8, 13, Color{ 15, 10, 15, 230 });
         DrawRectangleLines(bx, by, tw + 8, 13, st.color);
         VisualsEngine::DrawPixelText(st.text.c_str(), bx + 4, by + 2, 10, st.color);
     }
 
-    // F1 Live Hitbox / Hurtbox / Pushbox Debug Overlay
     if (s_debugHitboxes) {
         const Fighter* fighters[2] = { &p1, &p2 };
         for (int i = 0; i < 2; i++) {
@@ -1356,56 +1465,26 @@ inline void DrawWorldParticlesAndDebug(const Fighter& p1, const Fighter& p2) {
 }
 
 inline void DrawScreenHUDAndSuperFlash(const Fighter& p1, const Fighter& p2, const InputManager& in1) {
-    // 1. Bottom Super Meter Bars ("OMNIBUS BILL" 0-100%)
-    constexpr int METER_W = 124;
-    constexpr int METER_H = 7;
-    int meterY = SCREEN_HEIGHT - 13;
+    // NO bottom meter bar! Clean arcade playfield at the bottom!
 
-    // P1 Meter
-    float m1 = p1.GetSuperMeter();
-    int w1 = (int)((m1 / 100.0f) * METER_W);
-    DrawRectangle(18, meterY, METER_W + 4, METER_H + 4, Color{ 12, 14, 22, 235 });
-    Color c1 = (m1 >= 100.0f) ? (((int)(GetTime() * 16.0f) % 2 == 0) ? Color{ 255, 235, 70, 255 } : Color{ 255, 110, 30, 255 }) : Color{ 40, 175, 255, 255 };
-    DrawRectangle(20, meterY + 2, w1, METER_H, c1);
-    DrawRectangleLines(18, meterY, METER_W + 4, METER_H + 4, Color{ 190, 165, 60, 255 });
-    VisualsEngine::DrawPixelText(m1 >= 100.0f ? "OMNIBUS READY! (236236+P)" : "OMNIBUS METER", 20, meterY - 8, 6, c1);
+    // 1. Top Championship Edition Badge under Round Timer
+    int ceTw = MeasureText("CHAMPIONSHIP EDITION", 6);
+    VisualsEngine::DrawPixelText("CHAMPIONSHIP EDITION", (SCREEN_WIDTH - ceTw) / 2, 35, 6, Color{ 255, 215, 60, 220 });
 
-    // P2 Meter
-    float m2 = p2.GetSuperMeter();
-    int w2 = (int)((m2 / 100.0f) * METER_W);
-    int p2X = SCREEN_WIDTH - 22 - METER_W;
-    DrawRectangle(p2X, meterY, METER_W + 4, METER_H + 4, Color{ 12, 14, 22, 235 });
-    Color c2 = (m2 >= 100.0f) ? (((int)(GetTime() * 16.0f) % 2 == 0) ? Color{ 255, 235, 70, 255 } : Color{ 255, 110, 30, 255 }) : Color{ 40, 175, 255, 255 };
-    DrawRectangle(p2X + 2 + (METER_W - w2), meterY + 2, w2, METER_H, c2);
-    DrawRectangleLines(p2X, meterY, METER_W + 4, METER_H + 4, Color{ 190, 165, 60, 255 });
-    VisualsEngine::DrawPixelText(m2 >= 100.0f ? "OMNIBUS MAX!" : "OMNIBUS METER", SCREEN_WIDTH - 92, meterY - 8, 6, c2);
-
-    // 2. Bruised / Sweating Critical Health Indicator (<30% HP)
-    if (p1.GetHealth() > 0 && p1.GetHealth() < 30) {
-        int dropY = 28 + ((int)(GetTime() * 24.0f) % 8);
-        DrawCircle(15, dropY, 2, Color{ 110, 215, 255, 240 });
-        VisualsEngine::DrawPixelText("CRITICAL!", 22, 29, 6, Color{ 255, 70, 70, 255 });
-    }
-    if (p2.GetHealth() > 0 && p2.GetHealth() < 30) {
-        int dropY = 28 + ((int)(GetTime() * 24.0f) % 8);
-        DrawCircle(SCREEN_WIDTH - 15, dropY, 2, Color{ 110, 215, 255, 240 });
-        VisualsEngine::DrawPixelText("CRITICAL!", SCREEN_WIDTH - 64, 29, 6, Color{ 255, 70, 70, 255 });
-    }
-
-    // 3. Sliding Combo & Callout Banners
+    // 2. Sliding Combo & Callout Banners
     for (const auto& b : s_banners) {
         float slide = std::min(1.0f, (float)(b.maxTimer - b.timer) / 6.0f);
         int bw = 122;
         int bh = 22;
         int bx = (b.playerIndex == 0) ? (int)(-bw + slide * (bw + 8)) : (int)(SCREEN_WIDTH - slide * (bw + 8));
-        int by = 46 + b.playerIndex * 26;
-        DrawRectangle(bx, by, bw, bh, Color{ 14, 16, 28, 230 });
+        int by = 48 + b.playerIndex * 26;
+        DrawRectangle(bx, by, bw, bh, Color{ 14, 16, 28, 235 });
         DrawRectangleLines(bx, by, bw, bh, b.color);
         VisualsEngine::DrawPixelText(b.text.c_str(), bx + 5, by + 3, 8, b.color);
         VisualsEngine::DrawPixelText(b.subtext.c_str(), bx + 5, by + 12, 6, WHITE);
     }
 
-    // 4. 30-Frame Dramatic Super-Flash Cut-In Banner
+    // 3. Dramatic Super-Flash Cut-In Banner
     if (s_superFlashTimer > 0) {
         DrawRectangle(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT, Color{ 5, 8, 22, 195 });
         int bandY = SCREEN_HEIGHT / 2 - 24;
@@ -1421,18 +1500,18 @@ inline void DrawScreenHUDAndSuperFlash(const Fighter& p1, const Fighter& p2, con
         VisualsEngine::DrawPixelText(s_superFlashMove.c_str(), 28, bandY + 24, 14, WHITE);
     }
 
-    // 5. F1 Live Frame-Advantage & Input Buffer Telemetry Panel
+    // 4. F1 Live Frame-Advantage & Input Buffer Telemetry Panel
     if (s_debugHitboxes) {
-        DrawRectangle(6, SCREEN_HEIGHT - 54, SCREEN_WIDTH - 12, 36, Color{ 8, 10, 16, 225 });
-        DrawRectangleLines(6, SCREEN_HEIGHT - 54, SCREEN_WIDTH - 12, 36, Color{ 80, 240, 120, 220 });
+        DrawRectangle(6, SCREEN_HEIGHT - 42, SCREEN_WIDTH - 12, 36, Color{ 8, 10, 16, 225 });
+        DrawRectangleLines(6, SCREEN_HEIGHT - 42, SCREEN_WIDTH - 12, 36, Color{ 80, 240, 120, 220 });
         char p1Info[128];
         snprintf(p1Info, sizeof(p1Info), "P1 F:%d ADV:%+d ST:%d %s",
                  p1.GetStateFrame(), p1.GetLastFrameAdvantage(), (int)p1.GetState(), p1.GetCurrentAttack().name.c_str());
         char p2Info[128];
         snprintf(p2Info, sizeof(p2Info), "P2 F:%d ADV:%+d ST:%d %s",
                  p2.GetStateFrame(), p2.GetLastFrameAdvantage(), (int)p2.GetState(), p2.GetCurrentAttack().name.c_str());
-        VisualsEngine::DrawPixelText(p1Info, 10, SCREEN_HEIGHT - 51, 6, Color{ 110, 255, 140, 255 });
-        VisualsEngine::DrawPixelText(p2Info, 10, SCREEN_HEIGHT - 41, 6, Color{ 255, 190, 100, 255 });
+        VisualsEngine::DrawPixelText(p1Info, 10, SCREEN_HEIGHT - 39, 6, Color{ 110, 255, 140, 255 });
+        VisualsEngine::DrawPixelText(p2Info, 10, SCREEN_HEIGHT - 29, 6, Color{ 255, 190, 100, 255 });
 
         std::string hist = "BUF: ";
         for (int a = 11; a >= 0; a--) {
@@ -1445,7 +1524,7 @@ inline void DrawScreenHUDAndSuperFlash(const Fighter& p1, const Fighter& p2, con
             else if (hf.buttonsPressed & BTN_HK) hist += "S";
             hist.push_back(' ');
         }
-        VisualsEngine::DrawPixelText(hist.c_str(), 10, SCREEN_HEIGHT - 30, 6, Color{ 140, 220, 255, 255 });
+        VisualsEngine::DrawPixelText(hist.c_str(), 10, SCREEN_HEIGHT - 18, 6, Color{ 140, 220, 255, 255 });
     }
 }
 
@@ -1946,7 +2025,7 @@ SpecialMotionType InputManager::CheckSpecialMotion(int& outButtonUsed) {
 
     outButtonUsed = curr.buttonsPressed;
 
-    // Championship Edition: Check 236236 (Double QCF + Attack) for Omnibus Bill Super Combo
+    // Championship Edition: Check 236236 (Double QCF + Attack) for Turbo Super Combo
     if (curr.buttonsPressed & (BTN_LP | BTN_HP | BTN_LK | BTN_HK)) {
         int sStage = 0;
         for (int i = 26; i >= 0; i--) {
@@ -2273,51 +2352,58 @@ void AudioEngine::SynthesizeAll() {
     }
 
     {
-        int count = (int)(SAMPLE_RATE * 0.15f);
+        // Championship Edition CPS-1 Crisp FM + Transient Snap Light Hit
+        int count = (int)(SAMPLE_RATE * 0.18f);
         std::vector<int16_t> pcm(count);
-        float phase = 0.0f;
+        float phase = 0.0f, fmPhase = 0.0f;
         for (int i = 0; i < count; i++) {
             float t = (float)i / count;
-            float env = expf(-t * 18.0f);
-            float freq = 140.0f * expf(-t * 12.0f) + 45.0f;
-            phase += 2.0f * PI_F * freq / SAMPLE_RATE;
-            float bass = sinf(phase);
-            float snap = RandFloat() * expf(-t * 40.0f);
-            float s = (bass * 0.65f + snap * 0.45f) * env * 24000.0f;
+            float env = expf(-t * 15.0f);
+            float freq = 260.0f * expf(-t * 18.0f) + 58.0f;
+            fmPhase += 2.0f * PI_F * (freq * 3.5f) / SAMPLE_RATE;
+            phase += 2.0f * PI_F * (freq + sinf(fmPhase) * 180.0f * expf(-t * 25.0f)) / SAMPLE_RATE;
+            float punch = sinf(phase);
+            float crack = RandFloat() * expf(-t * 28.0f);
+            float s = (punch * 0.72f + crack * 0.65f) * env * 30000.0f;
             pcm[i] = (int16_t)std::clamp(s, -32000.0f, 32000.0f);
         }
         m_sounds[SFX_HIT_LIGHT] = BuildWaveformSound(SAMPLE_RATE, count, pcm.data());
     }
 
     {
-        int count = (int)(SAMPLE_RATE * 0.28f);
+        // Championship Edition CPS-1 Heavy Bone-Crushing Impact + Sub Drop + Metallic Ring
+        int count = (int)(SAMPLE_RATE * 0.34f);
         std::vector<int16_t> pcm(count);
-        float phase = 0.0f;
+        float phase = 0.0f, ringPhase = 0.0f;
         for (int i = 0; i < count; i++) {
             float t = (float)i / count;
-            float env = expf(-t * 10.0f);
-            float freq = 120.0f * expf(-t * 9.0f) + 36.0f;
+            float env = expf(-t * 8.5f);
+            float freq = 340.0f * expf(-t * 20.0f) + 42.0f;
             phase += 2.0f * PI_F * freq / SAMPLE_RATE;
-            float bass = sinf(phase) + 0.35f * sinf(phase * 0.5f);
-            float snap = RandFloat() * expf(-t * 30.0f);
-            float raw = (bass * 0.7f + snap * 0.5f) * env * 1.8f;
-            if (raw > 0.9f) raw = 0.9f + (raw - 0.9f) * 0.2f;
-            if (raw < -0.9f) raw = -0.9f + (raw + 0.9f) * 0.2f;
-            pcm[i] = (int16_t)(raw * 28000.0f);
+            ringPhase += 2.0f * PI_F * 520.0f / SAMPLE_RATE;
+            float sub = sinf(phase);
+            float sq = (sinf(phase * 1.5f) >= 0.0f) ? 0.85f : -0.85f;
+            float ring = sinf(ringPhase) * sinf(phase * 3.0f) * expf(-t * 18.0f);
+            float crunch = RandFloat() * expf(-t * 12.0f);
+            float s = (sub * 0.65f + sq * 0.38f + ring * 0.35f + crunch * 0.62f) * env * 31000.0f;
+            pcm[i] = (int16_t)std::clamp(s, -32000.0f, 32000.0f);
         }
         m_sounds[SFX_HIT_HEAVY] = BuildWaveformSound(SAMPLE_RATE, count, pcm.data());
     }
 
     {
-        int count = (int)(SAMPLE_RATE * 0.12f);
+        // Championship Edition CPS-1 Metallic Anvil Guard Clang
+        int count = (int)(SAMPLE_RATE * 0.18f);
         std::vector<int16_t> pcm(count);
+        float p1 = 0.0f, p2 = 0.0f, p3 = 0.0f;
         for (int i = 0; i < count; i++) {
             float t = (float)i / count;
-            float env = expf(-t * 28.0f);
-            float tone1 = sinf(2.0f * PI_F * 1150.0f * i / SAMPLE_RATE);
-            float tone2 = sinf(2.0f * PI_F * 1720.0f * i / SAMPLE_RATE);
-            float click = RandFloat() * expf(-t * 60.0f);
-            float s = (tone1 * 0.4f + tone2 * 0.3f + click * 0.5f) * env * 22000.0f;
+            float env = expf(-t * 16.0f);
+            p1 += 2.0f * PI_F * 780.0f / SAMPLE_RATE;
+            p2 += 2.0f * PI_F * 1240.0f / SAMPLE_RATE;
+            p3 += 2.0f * PI_F * 1890.0f / SAMPLE_RATE;
+            float fm = sinf(p1 + sinf(p2) * 2.2f) + sinf(p3) * 0.5f;
+            float s = (fm * 0.65f + RandFloat() * expf(-t * 35.0f) * 0.35f) * env * 28000.0f;
             pcm[i] = (int16_t)std::clamp(s, -32000.0f, 32000.0f);
         }
         m_sounds[SFX_BLOCK] = BuildWaveformSound(SAMPLE_RATE, count, pcm.data());
@@ -3122,85 +3208,91 @@ struct FMVoiceState {
 };
 
 void AudioEngine::SynthesizeBgmTracks() {
-
-    constexpr int LOOP_SAMPLES = 78400;
-    constexpr int STEPS = 32;
+    // Championship Edition 4-Voice YM2151 / OKI6295 Arcade Soundboard
+    // Faster 64-step arcade tracker with slap-bass, FM brass leads, fast arpeggiators,
+    // harmonic chord stabs, and gated-reverb arcade drums!
+    constexpr int LOOP_SAMPLES = 96000;
+    constexpr int STEPS = 64;
     constexpr int SAMPLES_PER_STEP = LOOP_SAMPLES / STEPS;
+
+    static const int ceBass[6][16] = {
+        // Track 0: Championship Edition Title / Select Overdrive Fanfare (A Minor / F / G / E)
+        { 110, 110, 220, 110, 87, 87, 175, 87, 98, 98, 196, 98, 82, 165, 123, 165 },
+        // Track 1: East Wing Turbo Funk (E Minor Slap Bass)
+        { 82, 82, 165, 98, 110, 110, 220, 98, 82, 82, 165, 123, 131, 123, 110, 98 },
+        // Track 2: Reflecting Pool CPS-1 Heroic Theme (C#m / A / B / G#m)
+        { 138, 138, 277, 138, 110, 110, 220, 110, 123, 123, 247, 123, 104, 208, 123, 138 },
+        // Track 3: Capitol & Press Room High-Stakes Showdown (D Minor Gallop)
+        { 73, 147, 147, 73, 87, 175, 175, 87, 98, 196, 196, 98, 110, 220, 110, 98 },
+        // Track 4: Final Boss / Pentagon / Island Theme (F Minor Doom Synth)
+        { 87, 175, 87, 175, 104, 208, 104, 208, 78, 156, 78, 156, 82, 165, 98, 131 },
+        // Track 5: Bonus Car / Hyper Turbo Theme (G Mixolydian)
+        { 98, 196, 123, 147, 165, 147, 123, 98, 110, 220, 138, 165, 185, 165, 138, 110 }
+    };
+
+    static const int ceLead[6][16] = {
+        // Track 0: Heroic Championship Brass Lead
+        { 440, 523, 659, 880, 784, 659, 523, 659, 587, 659, 784, 987, 880, 784, 659, 880 },
+        // Track 1: Syncopated FM Synth Lead
+        { 329, 392, 440, 494, 659, 587, 494, 440, 329, 392, 494, 659, 784, 659, 587, 494 },
+        // Track 2: Soaring Arcade Melody
+        { 554, 659, 740, 830, 740, 659, 554, 494, 554, 659, 830, 987, 880, 830, 740, 659 },
+        // Track 3: Intense Debate Lead
+        { 587, 698, 880, 698, 784, 880, 1046, 880, 784, 698, 659, 587, 659, 784, 880, 1174 },
+        // Track 4: Boss Cyber-Organ Lead
+        { 349, 415, 523, 698, 622, 523, 466, 415, 349, 466, 523, 698, 784, 698, 622, 523 },
+        // Track 5: Hyper Arcade Lead
+        { 392, 494, 587, 784, 659, 784, 880, 987, 880, 784, 659, 587, 659, 784, 987, 1174 }
+    };
 
     for (int t = 0; t < 6; t++) {
         m_bgmTracks[t].resize(LOOP_SAMPLES);
         FMVoiceState bassVoice;
         FMVoiceState leadVoice;
+        FMVoiceState arpVoice;
+        FMVoiceState chordVoice;
 
         for (int step = 0; step < STEPS; step++) {
-            float bassFreq = 55.0f;
-            float leadFreq = 0.0f;
-
-            if (t == 0) {
-
-                int bassNotes[8] = { 55, 55, 65, 55, 73, 65, 55, 49 };
-                bassFreq = (float)bassNotes[step % 8];
-                leadFreq = bassFreq * 4.0f;
-            } else if (t == 1) {
-
-                int bassRiff[16] = { 55, 55, 110, 55, 65, 55, 98, 55, 55, 55, 110, 65, 73, 65, 49, 52 };
-                bassFreq = (float)bassRiff[step % 16];
-                int leadRiff[16] = { 220, 0, 261, 293, 329, 0, 293, 261, 220, 261, 293, 349, 329, 293, 261, 196 };
-                leadFreq = (float)leadRiff[step % 16];
-            } else if (t == 2) {
-
-                int bassNotes[16] = { 65, 65, 65, 65, 58, 58, 58, 58, 49, 49, 49, 49, 55, 55, 62, 62 };
-                bassFreq = (float)bassNotes[step % 16];
-                int leadNotes[16] = { 261, 293, 329, 392, 329, 293, 261, 293, 329, 392, 440, 523, 440, 392, 329, 293 };
-                leadFreq = (float)leadNotes[step % 16];
-            } else if (t == 3) {
-
-                int bassNotes[16] = { 73, 73, 82, 73, 87, 73, 98, 73, 73, 82, 87, 98, 110, 98, 87, 82 };
-                bassFreq = (float)bassNotes[step % 16];
-                int leadNotes[16] = { 293, 329, 349, 392, 440, 392, 349, 329, 293, 349, 440, 523, 587, 523, 440, 349 };
-                leadFreq = (float)leadNotes[step % 16];
-            } else if (t == 4) {
-
-                int bassNotes[16] = { 41, 41, 82, 41, 49, 41, 73, 41, 41, 41, 82, 49, 55, 49, 41, 44 };
-                bassFreq = (float)bassNotes[step % 16];
-                leadFreq = bassFreq * 6.0f;
-            } else {
-
-                int bonusBass[16] = { 65, 65, 130, 65, 78, 65, 116, 65, 73, 65, 146, 73, 82, 73, 65, 78 };
-                bassFreq = (float)bonusBass[step % 16];
-                int bonusLead[16] = { 261, 329, 392, 523, 392, 329, 261, 392, 293, 349, 440, 587, 440, 349, 293, 440 };
-                leadFreq = (float)bonusLead[step % 16];
+            float bassFreq = (float)ceBass[t][step % 16];
+            float leadFreq = (float)ceLead[t][(step / 2) % 16];
+            if ((step >= 32) && (step % 4 == 0)) {
+                leadFreq *= 1.25f; // Second-half phrase lift
             }
+            float arpMult = (step % 3 == 0) ? 2.0f : ((step % 3 == 1) ? 2.5f : 3.0f);
+            float arpFreq = bassFreq * arpMult;
+            float chordFreq = bassFreq * 1.5f;
 
             for (int s = 0; s < SAMPLES_PER_STEP; s++) {
                 int sampleIdx = step * SAMPLES_PER_STEP + s;
                 float stepT = (float)s / SAMPLES_PER_STEP;
 
-                float bassEnv = expf(-stepT * 5.0f);
-                float leadEnv = sinf(stepT * PI_F * 0.9f);
+                float bassEnv = expf(-stepT * 4.2f);
+                float leadEnv = (stepT < 0.08f) ? (stepT / 0.08f) : expf(-(stepT - 0.08f) * 2.2f);
+                float arpEnv = expf(-stepT * 7.5f);
+                float chordEnv = ((step % 8 == 0) || (step % 8 == 3) || (step % 8 == 6)) ? expf(-stepT * 3.5f) : 0.0f;
 
+                // CPS-1 Gated Drums (Double-Kick, Snare, Tom Fills & Hi-Hats)
                 float drum = 0.0f;
-
-                if ((step % 4) == 0) {
-                    drum += sinf(2.0f * PI_F * (130.0f * expf(-stepT * 20.0f)) * ((float)s / SAMPLE_RATE)) * expf(-stepT * 10.0f) * 0.55f;
+                if ((step % 4 == 0) || (step % 16 == 14) || (step % 16 == 15)) {
+                    float kFreq = 165.0f * expf(-stepT * 22.0f) + 42.0f;
+                    drum += sinf(2.0f * PI_F * kFreq * ((float)s / SAMPLE_RATE)) * expf(-stepT * 8.0f) * 0.65f;
                 }
-
-                if ((step % 4) == 2) {
+                if ((step % 4 == 2)) {
                     float noise = ((float)rand() / (float)RAND_MAX * 2.0f - 1.0f);
-                    drum += noise * expf(-stepT * 10.0f) * 0.38f;
+                    float body = sinf(2.0f * PI_F * 195.0f * ((float)s / SAMPLE_RATE)) * expf(-stepT * 14.0f);
+                    drum += (noise * 0.72f + body * 0.45f) * expf(-stepT * 7.5f) * 0.50f;
                 }
-
                 float hatNoise = ((float)rand() / (float)RAND_MAX * 2.0f - 1.0f);
-                drum += hatNoise * expf(-stepT * 32.0f) * 0.12f;
+                float hatDecay = (step % 2 == 1) ? 18.0f : 36.0f;
+                drum += hatNoise * expf(-stepT * hatDecay) * 0.16f;
 
-                float bass = bassVoice.Process(bassFreq, 2.0f, 2.0f, bassEnv) * 0.42f;
-                float lead = 0.0f;
-                if (leadFreq > 50.0f) {
-                    lead = leadVoice.Process(leadFreq, 3.0f, 1.4f, leadEnv) * 0.22f;
-                }
+                float bass = bassVoice.Process(bassFreq, 2.0f, 2.6f, bassEnv) * 0.42f;
+                float lead = leadVoice.Process(leadFreq, 1.0f, 1.8f, leadEnv) * 0.28f;
+                float arp = arpVoice.Process(arpFreq, 3.0f, 1.2f, arpEnv) * 0.16f;
+                float chord = chordVoice.Process(chordFreq, 2.0f, 1.1f, chordEnv) * 0.18f;
 
-                float mix = (bass + lead + drum) * 0.55f;
-                m_bgmTracks[t][sampleIdx] = (int16_t)std::clamp(mix * 28000.0f, -32000.0f, 32000.0f);
+                float mix = (bass + lead + arp + chord + drum) * 0.62f;
+                m_bgmTracks[t][sampleIdx] = (int16_t)std::clamp(mix * 29500.0f, -32000.0f, 32000.0f);
             }
         }
     }
@@ -3221,7 +3313,6 @@ void AudioEngine::BgmAudioCallback(void* bufferData, unsigned int frames) {
             if (pos >= sz) pos = 0;
             out[i] = pcm[pos];
             if (fast) {
-                // 1.25x tempo acceleration when either fighter is in critical health (<30% HP)
                 fracAcc += 5;
                 pos += (fracAcc >> 2);
                 fracAcc &= 3;
@@ -3491,16 +3582,14 @@ void Fighter::ExecuteSpecial(SpecialMotionType motion, int buttonUsed, const Fig
     m_armor = 0;
     m_isSuperMove = false;
     m_multiHitsRemaining = 1;
-    AddSuperMeter(8.0f);
 
-    if (motion == MOTION_SUPER_OMNIBUS && m_superMeter >= 100.0f) {
-        m_superMeter = 0.0f;
+    if (motion == MOTION_SUPER_OMNIBUS) {
         m_isSuperMove = true;
         m_triggerSuperFlash = true;
         m_invincibleFrames = 18;
         m_multiHitsRemaining = 5;
         m_specialIndex = 2;
-        m_currentAttack = AttackData{ "OMNIBUS BILL SUPER", 4, 28, 18, 7, ATTACK_MID, 14, 30, 18, 5.2f, true, true, 44.0f, -34.0f, 46.0f, 38.0f, true, MOVE_SPECIAL };
+        m_currentAttack = AttackData{ "TOTAL VETO FLURRY", 4, 28, 18, 6, ATTACK_MID, 14, 30, 18, 5.2f, true, true, 44.0f, -34.0f, 46.0f, 38.0f, true, MOVE_SPECIAL };
         m_vel = Vector2{ m_facingRight ? 5.2f : -5.2f, -2.5f };
         AudioEngine::Instance().PlaySfx(SFX_VOICE_TOTAL_VETO, 1.0f);
         AudioEngine::Instance().PlaySfx(SFX_UPPERCUT, 1.1f);
@@ -3997,7 +4086,6 @@ bool Fighter::TryExecuteBufferedMove(const Fighter& opponent) {
         if (btn == (BTN_LP | BTN_LK)) {
             StartNormalAttack(MOVE_HEAVY_PUNCH, "Bipartisan Toss", 3, 4, 14, 20, ATTACK_THROW, 14, 28, 0, 5.2f, true, 24.0f, -30.0f, 26.0f, 30.0f);
             m_currentAttack.causesKnockdown = true;
-            AddSuperMeter(8.0f);
             return true;
         } else if (btn == BTN_LP) {
             const char* name = (m_charId == CHAR_BILLARY) ?
@@ -4005,7 +4093,6 @@ bool Fighter::TryExecuteBufferedMove(const Fighter& opponent) {
                 (crouch ? "Crouch Jab" : "Stand Jab");
             if (crouch) StartNormalAttack(MOVE_LIGHT_PUNCH, name, 3, 3, 4, 6, ATTACK_MID, 6, 11, 8, 2.0f, false, 28.0f, -14.0f, 22.0f, 14.0f);
             else StartNormalAttack(MOVE_LIGHT_PUNCH, name, 3, 3, 5, 7, ATTACK_MID, 6, 12, 8, 2.2f, false, 32.0f, -34.0f, 24.0f, 14.0f);
-            AddSuperMeter(3.0f);
             return true;
         } else if (btn == BTN_HP) {
             const char* name = (m_charId == CHAR_BILLARY) ?
@@ -4013,7 +4100,6 @@ bool Fighter::TryExecuteBufferedMove(const Fighter& opponent) {
                 (crouch ? "Crouch Haymaker" : "Stand Haymaker");
             if (crouch) StartNormalAttack(MOVE_HEAVY_PUNCH, name, 5, 4, 12, 16, ATTACK_MID, 11, 22, 14, 3.8f, true, 30.0f, -24.0f, 28.0f, 24.0f);
             else StartNormalAttack(MOVE_HEAVY_PUNCH, name, 5, 4, 12, 18, ATTACK_OVERHEAD, 11, 24, 16, 4.2f, true, 36.0f, -36.0f, 32.0f, 20.0f);
-            AddSuperMeter(6.0f);
             return true;
         } else if (btn == BTN_LK) {
             const char* name = (m_charId == CHAR_BILLARY) ?
@@ -4021,7 +4107,6 @@ bool Fighter::TryExecuteBufferedMove(const Fighter& opponent) {
                 (crouch ? "Crouch Light Kick" : "Stand Light Kick");
             if (crouch) StartNormalAttack(MOVE_LIGHT_KICK, name, 3, 3, 5, 7, ATTACK_LOW, 6, 12, 8, 2.0f, false, 32.0f, -8.0f, 26.0f, 14.0f);
             else StartNormalAttack(MOVE_LIGHT_KICK, name, 4, 3, 5, 8, ATTACK_MID, 6, 13, 9, 2.4f, false, 34.0f, -22.0f, 26.0f, 14.0f);
-            AddSuperMeter(3.0f);
             return true;
         } else if (btn == BTN_HK) {
             const char* name = (m_charId == CHAR_BILLARY) ?
@@ -4033,7 +4118,6 @@ bool Fighter::TryExecuteBufferedMove(const Fighter& opponent) {
             } else {
                 StartNormalAttack(MOVE_HEAVY_KICK, name, 6, 4, 13, 18, ATTACK_MID, 11, 25, 15, 4.4f, true, 36.0f, -38.0f, 30.0f, 22.0f);
             }
-            AddSuperMeter(6.0f);
             return true;
         }
     }
@@ -4076,7 +4160,6 @@ void Fighter::ApplyHit(int damage, AttackType type, int hitstop, int hitstun, fl
     if (m_invincibleFrames > 0) {
         return;
     }
-    AddSuperMeter(damage * 0.65f);
 
     if (m_charId == CHAR_SLEEPY_JOE && m_state == FSTATE_SPECIAL && m_specialIndex == 1) {
         AudioEngine::Instance().PlaySfx(SFX_SECRET_SERVICE, 1.0f);
@@ -4146,7 +4229,6 @@ void Fighter::ApplyHit(int damage, AttackType type, int hitstop, int hitstun, fl
 }
 
 void Fighter::ApplyBlock(int chipDamage, int blockstop, int blockstun, float pushback) {
-    AddSuperMeter(4.0f);
 
     if (chipDamage > 0) {
         m_health = std::max(1, m_health - chipDamage);
@@ -4287,10 +4369,7 @@ void Fighter::UpdatePhysics(const InputManager& input, const Fighter& opponent) 
     }
 
     if (input.IsButtonPressed(BTN_SPECIAL)) {
-        if (m_superMeter >= 100.0f && crouching) {
-            if (m_state == FSTATE_ATTACK) m_justCanceled = true;
-            ExecuteSpecial(MOTION_SUPER_OMNIBUS, BTN_HP, opponent);
-        } else if (grounded && (m_state == FSTATE_IDLE || m_state == FSTATE_WALK_FWD || m_state == FSTATE_WALK_BACK || m_state == FSTATE_CROUCH)) {
+        if (grounded && (m_state == FSTATE_IDLE || m_state == FSTATE_WALK_FWD || m_state == FSTATE_WALK_BACK || m_state == FSTATE_CROUCH)) {
             TriggerSignatureSpecial(opponent);
         } else if (m_state == FSTATE_ATTACK && (m_hitConnected || m_stateFrame < m_currentAttack.startupFrames + m_currentAttack.activeFrames + 4)) {
             m_justCanceled = true;
@@ -4663,7 +4742,6 @@ static void TestStrike(Fighter& attacker, Fighter& defender,
                 int chip = attack.isSpecial ? std::max(1, attack.damage / 5) : 0;
                 defender.ApplyBlock(chip, 6, attack.blockstunFrames, attack.pushback);
                 attacker.SetHitstop(6);
-                attacker.AddSuperMeter(5.0f);
                 attacker.SetLastFrameAdvantage(attack.blockstunFrames - remFrames);
                 defender.SetLastFrameAdvantage(remFrames - attack.blockstunFrames);
                 cameraShake = 1.2f;
@@ -4674,7 +4752,6 @@ static void TestStrike(Fighter& attacker, Fighter& defender,
                 int hs = attack.isSpecial ? 14 : (attack.isHeavy ? 11 : 6);
                 defender.ApplyHit(attack.damage, attack.type, hs, attack.hitstunFrames, attack.pushback, attack.causesKnockdown);
                 attacker.SetHitstop(hs);
-                attacker.AddSuperMeter(attack.isHeavy ? 12.0f : 7.0f);
                 attacker.AddComboHit();
                 defender.ResetCombo();
                 attacker.SetLastFrameAdvantage(attack.hitstunFrames - remFrames);
@@ -5245,6 +5322,7 @@ void StageManager::DrawMidLayer(float camX, float time) {
 }
 
 void StageManager::DrawPlayfield(float camX, float time) {
+    ChampionshipEdition::DrawStageUpgrades(m_stageId, camX, time);
     if (m_texturesLoaded && m_stageTextures[m_stageId].id > 0) {
 
         switch (m_stageId) {
@@ -5897,6 +5975,32 @@ void VisualsEngine::DrawFighterSprite(const Fighter& f) {
             dstRec.y = posY - 45.0f * baseScale;
         }
 
+        // Championship Edition: 1) CPS-1 Afterimage Shadow Trails on Specials/Jumps/Heavies
+        int pIdx = (f.GetPlayerIndex() == 0) ? 0 : 1;
+        for (const auto& gh : ChampionshipEdition::s_afterimages[pIdx]) {
+            float ghDx = gh.pos.x - posX;
+            float ghDy = gh.pos.y - posY;
+            Rectangle ghDst = dstRec;
+            ghDst.x += ghDx;
+            ghDst.y += ghDy;
+            unsigned char ga = (unsigned char)std::clamp(gh.life * 18, 20, 145);
+            Color ghCol = (state == FSTATE_SPECIAL) ? Color{ 70, 210, 255, ga } : Color{ 255, 210, 70, ga };
+            DrawTexturePro(tex, srcRec, ghDst, origin, rotation, ghCol);
+        }
+
+        // Championship Edition: 2) Dark CPS-1 Outer Silhouette & Specular Rim Bevel Pass
+        Rectangle rimDark = dstRec;
+        rimDark.x += (fr ? -1.5f : 1.5f);
+        rimDark.y += 1.5f;
+        DrawTexturePro(tex, srcRec, rimDark, origin, rotation, Color{ 10, 12, 22, 195 });
+
+        Rectangle rimLight = dstRec;
+        rimLight.x += (fr ? 1.0f : -1.0f);
+        rimLight.y -= 1.0f;
+        Color bevelTint = (state == FSTATE_SPECIAL) ? Color{ 255, 230, 90, 160 } : Color{ 220, 240, 255, 110 };
+        DrawTexturePro(tex, srcRec, rimLight, origin, rotation, bevelTint);
+
+        // Championship Edition: 3) Main Character Pass
         DrawTexturePro(tex, srcRec, dstRec, origin, rotation, tint);
 
         if (state == FSTATE_ATTACK) {
@@ -6548,14 +6652,40 @@ void VisualsEngine::DrawBattleHUD(const Fighter& p1, const Fighter& p2, int roun
     }
 
     int p1HealthW = (int)((p1Hp / 100.0f) * BAR_WIDTH);
-    DrawRectangle(20, TOP_Y, BAR_WIDTH + 4, BAR_HEIGHT + 4, Color{ 20, 20, 25, 230 });
-    DrawRectangle(22, TOP_Y + 2, BAR_WIDTH, BAR_HEIGHT, Color{ 160, 30, 30, 255 });
-    DrawRectangle(22 + (BAR_WIDTH - p1HealthW), TOP_Y + 2, p1HealthW, BAR_HEIGHT, Color{ 240, 210, 40, 255 });
+    int p1TrailW = (int)((std::max(p1Hp, ChampionshipEdition::s_p1TrailHp) / 100.0f) * BAR_WIDTH);
+    DrawRectangle(20, TOP_Y, BAR_WIDTH + 4, BAR_HEIGHT + 4, Color{ 12, 14, 24, 240 });
+    DrawRectangleLines(20, TOP_Y, BAR_WIDTH + 4, BAR_HEIGHT + 4, Color{ 235, 195, 55, 255 });
+    DrawRectangle(22, TOP_Y + 2, BAR_WIDTH, BAR_HEIGHT, Color{ 75, 15, 20, 255 });
+    DrawRectangle(22 + (BAR_WIDTH - p1TrailW), TOP_Y + 2, p1TrailW, BAR_HEIGHT, Color{ 235, 55, 45, 255 });
+    Color p1BarTop = (p1Hp < 30.0f && ((int)(GetTime() * 14.0f) % 2 == 0)) ? Color{ 255, 120, 40, 255 } : Color{ 255, 235, 65, 255 };
+    DrawRectangleGradientV(22 + (BAR_WIDTH - p1HealthW), TOP_Y + 2, p1HealthW, BAR_HEIGHT, p1BarTop, Color{ 210, 155, 15, 255 });
 
     int p2HealthW = (int)((p2Hp / 100.0f) * BAR_WIDTH);
-    DrawRectangle(SCREEN_WIDTH - 24 - BAR_WIDTH, TOP_Y, BAR_WIDTH + 4, BAR_HEIGHT + 4, Color{ 20, 20, 25, 230 });
-    DrawRectangle(SCREEN_WIDTH - 22 - BAR_WIDTH, TOP_Y + 2, BAR_WIDTH, BAR_HEIGHT, Color{ 160, 30, 30, 255 });
-    DrawRectangle(SCREEN_WIDTH - 22 - BAR_WIDTH, TOP_Y + 2, p2HealthW, BAR_HEIGHT, Color{ 240, 210, 40, 255 });
+    int p2TrailW = (int)((std::max(p2Hp, ChampionshipEdition::s_p2TrailHp) / 100.0f) * BAR_WIDTH);
+    DrawRectangle(SCREEN_WIDTH - 24 - BAR_WIDTH, TOP_Y, BAR_WIDTH + 4, BAR_HEIGHT + 4, Color{ 12, 14, 24, 240 });
+    DrawRectangleLines(SCREEN_WIDTH - 24 - BAR_WIDTH, TOP_Y, BAR_WIDTH + 4, BAR_HEIGHT + 4, Color{ 235, 195, 55, 255 });
+    DrawRectangle(SCREEN_WIDTH - 22 - BAR_WIDTH, TOP_Y + 2, BAR_WIDTH, BAR_HEIGHT, Color{ 75, 15, 20, 255 });
+    DrawRectangle(SCREEN_WIDTH - 22 - BAR_WIDTH, TOP_Y + 2, p2TrailW, BAR_HEIGHT, Color{ 235, 55, 45, 255 });
+    Color p2BarTop = (p2Hp < 30.0f && ((int)(GetTime() * 14.0f) % 2 == 0)) ? Color{ 255, 120, 40, 255 } : Color{ 255, 235, 65, 255 };
+    DrawRectangleGradientV(SCREEN_WIDTH - 22 - BAR_WIDTH, TOP_Y + 2, p2HealthW, BAR_HEIGHT, p2BarTop, Color{ 210, 155, 15, 255 });
+
+    // Championship Edition Live HUD Portrait Busts (bruised/sweating when HP < 30%)
+    if (s_loaded) {
+        int c1Id = (int)p1.GetCharacterId();
+        int c2Id = (int)p2.GetCharacterId();
+        Texture2D port1 = (p1Hp < 30.0f && s_portraitsLose[c1Id].id > 0) ? s_portraitsLose[c1Id] : s_portraits[c1Id];
+        Texture2D port2 = (p2Hp < 30.0f && s_portraitsLose[c2Id].id > 0) ? s_portraitsLose[c2Id] : s_portraits[c2Id];
+        if (port1.id > 0) {
+            DrawRectangle(2, TOP_Y - 2, 17, 18, Color{ 15, 18, 28, 240 });
+            DrawTexturePro(port1, Rectangle{ 0, 0, (float)port1.width, (float)port1.height }, Rectangle{ 3, (float)TOP_Y - 1, 15, 16 }, Vector2{ 0, 0 }, 0.0f, WHITE);
+            DrawRectangleLines(2, TOP_Y - 2, 17, 18, (p1Hp < 30.0f) ? Color{ 255, 60, 60, 255 } : Color{ 235, 195, 55, 255 });
+        }
+        if (port2.id > 0) {
+            DrawRectangle(SCREEN_WIDTH - 19, TOP_Y - 2, 17, 18, Color{ 15, 18, 28, 240 });
+            DrawTexturePro(port2, Rectangle{ 0, 0, -(float)port2.width, (float)port2.height }, Rectangle{ (float)SCREEN_WIDTH - 18, (float)TOP_Y - 1, 15, 16 }, Vector2{ 0, 0 }, 0.0f, WHITE);
+            DrawRectangleLines(SCREEN_WIDTH - 19, TOP_Y - 2, 17, 18, (p2Hp < 30.0f) ? Color{ 255, 60, 60, 255 } : Color{ 235, 195, 55, 255 });
+        }
+    }
 
     DrawPixelText(p1.GetName().c_str(), 22, TOP_Y - 11, 10, Color{ 255, 220, 60, 255 });
     int p2NameW = MeasureText(p2.GetName().c_str(), 10);
@@ -6591,6 +6721,29 @@ void VisualsEngine::DrawCinematicIntro(float timer, bool logoDropped, const Shad
         Rectangle dstRec = { 0.0f, 0.0f, (float)SCREEN_WIDTH, (float)SCREEN_HEIGHT };
         DrawTexturePro(s_titleSplash, srcRec, dstRec, Vector2{ 0.0f, 0.0f }, 0.0f, WHITE);
 
+        // Championship Edition Metallic Arcade Ribbon & Plasma Sparks
+        float pulse = 0.5f + 0.5f * sinf(timer * 6.0f);
+        int banW = 248;
+        int banH = 22;
+        int banX = (SCREEN_WIDTH - banW) / 2;
+        int banY = SCREEN_HEIGHT - 48;
+        DrawRectangle(banX - 2, banY - 2, banW + 4, banH + 4, Color{ 15, 10, 25, 240 });
+        DrawRectangleGradientH(banX, banY, banW, banH, Color{ 180, 20, 35, 245 }, Color{ 40, 60, 170, 245 });
+        DrawRectangleLines(banX, banY, banW, banH, Color{ 255, 215, 50, 255 });
+        DrawRectangleLines(banX - 1, banY - 1, banW + 2, banH + 2, Color{ 255, 245, 150, (unsigned char)(140 + pulse * 115) });
+        int ctw = MeasureText("CHAMPIONSHIP EDITION", 14);
+        DrawPixelText("CHAMPIONSHIP EDITION", (SCREEN_WIDTH - ctw) / 2, banY + 4, 14, Color{ 255, 235, 70, 255 });
+
+        if (((int)(timer * 3.0f) % 2) == 0) {
+            int ptw = MeasureText("INSERT COIN / PRESS START", 10);
+            DrawRectangle((SCREEN_WIDTH - ptw) / 2 - 6, SCREEN_HEIGHT - 20, ptw + 12, 14, Color{ 10, 12, 20, 210 });
+            DrawPixelText("INSERT COIN / PRESS START", (SCREEN_WIDTH - ptw) / 2, SCREEN_HEIGHT - 18, 10, WHITE);
+        }
+        for (int s = 0; s < 12; s++) {
+            float sx = fmodf(s * 33.0f + timer * (25.0f + s * 3.0f), (float)SCREEN_WIDTH);
+            float sy = SCREEN_HEIGHT - fmodf(s * 19.0f + timer * (32.0f + s * 4.0f), (float)SCREEN_HEIGHT);
+            DrawCircle((int)sx, (int)sy, 1.5f, (s % 2 == 0) ? Color{ 255, 225, 80, 210 } : Color{ 100, 220, 255, 200 });
+        }
         return;
     }
 
