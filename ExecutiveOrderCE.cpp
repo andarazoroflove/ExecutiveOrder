@@ -48,7 +48,8 @@ enum CharacterId {
     CHAR_SOCIALIST = 12,
     CHAR_BILLARY = 13,
     CHAR_PALM_BEACH_PETE = 14,
-    CHARACTER_COUNT = 15
+    CHAR_THE_PUNDIT = 15,
+    CHARACTER_COUNT = 16
 };
 constexpr int PLAYABLE_CHARACTER_COUNT = 10;
 
@@ -65,7 +66,8 @@ enum StageId {
     STAGE_LINCOLN_MEMORIAL = 9,
     STAGE_SMITHSONIAN_AERO = 10,
     STAGE_TOMB_UNKNOWN = 11,
-    STAGE_COUNT = 12
+    STAGE_ENN_NEWS_STUDIO = 12,
+    STAGE_COUNT = 13
 };
 
 enum GameState {
@@ -892,7 +894,9 @@ private:
 // - 12-Part Articulated Hierarchical Character Rig & 5-Node Verlet Tie Physics
 // - CPS-1 3-Tone Silhouette Rim, Specular Bevels & Afterimage Shadow Trails
 // - Dynamic Stage Searchlights, Paparazzi Flashes, Weather & Perspective Floor
-// - Upgraded CPS-1 HUD with Live Bruised Portraits & Red-Damage Drain Trails
+// - Live Stage Animations (Clapping Lincoln, Predator Drone, Eternal Flame, ENN Studio)
+// - Karl Rove ("The Pundit") Real-Time "DECISION 2028" Whiteboard Map Markup
+// - 2-Continue Campaign Rematch System
 // - F1 Live Hitbox/Hurtbox/Pushbox & Frame-Advantage Debug Overlay
 // ============================================================================
 #include <cstdlib>
@@ -907,6 +911,8 @@ static int  s_superFlashPlayer = 0;
 static std::string s_superFlashMove = "TOTAL VETO FLURRY!";
 static float s_p1TrailHp = 100.0f;
 static float s_p2TrailHp = 100.0f;
+static int   s_continuesRemaining = 2;
+static bool  s_isSecretMatch = false;
 
 struct CEAfterimage {
     Vector2 pos;
@@ -1248,8 +1254,8 @@ inline void DrawStageUpgrades(StageId stageId, float camX, float time) {
             // Drifting Cherry Blossom Petals / Confetti
             DrawCircle((int)px, (int)py, 2.0f, Color{ 255, 185, 215, 210 });
             DrawPixel((int)px + 1, (int)py, WHITE);
-        } else if (stageId == STAGE_CONGRESSIONAL_FLOOR || stageId == STAGE_PRESS_BRIEFING || stageId == STAGE_WTC_PLAZA || stageId == STAGE_SMITHSONIAN_AERO) {
-            // Fluttering Legal Subpoenas / Press Notes / Museum Pamphlets
+        } else if (stageId == STAGE_CONGRESSIONAL_FLOOR || stageId == STAGE_PRESS_BRIEFING || stageId == STAGE_WTC_PLAZA || stageId == STAGE_SMITHSONIAN_AERO || stageId == STAGE_ENN_NEWS_STUDIO) {
+            // Fluttering Legal Subpoenas / Press Notes / Broadcast Script Pages
             float sway = sinf(time * 5.0f + p) * 3.0f;
             DrawRectangle((int)(px + sway), (int)py, 4, 3, Color{ 250, 245, 220, 195 });
         } else {
@@ -1259,7 +1265,7 @@ inline void DrawStageUpgrades(StageId stageId, float camX, float time) {
         }
     }
 
-    // 5. Stage-Specific Live Animations for the 3 New Championship Edition Venues
+    // 5. Stage-Specific Live Animations for the 4 New Championship Edition Venues
     float minCam = STAGE_MIN_X;
     float maxCam = STAGE_MAX_X - SCREEN_WIDTH;
     float scrollT = std::clamp((camX - minCam) / (maxCam - minCam), 0.0f, 1.0f);
@@ -1279,7 +1285,6 @@ inline void DrawStageUpgrades(StageId stageId, float camX, float time) {
         int lincHandsY = (int)BgY(186.0f);
         int lincHeadY = (int)BgY(115.0f);
 
-        // Animated marble hands clapping together directly over Lincoln's sculpted hands
         Color marbleBase{ 242, 240, 234, 255 };
         Color marbleShadow{ 165, 162, 156, 255 };
         DrawCircle((int)(lincX - 2.0f - clapGap), lincHandsY, 3.2f, marbleShadow);
@@ -1287,7 +1292,6 @@ inline void DrawStageUpgrades(StageId stageId, float camX, float time) {
         DrawCircle((int)(lincX + 2.0f + clapGap), lincHandsY, 3.2f, marbleShadow);
         DrawCircle((int)(lincX + 2.0f + clapGap), lincHandsY, 2.4f, marbleBase);
 
-        // Impact clap burst & Lincoln cheering callout as the fight intensifies
         if (clapWave < 0.35f) {
             DrawCircleLines(lincX, lincHandsY, 6.0f + (0.35f - clapWave) * 22.0f, Color{ 255, 235, 110, 225 });
             DrawLine(lincX - 8, lincHandsY - 5, lincX - 13, lincHandsY - 9, Color{ 255, 245, 160, 235 });
@@ -1315,11 +1319,9 @@ inline void DrawStageUpgrades(StageId stageId, float camX, float time) {
         DrawLine(droneNoseX, droneNoseY, (int)scanX, (int)GROUND_Y - 8, Color{ 255, 45, 45, 70 });
         DrawCircle((int)scanX, (int)GROUND_Y - 8, 2.5f, Color{ 255, 60, 60, 175 });
 
-        // B. Spinning P-51 Mustang Propeller in Center Rafters & Wright Flyer Twin Props
         float p51Span = cosf(time * 44.0f) * 12.0f;
         DrawLine((int)BgX(492.0f), (int)BgY(192.0f) - (int)p51Span, (int)BgX(492.0f), (int)BgY(192.0f) + (int)p51Span, Color{ 225, 235, 250, 195 });
 
-        // C. Sally Ride by the Space Shuttle & Wright Brothers by the 1903 Wright Flyer Cheering Callouts
         int sallyX = (int)BgX(292.0f);
         int sallyY = (int)BgY(320.0f);
         int wrightX = (int)BgX(955.0f);
@@ -1336,7 +1338,7 @@ inline void DrawStageUpgrades(StageId stageId, float camX, float time) {
             VisualsEngine::DrawPixelText("FIRST FLIGHT!", wrightX - wtw / 2, wrightY - 10, 5, Color{ 255, 225, 120, 255 });
         }
     } else if (stageId == STAGE_TOMB_UNKNOWN) {
-        // A. The Eternal Flame Burning Brightly in the Bronze Brazier Pedestal (Right Midground: BgX(918), BgY(298))
+        // A. The Eternal Flame Burning Brightly in the Bronze Brazier Pedestal
         float flameX = BgX(918.0f);
         float flameY = BgY(298.0f);
         float flicker1 = sinf(time * 17.0f) * 3.0f;
@@ -1362,7 +1364,6 @@ inline void DrawStageUpgrades(StageId stageId, float camX, float time) {
             DrawCircle((int)ex, (int)ey, 1.2f, (e % 2 == 0) ? Color{ 255, 235, 95, 235 } : Color{ 255, 120, 30, 215 });
         }
 
-        // B. Tomb Sentinels Bayonet Glint & 21-Step Heel-Click Cadence Along the Black Mat
         int bayonetX = (int)BgX(398.0f);
         int bayonetY = (int)BgY(260.0f);
         if (fmodf(time * 2.2f, 1.0f) < 0.35f) {
@@ -1375,6 +1376,51 @@ inline void DrawStageUpgrades(StageId stageId, float camX, float time) {
         float stepWave = fmodf(time * 1.5f, 1.0f);
         if (stepWave < 0.28f) {
             DrawCircleLines(heelX, heelY, 4.0f + stepWave * 22.0f, Color{ 255, 225, 120, 190 });
+        }
+    } else if (stageId == STAGE_ENN_NEWS_STUDIO) {
+        // A. Blinking Red "ON AIR" Pedestal Camera Tally Lights & Lens Glints
+        if (fmodf(time * 2.4f, 1.0f) < 0.65f) {
+            int cam1X = (int)BgX(118.0f);
+            int cam1Y = (int)BgY(276.0f);
+            int cam2X = (int)BgX(298.0f);
+            int cam2Y = (int)BgY(320.0f);
+            DrawCircle(cam1X, cam1Y, 4.0f, Color{ 255, 30, 30, 180 });
+            DrawCircle(cam1X, cam1Y, 2.0f, WHITE);
+            DrawCircle(cam2X, cam2Y, 3.5f, Color{ 255, 30, 30, 180 });
+            DrawCircle(cam2X, cam2Y, 1.8f, WHITE);
+        }
+
+        // B. Glowing ENN News Desk Pulse & Live Talking Heads Callouts (Sean Hannity, Anderson Cooper, Laura Ingraham)
+        int deskX = (int)BgX(565.0f);
+        int deskY = (int)BgY(418.0f);
+        float deskPulse = 0.5f + 0.5f * sinf(time * 6.0f);
+        DrawCircle(deskX, deskY, 16.0f + deskPulse * 6.0f, Color{ 255, 40, 50, (unsigned char)(28 + deskPulse * 35) });
+
+        int cycle = ((int)(time * 0.9f)) % 3;
+        if (cycle == 0) {
+            // Sean Hannity (Seated in Left Studio Audience)
+            int hx = (int)BgX(268.0f);
+            int hy = (int)BgY(218.0f);
+            int tw = MeasureText("HANNITY: BREAKING!", 5);
+            DrawRectangle(hx - tw / 2 - 2, hy, tw + 4, 8, Color{ 15, 25, 65, 230 });
+            DrawRectangleLines(hx - tw / 2 - 2, hy, tw + 4, 8, Color{ 255, 70, 70, 240 });
+            VisualsEngine::DrawPixelText("HANNITY: BREAKING!", hx - tw / 2, hy + 2, 5, Color{ 255, 225, 90, 255 });
+        } else if (cycle == 1) {
+            // Anderson Cooper (Seated in Left-Center Studio Audience)
+            int cx = (int)BgX(352.0f);
+            int cy = (int)BgY(216.0f);
+            int tw = MeasureText("COOPER: ENN 360!", 5);
+            DrawRectangle(cx - tw / 2 - 2, cy, tw + 4, 8, Color{ 15, 35, 75, 230 });
+            DrawRectangleLines(cx - tw / 2 - 2, cy, tw + 4, 8, Color{ 90, 215, 255, 240 });
+            VisualsEngine::DrawPixelText("COOPER: ENN 360!", cx - tw / 2, cy + 2, 5, Color{ 150, 235, 255, 255 });
+        } else {
+            // Laura Ingraham (Seated in Right Studio Audience)
+            int ix = (int)BgX(795.0f);
+            int iy = (int)BgY(216.0f);
+            int tw = MeasureText("INGRAHAM: THE ANGLE!", 5);
+            DrawRectangle(ix - tw / 2 - 2, iy, tw + 4, 8, Color{ 65, 15, 35, 230 });
+            DrawRectangleLines(ix - tw / 2 - 2, iy, tw + 4, 8, Color{ 255, 195, 60, 240 });
+            VisualsEngine::DrawPixelText("INGRAHAM: THE ANGLE!", ix - tw / 2, iy + 2, 5, Color{ 255, 230, 110, 255 });
         }
     }
 }
@@ -1509,7 +1555,49 @@ inline void UpdateAndTrackFighters(Fighter& p1, Fighter& p2) {
 }
 
 inline void DrawFighterWorldOverlays(const Fighter& f) {
-    // 1. Bold CPS-1 Motion-Blur Smear Slash Arcs during Active Attack Frames
+    // 1. Karl Rove ("The Pundit"): Real-Time "DECISION 2028" Whiteboard Map Markup Animation!
+    if (f.GetCharacterId() == CHAR_THE_PUNDIT && f.GetState() == FSTATE_SPECIAL && f.GetSpecialIndex() == 1) {
+        int fr = f.GetStateFrame();
+        float dir = f.IsFacingRight() ? 1.0f : -1.0f;
+        int wbCenterX = (int)(f.GetPosition().x + dir * 39.0f);
+        int wbW = 76;
+        int wbX = wbCenterX - wbW / 2;
+        int wbY = (int)(f.GetPosition().y - 80.0f);
+
+        // Top Header Banner "DECISION 2028" aligned to the top of Karl's Whiteboard (always un-mirrored!)
+        DrawRectangle(wbX - 1, wbY - 1, wbW + 2, 13, Color{ 220, 30, 40, 255 });
+        DrawRectangle(wbX, wbY, wbW, 11, Color{ 16, 38, 105, 255 });
+        VisualsEngine::DrawPixelText("DECISION 2028", wbX + 3, wbY + 1, 10, Color{ 255, 235, 80, 255 });
+
+        // Progressive Real-Time Map Highlighting & Markup on the Whiteboard
+        int mapX = wbCenterX - 28;
+        int mapY = wbY + 14;
+        if (fr >= 2) {
+            // West & Midwest Blue/Red State Highlights
+            DrawRectangleLines(mapX + 2, mapY + 2, 12, 14, Color{ 35, 115, 255, 255 });
+            DrawRectangleLines(mapX + 15, mapY + 2, 14, 11, Color{ 255, 45, 55, 255 });
+        }
+        if (fr >= 5) {
+            // Swing States & Trajectory Arrows
+            DrawRectangleLines(mapX + 18, mapY + 14, 14, 10, Color{ 255, 45, 55, 255 });
+            DrawLine(mapX + 12, mapY + 10, mapX + 46, mapY + 6, Color{ 255, 230, 60, 255 });
+            DrawLine(mapX + 20, mapY + 18, mapX + 48, mapY + 20, Color{ 40, 220, 255, 255 });
+        }
+        if (fr >= 7) {
+            // Circled "270!" Electoral Victory Badge on Bottom Corner of Board
+            int badgeX = wbCenterX + (f.IsFacingRight() ? 8 : -32);
+            int badgeY = wbY + 25;
+            DrawRectangle(badgeX - 2, badgeY - 1, 28, 12, Color{ 255, 250, 240, 245 });
+            DrawRectangleLines(badgeX - 2, badgeY - 1, 28, 12, Color{ 225, 30, 40, 255 });
+            VisualsEngine::DrawPixelText("270!", badgeX, badgeY, 10, Color{ 220, 20, 30, 255 });
+        }
+        // Moving Dry-Erase Marker Tip Scribbling Live on the Map
+        int penX = mapX + 8 + ((fr * 7) % 40);
+        int penY = mapY + 5 + ((fr * 5) % 18);
+        DrawCircle(penX, penY, 2.5f, (fr % 2 == 0) ? Color{ 255, 45, 55, 255 } : Color{ 45, 130, 255, 255 });
+    }
+
+    // 2. Bold CPS-1 Motion-Blur Smear Slash Arcs during Active Attack Frames
     if (f.GetState() == FSTATE_ATTACK || f.GetState() == FSTATE_SPECIAL) {
         int su = f.GetCurrentAttack().startupFrames;
         int ac = f.GetCurrentAttack().activeFrames;
@@ -3644,6 +3732,14 @@ void Fighter::InitCharacterProfile() {
         m_color2 = Color{ 215, 185, 70, 255 };
         m_colorSkin = Color{ 235, 190, 160, 255 };
         break;
+    case CHAR_THE_PUNDIT:
+        m_name = "The Pundit";
+        m_walkFwdSpeed = 1.95f;
+        m_walkBackSpeed = 1.45f;
+        m_color1 = Color{ 25, 42, 85, 255 };
+        m_color2 = Color{ 215, 35, 45, 255 };
+        m_colorSkin = Color{ 245, 200, 175, 255 };
+        break;
     default:
         break;
     }
@@ -3694,6 +3790,12 @@ void Fighter::SpawnProjectile(int type, float vx, float vy, int damage) {
 
         p.pos.y = GROUND_Y - 32.0f;
         p.pos.x = m_pos.x + (m_facingRight ? -30.0f : 30.0f);
+    } else if (type == 9) {
+        // Karl Rove's "DECISION 2028" Whiteboard Map State & "270!" Projectile
+        p.pos.x = m_pos.x + (m_facingRight ? 34.0f : -34.0f);
+        p.pos.y = m_pos.y - 40.0f;
+        p.width = 26.0f;
+        p.height = 20.0f;
     }
     p.damage = damage;
     p.lifetime = (type == 3) ? 180 : ((type == 7) ? 80 : 140);
@@ -4032,6 +4134,22 @@ void Fighter::ExecuteSpecial(SpecialMotionType motion, int buttonUsed, const Fig
             AudioEngine::Instance().PlaySfx(SFX_HIT_HEAVY, 1.0f);
         }
         break;
+
+    case CHAR_THE_PUNDIT:
+        if (motion == MOTION_DP_P || motion == MOTION_DP_K) {
+            m_specialIndex = 2;
+            m_currentAttack = AttackData{ "Karl's Polling Slam", 5, 12, 16, 20, ATTACK_OVERHEAD, 12, 26, 14, 4.4f, true, true, 42.0f, -36.0f, 40.0f, 30.0f };
+            m_vel = Vector2{ m_facingRight ? 2.2f : -2.2f, -6.5f };
+            AudioEngine::Instance().PlaySfx(SFX_GAVEL_SLAM, 1.15f);
+        } else {
+            // Signature Special: Pulls out "DECISION 2028" Whiteboard, draws map in real time, & shoots map states!
+            m_specialIndex = 1;
+            m_currentAttack = AttackData{ "DECISION 2028 MAP", 10, 20, 16, 18, ATTACK_PROJECTILE, 12, 24, 14, 4.2f, true, true, 52.0f, -36.0f, 48.0f, 32.0f };
+            SpawnProjectile(9, isHeavy ? 4.8f : 3.8f, -0.25f, 10);
+            AudioEngine::Instance().PlaySfx(SFX_ELECTRO_GLITCH, 1.3f);
+            AudioEngine::Instance().PlaySfx(SFX_FIREBALL_LAUNCH, 1.05f);
+        }
+        break;
     }
 
     m_currentAttack.isSpecial = true;
@@ -4101,6 +4219,7 @@ void Fighter::TriggerSignatureSpecial(const Fighter& opponent) {
         ExecuteSpecial(MOTION_QCF_P, BTN_HP, opponent);
         break;
     case CHAR_PALM_BEACH_PETE:
+    case CHAR_THE_PUNDIT:
         ExecuteSpecial(MOTION_QCF_P, BTN_HP, opponent);
         break;
     default:
@@ -4165,6 +4284,7 @@ bool Fighter::HasSpeechTaunt() const {
     case CHAR_BILLARY:
     case CHAR_SLEEPY_JOE:
     case CHAR_MTG:
+    case CHAR_THE_PUNDIT:
         return true;
     default:
         return false;
@@ -4184,6 +4304,7 @@ const char* Fighter::GetTauntQuote() const {
     case CHAR_POPULIST:         return "SMILE! :)";
     case CHAR_WAR_PIG:          return "BRING IT!";
     case CHAR_BILLARY:          return m_facingRight ? "OH YEAH!" : "DELETED!";
+    case CHAR_THE_PUNDIT:       return (rand() % 2 == 0) ? "DECISION 2028: 270!" : "CHECK THE WHITEBOARD!";
     case CHAR_SLEEPY_JOE:       return (rand() % 2 == 0) ? "this is a big fkin deal." : "Hunter's Laptop!";
     case CHAR_MTG: {
         static int mtgTauntCycle = 0;
@@ -4623,6 +4744,11 @@ void Fighter::UpdatePhysics(const InputManager& input, const Fighter& opponent) 
         if (m_multiHitsRemaining > 1 && m_stateFrame > m_currentAttack.startupFrames && (m_stateFrame % 5 == 0)) {
             m_hitConnected = false;
             m_multiHitsRemaining--;
+        }
+        // Karl Rove ("The Pundit"): Real-time whiteboard map drawing shoots additional electoral states off the board!
+        if (m_charId == CHAR_THE_PUNDIT && m_specialIndex == 1 && (m_stateFrame == 12 || m_stateFrame == 20)) {
+            SpawnProjectile(9, (m_stateFrame == 12) ? 4.4f : 5.3f, (m_stateFrame == 12) ? 0.22f : 0.0f, 10);
+            AudioEngine::Instance().PlaySfx(SFX_FIREBALL_LAUNCH, 1.15f);
         }
 
         if (m_charId == CHAR_TECH_VISIONARY && m_specialIndex == 3 && m_stateFrame == 12) {
@@ -5066,6 +5192,13 @@ StageManager::StageManager() {
         Color{ 215, 210, 205, 255 }, Color{ 145, 142, 140, 255 },
         Color{ 255, 185, 50, 255 }
     };
+
+    m_venues[STAGE_ENN_NEWS_STUDIO] = VenueDetails{
+        "ENN NEWS STUDIO", "EXECUTIVE NEWS NETWORK - LIVE",
+        Color{ 14, 22, 48, 255 }, Color{ 30, 55, 110, 255 },
+        Color{ 195, 25, 35, 255 }, Color{ 25, 35, 60, 255 },
+        Color{ 255, 60, 60, 255 }
+    };
 }
 
 StageManager::~StageManager() {
@@ -5094,7 +5227,8 @@ void StageManager::Init() {
     const char* namedStages[STAGE_COUNT] = {
         "stage_0.png", "stage_1.png", "stage_2.png", "stage_3.png", "stage_4.png", "stage_5.png",
         "stage_wtc_plaza.png", "stage_comet_ping_pong.png", "stage_florida_keys.png",
-        "stage_lincoln_memorial.png", "stage_smithsonian_aero.png", "stage_tomb_unknown.png"
+        "stage_lincoln_memorial.png", "stage_smithsonian_aero.png", "stage_tomb_unknown.png",
+        "stage_enn_news_studio.png"
     };
 
     for (int i = 0; i < STAGE_COUNT; i++) {
@@ -6013,7 +6147,8 @@ void VisualsEngine::DrawFighterSprite(const Fighter& f) {
             98.4f / 302.0f,
             84.0f / 272.0f,
             84.0f / 276.0f,
-            86.0f / 295.0f
+            86.0f / 295.0f,
+            84.0f / 262.0f
         };
 
         Texture2D tex = s_sprites[charId][animIdx];
@@ -6741,6 +6876,34 @@ void VisualsEngine::DrawProjectiles(const Fighter& f) {
             DrawLine((int)(p.pos.x - dir * 15), (int)p.pos.y + 4, (int)(p.pos.x - dir * 15), (int)p.pos.y - 4, Color{ 255, 200, 40, 220 });
 
             DrawCircle((int)(p.pos.x + dir * 12), (int)p.pos.y - 2, 2, WHITE);
+        } else if (p.type == 9) {
+            // Karl Rove's "DECISION 2028" Whiteboard Electoral Map State & "270!" Projectile
+            float dir = p.facingRight ? 1.0f : -1.0f;
+            int mode = ((p.lifetime / 5) % 3);
+            bool isRedState = (mode != 1);
+            Color stateCol = isRedState ? Color{ 230, 35, 45, 245 } : Color{ 35, 105, 245, 245 };
+            int px = (int)p.pos.x;
+            int py = (int)p.pos.y;
+
+            // Flying Electoral State Polygon & Dry-Erase Whiteboard Border
+            DrawRectangle(px - 17, py - 8, 34, 16, WHITE);
+            DrawRectangle(px - 15, py - 6, 30, 12, stateCol);
+            DrawRectangleLines(px - 17, py - 8, 34, 16, Color{ 255, 230, 70, 255 });
+
+            const char* stateLabel = (mode == 0) ? "270!" : ((mode == 1) ? "PA 19" : "TX 40");
+            VisualsEngine::DrawPixelText(stateLabel, px - 13, py - 5, 10, (mode == 0) ? Color{ 255, 245, 90, 255 } : WHITE);
+
+            // Forward Dry-Erase Marker Arrow & Trailing Ink Sparkles
+            int tipX = px + (int)(dir * 22.0f);
+            DrawLineEx(Vector2{ (float)(px + dir * 16.0f), (float)py }, Vector2{ (float)tipX, (float)py }, 2.5f, Color{ 255, 235, 80, 255 });
+            DrawTriangle(
+                Vector2{ (float)(tipX + dir * 4.0f), (float)py },
+                Vector2{ (float)tipX, (float)(py - 4) },
+                Vector2{ (float)tipX, (float)(py + 4) },
+                Color{ 255, 60, 60, 255 }
+            );
+            DrawCircle((int)(px - dir * 20.0f), py - 4, 2.0f, Color{ 230, 45, 55, 220 });
+            DrawCircle((int)(px - dir * 25.0f), py + 3, 2.0f, Color{ 45, 130, 255, 220 });
         }
     }
 }
@@ -7219,7 +7382,8 @@ void VisualsEngine::DrawStageAndCharSelect(int selectedStage, int p1Char, int p2
         { 260, 138 },
         { 118, 88 },
         { 228, 92 },
-        { 78, 118 }
+        { 78, 118 },
+        { 212, 54 }
     };
 
     const char* pinNames[STAGE_COUNT] = {
@@ -7234,7 +7398,8 @@ void VisualsEngine::DrawStageAndCharSelect(int selectedStage, int p1Char, int p2
         "9. TEMPLE ISLAND",
         "10. LINCOLN MEMORIAL",
         "11. SMITHSONIAN AERO",
-        "12. TOMB OF UNKNOWN"
+        "12. TOMB OF UNKNOWN",
+        "13. ENN NEWS STUDIO"
     };
 
     for (int i = 0; i < STAGE_COUNT; i++) {
@@ -7323,7 +7488,8 @@ void VisualsEngine::DrawStageAndCharSelect(int selectedStage, int p1Char, int p2
         "TEMPLE ISLAND (FL KEYS)",
         "LINCOLN MEMORIAL STEPS",
         "SMITHSONIAN AIR & SPACE",
-        "TOMB OF THE UNKNOWN"
+        "TOMB OF THE UNKNOWN",
+        "ENN NEWS STUDIO"
     };
 
     char venueBanner[64];
@@ -7337,7 +7503,7 @@ void VisualsEngine::DrawStageAndCharSelect(int selectedStage, int p1Char, int p2
         "TECHBRO", "FILIBUSTER", "FREAGLE", "POPULIST",
         "SLEEPY JOE", "MARJORY T.G.",
         "SUCKRATERY RKF", "WAR PIG", "THE SOCIALIST", "BILLARY",
-        "PALM BEACH PETE"
+        "PALM BEACH PETE", "THE PUNDIT"
     };
 
     const char* rosterArchetypes[CHARACTER_COUNT] = {
@@ -7345,7 +7511,7 @@ void VisualsEngine::DrawStageAndCharSelect(int selectedStage, int p1Char, int p2
         "Zoner Traps", "Turtle Defense", "Acrobatic Fur", "Mix-Up Kicks",
         "Power Nap Counter", "Trailer Brawler",
         "Brain Worm Cobra", "Pentagon Final Boss", "Produce & Cash",
-        "Dual Clinton Electro", "Adrenochrome Mogul"
+        "Dual Clinton Electro", "Adrenochrome Mogul", "Decision 2028 Map"
     };
 
     int p1BoxX = 10;
@@ -7467,86 +7633,73 @@ void VisualsEngine::DrawStageAndCharSelect(int selectedStage, int p1Char, int p2
             }
         }
     } else if (defeatedOriginalCount >= 9) {
+        int cWidth = 118;
+        int cHeight = 44;
+        int cY = GRID_Y + 14;
 
-        int bWidth = 156;
-        int bHeight = 44;
+        struct DCBossCard {
+            int x;
+            CharacterId id;
+            const char* header;
+            const char* name;
+            const char* stage;
+            bool locked;
+            bool defeated;
+        };
 
-        int b1X = 24;
-        int b1Y = GRID_Y + 14;
-        bool b1Defeated = (defeatedFighters != nullptr && defeatedFighters[CHAR_SUCKRATERY_RKF]);
-        bool b1Active = (p2Char == CHAR_SUCKRATERY_RKF);
+        bool rkfDef = (defeatedFighters != nullptr && defeatedFighters[CHAR_SUCKRATERY_RKF]);
+        bool punditDef = (defeatedFighters != nullptr && defeatedFighters[CHAR_THE_PUNDIT]);
+        bool wpDef = (defeatedFighters != nullptr && defeatedFighters[CHAR_WAR_PIG]);
 
-        Color b1Bg = b1Defeated ? Color{ 15, 15, 20, 255 } : Color{ 35, 25, 45, 255 };
-        DrawRectangle(b1X, b1Y, bWidth, bHeight, b1Bg);
+        DCBossCard dcCards[3] = {
+            { 8, CHAR_SUCKRATERY_RKF, "BOSS #1: D.C.", "SUCKRATERY RKF", "Press Briefing", false, rkfDef },
+            { 133, CHAR_THE_PUNDIT, "BOSS #2: ENN", "THE PUNDIT", "ENN News Studio", !rkfDef, punditDef },
+            { 258, CHAR_WAR_PIG, "FINAL D.C. BOSS", "WAR PIG", "Pentagon Altar", !punditDef, wpDef }
+        };
 
-        if (s_loaded && s_portraits[CHAR_SUCKRATERY_RKF].id > 0) {
-            Rectangle srcRec = { 0.0f, 0.0f, (float)s_portraits[CHAR_SUCKRATERY_RKF].width, (float)s_portraits[CHAR_SUCKRATERY_RKF].height };
-            Rectangle dstRec = { (float)b1X + 2, (float)b1Y + 2, (float)bHeight - 4, (float)bHeight - 4 };
-            DrawTexturePro(s_portraits[CHAR_SUCKRATERY_RKF], srcRec, dstRec, Vector2{ 0.0f, 0.0f }, 0.0f, b1Defeated ? Color{ 85, 85, 90, 200 } : WHITE);
-        }
-        DrawPixelText("BOSS #1", b1X + 46, b1Y + 4, 8, Color{ 255, 120, 120, 255 });
-        DrawPixelText("SUCKRATERY RKF", b1X + 46, b1Y + 15, 8, Color{ 255, 220, 60, 255 });
-        DrawPixelText("Press Briefing Room", b1X + 46, b1Y + 26, 7, Color{ 170, 190, 220, 220 });
+        for (int k = 0; k < 3; k++) {
+            const auto& cd = dcCards[k];
+            bool active = (p2Char == cd.id);
+            Color bgCol = cd.defeated ? Color{ 15, 15, 20, 255 } : (cd.locked ? Color{ 18, 18, 22, 255 } : Color{ 38, 22, 34, 255 });
+            DrawRectangle(cd.x, cY, cWidth, cHeight, bgCol);
 
-        if (b1Defeated) {
-            DrawRectangle(b1X + 2, b1Y + 2, bWidth - 4, bHeight - 4, Color{ 35, 0, 0, 140 });
-            DrawLineEx(Vector2{ (float)b1X + 4, (float)b1Y + 4 }, Vector2{ (float)b1X + bWidth - 4, (float)b1Y + bHeight - 4 }, 2.5f, Color{ 230, 30, 30, 240 });
-            DrawLineEx(Vector2{ (float)b1X + bWidth - 4, (float)b1Y + 4 }, Vector2{ (float)b1X + 4, (float)b1Y + bHeight - 4 }, 2.5f, Color{ 230, 30, 30, 240 });
-            DrawRectangle(b1X + 28, b1Y + 16, bWidth - 56, 12, Color{ 190, 20, 20, 230 });
-            DrawPixelText("DEFEATED", b1X + 48, b1Y + 18, 9, WHITE);
-        }
+            if (s_loaded && s_portraits[cd.id].id > 0) {
+                Rectangle srcRec = { 0.0f, 0.0f, (float)s_portraits[cd.id].width, (float)s_portraits[cd.id].height };
+                Rectangle dstRec = { (float)cd.x + 2, (float)cY + 2, (float)cHeight - 4, (float)cHeight - 4 };
+                Color pTint = cd.locked ? Color{ 55, 55, 60, 180 } : (cd.defeated ? Color{ 80, 80, 85, 200 } : WHITE);
+                DrawTexturePro(s_portraits[cd.id], srcRec, dstRec, Vector2{ 0.0f, 0.0f }, 0.0f, pTint);
+            }
 
-        Color b1Border = b1Active ? Color{ 255, 50, 50, 255 } : (b1Defeated ? Color{ 60, 40, 40, 255 } : Color{ 160, 80, 160, 255 });
-        DrawRectangleLines(b1X, b1Y, bWidth, bHeight, b1Border);
-        if (b1Active) {
-            DrawRectangleLines(b1X - 2, b1Y - 2, bWidth + 4, bHeight + 4, Color{ 255, 215, 0, 255 });
-            int ncW = MeasureText("NEXT CHALLENGE", 8);
-            DrawPixelText("NEXT CHALLENGE", b1X + (bWidth - ncW) / 2, b1Y - 9, 8, Color{ 255, 220, 50, 255 });
-        }
+            if (cd.locked) {
+                DrawRectangle(cd.x + 42, cY + 2, cWidth - 44, cHeight - 4, Color{ 16, 16, 22, 250 });
+                int lockW = MeasureText("[ LOCKED ]", 8);
+                DrawPixelText("[ LOCKED ]", cd.x + 42 + (cWidth - 44 - lockW) / 2, cY + 11, 8, Color{ 170, 170, 185, 220 });
+                const char* prevHint = "BEAT PREV BOSS";
+                int hintW = MeasureText(prevHint, 6);
+                DrawPixelText(prevHint, cd.x + 42 + (cWidth - 44 - hintW) / 2, cY + 25, 6, Color{ 130, 130, 145, 200 });
+            } else {
+                Color hdrCol = (k == 2 ? Color{ 255, 70, 70, 255 } : Color{ 255, 150, 90, 255 });
+                DrawPixelText(cd.header, cd.x + 44, cY + 4, 7, hdrCol);
+                DrawPixelText(cd.name, cd.x + 44, cY + 15, 8, Color{ 255, 220, 60, 255 });
+                DrawPixelText(cd.stage, cd.x + 44, cY + 26, 7, Color{ 170, 190, 220, 220 });
+            }
 
-        int b2X = SCREEN_WIDTH - b1X - bWidth;
-        int b2Y = b1Y;
-        bool b2Defeated = (defeatedFighters != nullptr && defeatedFighters[CHAR_WAR_PIG]);
-        bool b2Locked = !b1Defeated;
-        bool b2Active = (p2Char == CHAR_WAR_PIG);
+            if (cd.defeated) {
+                DrawRectangle(cd.x + 2, cY + 2, cWidth - 4, cHeight - 4, Color{ 35, 0, 0, 140 });
+                DrawLineEx(Vector2{ (float)cd.x + 4, (float)cY + 4 }, Vector2{ (float)cd.x + cWidth - 4, (float)cY + cHeight - 4 }, 2.0f, Color{ 230, 30, 30, 240 });
+                DrawLineEx(Vector2{ (float)cd.x + cWidth - 4, (float)cY + 4 }, Vector2{ (float)cd.x + 4, (float)cY + cHeight - 4 }, 2.0f, Color{ 230, 30, 30, 240 });
+                DrawRectangle(cd.x + 20, cY + 16, cWidth - 40, 12, Color{ 190, 20, 20, 230 });
+                int dw = MeasureText("DEFEATED", 8);
+                DrawPixelText("DEFEATED", cd.x + (cWidth - dw) / 2, cY + 18, 8, WHITE);
+            }
 
-        Color b2Bg = b2Defeated ? Color{ 15, 15, 20, 255 } : (b2Locked ? Color{ 20, 20, 25, 255 } : Color{ 50, 20, 25, 255 });
-        DrawRectangle(b2X, b2Y, bWidth, bHeight, b2Bg);
-
-        if (s_loaded && s_portraits[CHAR_WAR_PIG].id > 0) {
-            Rectangle srcRec = { 0.0f, 0.0f, (float)s_portraits[CHAR_WAR_PIG].width, (float)s_portraits[CHAR_WAR_PIG].height };
-            Rectangle dstRec = { (float)b2X + 2, (float)b2Y + 2, (float)bHeight - 4, (float)bHeight - 4 };
-            Color pTint = b2Locked ? Color{ 60, 60, 65, 180 } : (b2Defeated ? Color{ 85, 85, 90, 200 } : WHITE);
-            DrawTexturePro(s_portraits[CHAR_WAR_PIG], srcRec, dstRec, Vector2{ 0.0f, 0.0f }, 0.0f, pTint);
-        }
-
-        if (b2Locked) {
-            DrawRectangle(b2X + 44, b2Y + 2, bWidth - 46, bHeight - 4, Color{ 16, 16, 22, 250 });
-            int lockW = MeasureText("[ LOCKED ]", 9);
-            DrawPixelText("[ LOCKED ]", b2X + 44 + (bWidth - 46 - lockW) / 2, b2Y + 10, 9, Color{ 180, 180, 195, 230 });
-            const char* defeatHint = "DEFEAT BOSS #1";
-            int hintW = MeasureText(defeatHint, 7);
-            DrawPixelText(defeatHint, b2X + 44 + (bWidth - 46 - hintW) / 2, b2Y + 24, 7, Color{ 140, 140, 155, 220 });
-        } else {
-            DrawPixelText("FINAL BOSS", b2X + 46, b2Y + 4, 8, Color{ 255, 60, 60, 255 });
-            DrawPixelText("WAR PIG", b2X + 46, b2Y + 15, 8, Color{ 255, 220, 60, 255 });
-            DrawPixelText("Pentagon Altar", b2X + 46, b2Y + 26, 7, Color{ 220, 160, 160, 220 });
-        }
-
-        if (b2Defeated) {
-            DrawRectangle(b2X + 2, b2Y + 2, bWidth - 4, bHeight - 4, Color{ 35, 0, 0, 140 });
-            DrawLineEx(Vector2{ (float)b2X + 4, (float)b2Y + 4 }, Vector2{ (float)b2X + bWidth - 4, (float)b2Y + bHeight - 4 }, 2.5f, Color{ 230, 30, 30, 240 });
-            DrawLineEx(Vector2{ (float)b2X + bWidth - 4, (float)b2Y + 4 }, Vector2{ (float)b2X + 4, (float)b2Y + bHeight - 4 }, 2.5f, Color{ 230, 30, 30, 240 });
-            DrawRectangle(b2X + 28, b2Y + 16, bWidth - 56, 12, Color{ 190, 20, 20, 230 });
-            DrawPixelText("DEFEATED", b2X + 48, b2Y + 18, 9, WHITE);
-        }
-
-        Color b2Border = b2Active ? Color{ 255, 40, 40, 255 } : (b2Locked ? Color{ 60, 60, 70, 255 } : Color{ 200, 50, 50, 255 });
-        DrawRectangleLines(b2X, b2Y, bWidth, bHeight, b2Border);
-        if (b2Active) {
-            DrawRectangleLines(b2X - 2, b2Y - 2, bWidth + 4, bHeight + 4, Color{ 255, 215, 0, 255 });
-            int ftW = MeasureText("FINAL TARGET", 8);
-            DrawPixelText("FINAL TARGET", b2X + (bWidth - ftW) / 2, b2Y - 9, 8, Color{ 255, 220, 50, 255 });
+            Color borderCol = active ? Color{ 255, 50, 50, 255 } : (cd.locked ? Color{ 50, 50, 60, 255 } : Color{ 180, 75, 120, 255 });
+            DrawRectangleLines(cd.x, cY, cWidth, cHeight, borderCol);
+            if (active) {
+                DrawRectangleLines(cd.x - 2, cY - 2, cWidth + 4, cHeight + 4, Color{ 255, 215, 0, 255 });
+                int ctW = MeasureText("NEXT CHALLENGE", 7);
+                DrawPixelText("NEXT CHALLENGE", cd.x + (cWidth - ctW) / 2, cY - 9, 7, Color{ 255, 220, 50, 255 });
+            }
         }
     } else {
 
@@ -7652,7 +7805,7 @@ void VisualsEngine::DrawSecretSelectScreen(int step, int p1Char, int p2Char, int
         "TECHBRO", "FILIBUSTER", "FREAGLE", "POPULIST",
         "SLEEPY JOE", "MARJORY T.G.",
         "SUCKRATERY", "WAR PIG", "SOCIALIST", "BILLARY",
-        "P.B. PETE"
+        "P.B. PETE", "THE PUNDIT"
     };
 
     const char* rosterShortNames[CHARACTER_COUNT] = {
@@ -7660,7 +7813,7 @@ void VisualsEngine::DrawSecretSelectScreen(int step, int p1Char, int p2Char, int
         "TECHBRO", "TWEED", "FREAGLE", "POP",
         "JOE", "MTG",
         "RKF", "WAR PIG", "ZOHRAN", "BILLARY",
-        "PETE"
+        "PETE", "PUNDIT"
     };
 
     const char* rosterArchetypes[CHARACTER_COUNT] = {
@@ -7668,7 +7821,7 @@ void VisualsEngine::DrawSecretSelectScreen(int step, int p1Char, int p2Char, int
         "Drone & Laser", "Turtle Filibuster", "Direct Action Furry", "Viral Kicks",
         "Power Nap Counter", "Trailer Brawler",
         "Brain Worm Cobra", "Pentagon Juggernaut", "Groceries & Cash", "Dual Clinton Laptop",
-        "Florida Keys Boss"
+        "Florida Keys Boss", "Decision 2028 Map"
     };
 
     const char* stageNames[STAGE_COUNT] = {
@@ -7683,7 +7836,8 @@ void VisualsEngine::DrawSecretSelectScreen(int step, int p1Char, int p2Char, int
         "9. TEMPLE ISLAND",
         "10. LINCOLN MEMORIAL",
         "11. SMITHSONIAN AERO",
-        "12. TOMB OF UNKNOWN"
+        "12. TOMB OF UNKNOWN",
+        "13. ENN NEWS STUDIO"
     };
 
     const char* stageCardTitles[STAGE_COUNT] = {
@@ -7698,7 +7852,8 @@ void VisualsEngine::DrawSecretSelectScreen(int step, int p1Char, int p2Char, int
         "9. TEMPLE ISLE",
         "10. LINCOLN MEM",
         "11. AIR & SPACE",
-        "12. UNKNOWN TOMB"
+        "12. UNKNOWN TOMB",
+        "13. ENN STUDIO"
     };
 
     const char* stageCardSub[STAGE_COUNT] = {
@@ -7713,7 +7868,8 @@ void VisualsEngine::DrawSecretSelectScreen(int step, int p1Char, int p2Char, int
         "Florida Keys",
         "Memorial Steps",
         "Smithsonian",
-        "Arlington, VA"
+        "Arlington, VA",
+        "Cable News Desk"
     };
 
     const char* stageVenues[STAGE_COUNT] = {
@@ -7728,7 +7884,8 @@ void VisualsEngine::DrawSecretSelectScreen(int step, int p1Char, int p2Char, int
         "Florida Keys - Private Isle",
         "Lincoln Memorial Steps",
         "Smithsonian Air & Space",
-        "Tomb of the Unknown Soldier"
+        "Tomb of the Unknown Soldier",
+        "ENN Broadcast News Studio"
     };
 
     int cardW = 62;
@@ -7863,11 +8020,11 @@ void VisualsEngine::DrawSecretSelectScreen(int step, int p1Char, int p2Char, int
             DrawPixelText(rosterShortNames[i], bx + (boxW - nw0) / 2, by + boxH + 2, fSize0, Color{ 210, 220, 240, 255 });
         }
 
-        int startX1 = 21;
+        int startX1 = 6;
         int startY1 = 138;
-        for (int i = 8; i < 15; i++) {
+        for (int i = 8; i < CHARACTER_COUNT; i++) {
             int col = i - 8;
-            int bx = startX1 + col * 50;
+            int bx = startX1 + col * 47;
             int by = startY1;
 
             DrawRectangle(bx, by, boxW, boxH, (i >= 10) ? Color{ 28, 18, 22, 255 } : Color{ 18, 24, 36, 255 });
@@ -7913,13 +8070,13 @@ void VisualsEngine::DrawSecretSelectScreen(int step, int p1Char, int p2Char, int
         }
     } else if (step == 2) {
 
-        int cardW = 114;
-        int cardH = 22;
+        int cardW = 88;
+        int cardH = 20;
         for (int i = 0; i < STAGE_COUNT; i++) {
-            int col = i % 3;
-            int row = i / 3;
-            int cx = 16 + col * 120;
-            int cy = 89 + row * 28;
+            int col = i % 4;
+            int row = i / 4;
+            int cx = 10 + col * 92;
+            int cy = 89 + row * 23;
 
             bool isSelected = (i == selectedStage);
             DrawRectangle(cx, cy, cardW, cardH, isSelected ? Color{ 25, 45, 75, 255 } : Color{ 14, 20, 32, 255 });
@@ -8062,14 +8219,50 @@ void VisualsEngine::DrawVersusScreen(const Fighter& p1, const Fighter& p2, float
 }
 
 void VisualsEngine::DrawMatchOver(const Fighter& winner, float timer) {
-    DrawRectangle(0, (SCREEN_HEIGHT / 2) - 40, SCREEN_WIDTH, 80, Color{ 10, 12, 18, 230 });
-    DrawLine(0, (SCREEN_HEIGHT / 2) - 40, SCREEN_WIDTH, (SCREEN_HEIGHT / 2) - 40, Color{ 240, 190, 40, 255 });
-    DrawLine(0, (SCREEN_HEIGHT / 2) + 40, SCREEN_WIDTH, (SCREEN_HEIGHT / 2) + 40, Color{ 240, 190, 40, 255 });
+    int boxY = (SCREEN_HEIGHT / 2) - 52;
+    int boxH = 104;
+    DrawRectangle(0, boxY, SCREEN_WIDTH, boxH, Color{ 10, 12, 20, 242 });
+    DrawLine(0, boxY, SCREEN_WIDTH, boxY, Color{ 240, 190, 40, 255 });
+    DrawLine(0, boxY + boxH, SCREEN_WIDTH, boxY + boxH, Color{ 240, 190, 40, 255 });
 
-    std::string winText = winner.GetName() + " WINS!";
-    int tw = MeasureText(winText.c_str(), 24);
-    DrawPixelText(winText.c_str(), (SCREEN_WIDTH - tw) / 2, (SCREEN_HEIGHT / 2) - 24, 24, Color{ 255, 220, 60, 255 });
-    DrawPixelText("TOTAL VETO EXECUTION COMPLETE", 70, (SCREEN_HEIGHT / 2) + 8, 12, Color{ 255, 80, 80, 255 });
+    std::string winText = winner.GetName() + " WINS! - YOU WERE VETO'D!";
+    int tw = MeasureText(winText.c_str(), 14);
+    DrawPixelText(winText.c_str(), (SCREEN_WIDTH - tw) / 2, boxY + 8, 14, Color{ 255, 95, 95, 255 });
+
+    if (!ChampionshipEdition::s_isSecretMatch && ChampionshipEdition::s_continuesRemaining > 0) {
+        int countdown = std::clamp(9 - (int)timer, 0, 9);
+        char contBuf[64];
+        snprintf(contBuf, sizeof(contBuf), "CONTINUE?  %d", countdown);
+        int ctw = MeasureText(contBuf, 22);
+        DrawPixelText(contBuf, (SCREEN_WIDTH - ctw) / 2, boxY + 28, 22, Color{ 255, 230, 55, 255 });
+
+        char remBuf[64];
+        snprintf(remBuf, sizeof(remBuf), "CONTINUES REMAINING: %d / 2", ChampionshipEdition::s_continuesRemaining);
+        int rtw = MeasureText(remBuf, 9);
+        DrawRectangle((SCREEN_WIDTH - rtw) / 2 - 6, boxY + 56, rtw + 12, 14, Color{ 20, 40, 85, 240 });
+        DrawRectangleLines((SCREEN_WIDTH - rtw) / 2 - 6, boxY + 56, rtw + 12, 14, Color{ 80, 200, 255, 255 });
+        DrawPixelText(remBuf, (SCREEN_WIDTH - rtw) / 2, boxY + 59, 9, Color{ 110, 225, 255, 255 });
+
+        if (((int)(timer * 4.0f) % 2) == 0) {
+            const char* prompt = "PRESS START OR ATTACK TO CONTINUE REMATCH!";
+            int ptw = MeasureText(prompt, 8);
+            DrawPixelText(prompt, (SCREEN_WIDTH - ptw) / 2, boxY + 78, 8, Color{ 255, 240, 120, 255 });
+        }
+    } else {
+        const char* goText = "NO CONTINUES LEFT - GAME OVER!";
+        int gtw = MeasureText(goText, 16);
+        DrawPixelText(goText, (SCREEN_WIDTH - gtw) / 2, boxY + 34, 16, Color{ 255, 60, 60, 255 });
+
+        const char* subText = "3RD VETO REACHED - YOU MUST START OVER";
+        int stw = MeasureText(subText, 8);
+        DrawPixelText(subText, (SCREEN_WIDTH - stw) / 2, boxY + 58, 8, Color{ 210, 190, 190, 240 });
+
+        if (((int)(timer * 3.0f) % 2) == 0) {
+            const char* prompt = "PRESS START OR ATTACK TO START OVER";
+            int ptw = MeasureText(prompt, 8);
+            DrawPixelText(prompt, (SCREEN_WIDTH - ptw) / 2, boxY + 78, 8, Color{ 255, 225, 70, 255 });
+        }
+    }
 }
 
 void VisualsEngine::DrawVictorySplash(int winnerChar, int loserChar, float timer) {
@@ -8085,7 +8278,7 @@ void VisualsEngine::DrawVictorySplash(int winnerChar, int loserChar, float timer
         "TECHBRO", "THE FILIBUSTER", "FREAGLE", "JUNIOR POPULIST",
         "SLEEPY JOE", "MARJORY T. GREEN",
         "SUCKRATERY RKF", "WAR PIG", "THE SOCIALIST", "BILLARY",
-        "PALM BEACH PETE"
+        "PALM BEACH PETE", "THE PUNDIT"
     };
 
     int pSize = 78;
@@ -8164,7 +8357,8 @@ void VisualsEngine::DrawVictorySplash(int winnerChar, int loserChar, float timer
         "\"Maximum military aggression! You just took on",
         "\"Free groceries, subway rides, and knockouts!",
         "\"I did not have combat relations with that boxer!",
-        "\"Another refreshing sip of pure Adrenochrome..."
+        "\"Another refreshing sip of pure Adrenochrome...",
+        "\"Look at the DECISION 2028 whiteboard math:"
     };
 
     const char* line2[CHARACTER_COUNT] = {
@@ -8182,7 +8376,8 @@ void VisualsEngine::DrawVictorySplash(int winnerChar, int loserChar, float timer
         "the Pentagon's highest caliber firepower!\"",
         "Spread the joy and feel the progressive burn!\"",
         "Your loss was wiped from my private server!\"",
-        "The island elite always triumph in paradise!\""
+        "The island elite always triumph in paradise!\"",
+        "Ohio, Florida, and 270 electoral votes say VETO!\""
     };
 
     DrawPixelText(line1[winnerChar], boxX + 10, boxY + 20, 8, Color{ 240, 245, 255, 255 });
@@ -8489,6 +8684,11 @@ void AIController::TriggerSpecial(InputManager& input, CharacterId charId, int r
         if (role == 0 || role == 2) input.InjectSpecialMotion(MOTION_QCF_P, BTN_HP);
         else if (role == 1) input.InjectSpecialMotion(MOTION_DP_P, BTN_HP);
         else input.InjectSpecialMotion(MOTION_QCB_P, BTN_HP);
+        break;
+
+    case CHAR_THE_PUNDIT:
+        if (role == 1) input.InjectSpecialMotion(MOTION_DP_P, BTN_HP);
+        else input.InjectSpecialMotion(MOTION_QCF_P, BTN_HP);
         break;
 
     default:
@@ -8821,6 +9021,7 @@ int main(int argc, char* argv[]) {
 
     bool defeatedFighters[CHARACTER_COUNT] = { false };
     int matchesWon = 0;
+    int continuesRemaining = 2;
     bool bonusStagePlayed = false;
     bool playerLocked = false;
     bool choosingOpponent = false;
@@ -8851,6 +9052,7 @@ int main(int argc, char* argv[]) {
     static StageId s_lastRandomStage = STAGE_COUNT;
     auto GetStageForOpponent = [&](CharacterId opp) -> StageId {
         if (opp == CHAR_SUCKRATERY_RKF) return STAGE_PRESS_BRIEFING;
+        if (opp == CHAR_THE_PUNDIT) return STAGE_ENN_NEWS_STUDIO;
         if (opp == CHAR_WAR_PIG) return STAGE_PENTAGON_ALTAR;
         if (opp == CHAR_SOCIALIST) return STAGE_WTC_PLAZA;
         if (opp == CHAR_BILLARY) return STAGE_COMET_PING_PONG;
@@ -8887,6 +9089,7 @@ int main(int argc, char* argv[]) {
         }
         if (origDefeated >= 9) {
             if (!defeatedFighters[CHAR_SUCKRATERY_RKF]) return CHAR_SUCKRATERY_RKF;
+            if (!defeatedFighters[CHAR_THE_PUNDIT]) return CHAR_THE_PUNDIT;
             if (!defeatedFighters[CHAR_WAR_PIG]) return CHAR_WAR_PIG;
             return CHAR_WAR_PIG;
         }
@@ -9053,6 +9256,8 @@ int main(int argc, char* argv[]) {
                     AudioEngine::Instance().PlaySfx(SFX_COIN);
                     gameState = STATE_SELECT_MAP;
                     isSecretMode = false;
+                    continuesRemaining = 2;
+                    ChampionshipEdition::s_continuesRemaining = 2;
                     playerLocked = false;
                     choosingOpponent = false;
                     p1CharId = CHAR_COMMANDER;
@@ -9100,6 +9305,9 @@ int main(int argc, char* argv[]) {
                 if (!defeatedFighters[CHAR_SUCKRATERY_RKF]) {
                     p2CharId = CHAR_SUCKRATERY_RKF;
                     currentStage = STAGE_PRESS_BRIEFING;
+                } else if (!defeatedFighters[CHAR_THE_PUNDIT]) {
+                    p2CharId = CHAR_THE_PUNDIT;
+                    currentStage = STAGE_ENN_NEWS_STUDIO;
                 } else if (!defeatedFighters[CHAR_WAR_PIG]) {
                     p2CharId = CHAR_WAR_PIG;
                     currentStage = STAGE_PENTAGON_ALTAR;
@@ -9262,10 +9470,10 @@ int main(int argc, char* argv[]) {
                     AudioEngine::Instance().PlaySfx(SFX_SELECT_CURSOR);
                 } else if (inputP1.IsUpPressed()) {
                     if (secretP1 >= 8) secretP1 = std::min(7, secretP1 - 8);
-                    else secretP1 = std::min(14, secretP1 + 8);
+                    else secretP1 = std::min(15, secretP1 + 8);
                     AudioEngine::Instance().PlaySfx(SFX_SELECT_CURSOR);
                 } else if (inputP1.IsDownPressed()) {
-                    if (secretP1 < 8) secretP1 = std::min(14, secretP1 + 8);
+                    if (secretP1 < 8) secretP1 = std::min(15, secretP1 + 8);
                     else secretP1 = secretP1 - 8;
                     AudioEngine::Instance().PlaySfx(SFX_SELECT_CURSOR);
                 }
@@ -9288,10 +9496,10 @@ int main(int argc, char* argv[]) {
                     AudioEngine::Instance().PlaySfx(SFX_SELECT_CURSOR);
                 } else if (inputP1.IsUpPressed()) {
                     if (secretP2 >= 8) secretP2 = std::min(7, secretP2 - 8);
-                    else secretP2 = std::min(14, secretP2 + 8);
+                    else secretP2 = std::min(15, secretP2 + 8);
                     AudioEngine::Instance().PlaySfx(SFX_SELECT_CURSOR);
                 } else if (inputP1.IsDownPressed()) {
-                    if (secretP2 < 8) secretP2 = std::min(14, secretP2 + 8);
+                    if (secretP2 < 8) secretP2 = std::min(15, secretP2 + 8);
                     else secretP2 = secretP2 - 8;
                     AudioEngine::Instance().PlaySfx(SFX_SELECT_CURSOR);
                 }
@@ -9313,10 +9521,10 @@ int main(int argc, char* argv[]) {
                     secretStage = (secretStage + 1) % STAGE_COUNT;
                     AudioEngine::Instance().PlaySfx(SFX_SELECT_CURSOR);
                 } else if (inputP1.IsUpPressed()) {
-                    secretStage = (secretStage - 3 + STAGE_COUNT) % STAGE_COUNT;
+                    secretStage = (secretStage - 4 + STAGE_COUNT) % STAGE_COUNT;
                     AudioEngine::Instance().PlaySfx(SFX_SELECT_CURSOR);
                 } else if (inputP1.IsDownPressed()) {
-                    secretStage = (secretStage + 3) % STAGE_COUNT;
+                    secretStage = (secretStage + 4) % STAGE_COUNT;
                     AudioEngine::Instance().PlaySfx(SFX_SELECT_CURSOR);
                 }
 
@@ -9366,7 +9574,7 @@ int main(int argc, char* argv[]) {
 
                     gameState = STATE_FIGHT;
                     stateTimer = 0.0f;
-                    int bgmTrack = (currentStage == STAGE_LINCOLN_MEMORIAL) ? 2 : ((currentStage == STAGE_SMITHSONIAN_AERO) ? 1 : ((currentStage == STAGE_TOMB_UNKNOWN) ? 3 : ((currentStage >= 4) ? ((currentStage == STAGE_PRESS_BRIEFING) ? 3 : 4) : ((int)currentStage + 1))));
+                    int bgmTrack = (currentStage == STAGE_LINCOLN_MEMORIAL) ? 2 : ((currentStage == STAGE_SMITHSONIAN_AERO) ? 1 : ((currentStage == STAGE_TOMB_UNKNOWN || currentStage == STAGE_ENN_NEWS_STUDIO) ? 3 : ((currentStage >= 4) ? ((currentStage == STAGE_PRESS_BRIEFING) ? 3 : 4) : ((int)currentStage + 1))));
                     AudioEngine::Instance().SetBgmTrack(bgmTrack);
                     AudioEngine::Instance().PlaySfx(SFX_VOICE_ROUND1);
                 }
@@ -9391,7 +9599,7 @@ int main(int argc, char* argv[]) {
                 p2->ResetRound(480.0f, false);
                 cpuAI.Reset();
                 inputP2.Reset();
-                int bgmTrack = (currentStage == STAGE_LINCOLN_MEMORIAL) ? 2 : ((currentStage == STAGE_SMITHSONIAN_AERO) ? 1 : ((currentStage == STAGE_TOMB_UNKNOWN) ? 3 : ((currentStage >= 4) ? ((currentStage == STAGE_PRESS_BRIEFING) ? 3 : 4) : ((int)currentStage + 1))));
+                int bgmTrack = (currentStage == STAGE_LINCOLN_MEMORIAL) ? 2 : ((currentStage == STAGE_SMITHSONIAN_AERO) ? 1 : ((currentStage == STAGE_TOMB_UNKNOWN || currentStage == STAGE_ENN_NEWS_STUDIO) ? 3 : ((currentStage >= 4) ? ((currentStage == STAGE_PRESS_BRIEFING) ? 3 : 4) : ((int)currentStage + 1))));
                 AudioEngine::Instance().SetBgmTrack(bgmTrack);
                 AudioEngine::Instance().PlaySfx(SFX_VOICE_ROUND1);
             }
@@ -9705,32 +9913,79 @@ int main(int argc, char* argv[]) {
 
         case STATE_MATCH_OVER: {
             inputP1.Update(0, true);
-            if (stateTimer >= 5.0f || IsKeyPressed(KEY_ENTER) || IsKeyPressed(KEY_SPACE) ||
-                inputP1.IsButtonPressed(BTN_START) || inputP1.IsButtonPressed(BTN_LP) ||
-                inputP1.IsButtonPressed(BTN_HP) || inputP1.IsButtonPressed(BTN_LK) ||
-                inputP1.IsButtonPressed(BTN_HK)) {
+            ChampionshipEdition::s_continuesRemaining = continuesRemaining;
+            ChampionshipEdition::s_isSecretMatch = isSecretMode;
 
-                if (isSecretMode) {
+            bool actionPressed = (IsKeyPressed(KEY_ENTER) || IsKeyPressed(KEY_SPACE) ||
+                inputP1.IsButtonPressed(BTN_START) || inputP1.IsButtonPressed(BTN_COIN) ||
+                inputP1.IsButtonPressed(BTN_LP) || inputP1.IsButtonPressed(BTN_HP) ||
+                inputP1.IsButtonPressed(BTN_LK) || inputP1.IsButtonPressed(BTN_HK));
+
+            if (isSecretMode) {
+                if (stateTimer >= 5.0f || actionPressed) {
                     gameState = STATE_SECRET_SELECT;
                     secretStep = 0;
                     stateTimer = 0.0f;
                     AudioEngine::Instance().SetBgmTrack(0);
+                }
+                break;
+            }
+
+            if (continuesRemaining > 0) {
+                // Player has Continues left (up to 2 continues after being Veto'd)
+                if (actionPressed && stateTimer >= 0.35f) {
+                    continuesRemaining--;
+                    ChampionshipEdition::s_continuesRemaining = continuesRemaining;
+                    AudioEngine::Instance().PlaySfx(SFX_COIN);
+                    AudioEngine::Instance().PlaySfx(SFX_MATCH_START_FANFARE);
+
+                    cpuAI.Reset();
+                    inputP2.Reset();
+                    p1 = std::make_unique<Fighter>(0, p1CharId, 320.0f);
+                    p2 = std::make_unique<Fighter>(1, p2CharId, 480.0f);
+                    AudioEngine::Instance().StopBgm();
+
+                    gameState = STATE_VERSUS;
+                    stateTimer = 0.0f;
                     break;
                 }
+                if (stateTimer >= 10.0f) {
+                    // Countdown expired -> Start Over
+                    continuesRemaining = 2;
+                    ChampionshipEdition::s_continuesRemaining = 2;
+                    matchesWon = 0;
+                    bonusStagePlayed = false;
+                    playerLocked = false;
+                    choosingOpponent = false;
+                    for (int i = 0; i < CHARACTER_COUNT; i++) defeatedFighters[i] = false;
 
-                matchesWon = 0;
-                bonusStagePlayed = false;
-                playerLocked = false;
-                choosingOpponent = false;
-                for (int i = 0; i < CHARACTER_COUNT; i++) defeatedFighters[i] = false;
+                    p1CharId = CHAR_COMMANDER;
+                    p2CharId = PickNextAvailableOpponent(1);
+                    currentStage = GetStageForOpponent(p2CharId);
+                    stageMgr.SetStage(currentStage);
+                    gameState = STATE_SELECT_MAP;
+                    stateTimer = 0.0f;
+                    AudioEngine::Instance().SetBgmTrack(0);
+                }
+            } else {
+                // 3rd time Veto'd (0 continues left) -> Must Start Over!
+                if (stateTimer >= 5.0f || (actionPressed && stateTimer >= 0.35f)) {
+                    continuesRemaining = 2;
+                    ChampionshipEdition::s_continuesRemaining = 2;
+                    matchesWon = 0;
+                    bonusStagePlayed = false;
+                    playerLocked = false;
+                    choosingOpponent = false;
+                    for (int i = 0; i < CHARACTER_COUNT; i++) defeatedFighters[i] = false;
 
-                p1CharId = CHAR_COMMANDER;
-                p2CharId = PickNextAvailableOpponent(1);
-                currentStage = GetStageForOpponent(p2CharId);
-                stageMgr.SetStage(currentStage);
-                gameState = STATE_SELECT_MAP;
-                stateTimer = 0.0f;
-                AudioEngine::Instance().SetBgmTrack(0);
+                    p1CharId = CHAR_COMMANDER;
+                    p2CharId = PickNextAvailableOpponent(1);
+                    currentStage = GetStageForOpponent(p2CharId);
+                    stageMgr.SetStage(currentStage);
+                    gameState = STATE_SELECT_MAP;
+                    stateTimer = 0.0f;
+                    AudioEngine::Instance().SetBgmTrack(0);
+                }
             }
             break;
         }
