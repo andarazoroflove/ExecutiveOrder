@@ -1509,11 +1509,7 @@ inline void UpdateAndTrackFighters(Fighter& p1, Fighter& p2) {
 }
 
 inline void DrawFighterWorldOverlays(const Fighter& f) {
-    int idx = (f.GetPlayerIndex() == 0) ? 0 : 1;
-    // 1. Dynamic Verlet Necktie / Stole Trail
-    s_ties[idx].Draw(f.GetSecondaryColor(), Color{ 255, 220, 60, 255 });
-
-    // 2. Bold CPS-1 Motion-Blur Smear Slash Arcs during Active Attack Frames
+    // 1. Bold CPS-1 Motion-Blur Smear Slash Arcs during Active Attack Frames
     if (f.GetState() == FSTATE_ATTACK || f.GetState() == FSTATE_SPECIAL) {
         int su = f.GetCurrentAttack().startupFrames;
         int ac = f.GetCurrentAttack().activeFrames;
