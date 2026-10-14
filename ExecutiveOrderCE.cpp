@@ -1274,143 +1274,107 @@ inline void DrawStageUpgrades(StageId stageId, float camX, float time) {
         float fightProgress = std::clamp((200.0f - (s_p1TrailHp + s_p2TrailHp)) / 160.0f, 0.0f, 1.0f);
         float clapSpeed = 6.5f + fightProgress * 9.5f;
         float clapWave = fabsf(sinf(time * clapSpeed));
-        float clapGap = clapWave * 7.5f;
-        int lincX = (int)BgX(570.0f);
-        int lincY = (int)BgY(216.0f) - (int)((1.0f - clapWave) * 2.0f);
+        float clapGap = clapWave * 4.5f;
+        int lincX = (int)BgX(564.0f);
+        int lincHandsY = (int)BgY(186.0f);
+        int lincHeadY = (int)BgY(115.0f);
 
-        // Animated marble hands clapping together in front of Lincoln's chest
+        // Animated marble hands clapping together directly over Lincoln's sculpted hands
         Color marbleBase{ 242, 240, 234, 255 };
-        Color marbleShadow{ 155, 152, 146, 255 };
-        DrawCircle((int)(lincX - 3.0f - clapGap), lincY + 12, 4.0f, marbleShadow);
-        DrawCircle((int)(lincX - 3.0f - clapGap), lincY + 12, 3.0f, marbleBase);
-        DrawCircle((int)(lincX + 3.0f + clapGap), lincY + 12, 4.0f, marbleShadow);
-        DrawCircle((int)(lincX + 3.0f + clapGap), lincY + 12, 3.0f, marbleBase);
+        Color marbleShadow{ 165, 162, 156, 255 };
+        DrawCircle((int)(lincX - 2.0f - clapGap), lincHandsY, 3.2f, marbleShadow);
+        DrawCircle((int)(lincX - 2.0f - clapGap), lincHandsY, 2.4f, marbleBase);
+        DrawCircle((int)(lincX + 2.0f + clapGap), lincHandsY, 3.2f, marbleShadow);
+        DrawCircle((int)(lincX + 2.0f + clapGap), lincHandsY, 2.4f, marbleBase);
 
         // Impact clap burst & Lincoln cheering callout as the fight intensifies
-        if (clapWave < 0.22f) {
-            DrawCircleLines(lincX, lincY + 12, 7.0f + (0.22f - clapWave) * 24.0f, Color{ 255, 235, 110, 220 });
-            DrawLine(lincX - 9, lincY + 6, lincX - 13, lincY + 2, Color{ 255, 245, 160, 230 });
-            DrawLine(lincX + 9, lincY + 6, lincX + 13, lincY + 2, Color{ 255, 245, 160, 230 });
+        if (clapWave < 0.35f) {
+            DrawCircleLines(lincX, lincHandsY, 6.0f + (0.35f - clapWave) * 22.0f, Color{ 255, 235, 110, 225 });
+            DrawLine(lincX - 8, lincHandsY - 5, lincX - 13, lincHandsY - 9, Color{ 255, 245, 160, 235 });
+            DrawLine(lincX + 8, lincHandsY - 5, lincX + 13, lincHandsY - 9, Color{ 255, 245, 160, 235 });
             const char* cheers[4] = { "CLAP! CLAP!", "BRAVO!", "FOUR SCORE!", "ENCORE!" };
             const char* ch = cheers[((int)(time * 2.0f)) % 4];
             int ctw = MeasureText(ch, 6);
-            DrawRectangle(lincX - ctw / 2 - 3, lincY - 16, ctw + 6, 9, Color{ 15, 20, 35, 215 });
-            DrawRectangleLines(lincX - ctw / 2 - 3, lincY - 16, ctw + 6, 9, Color{ 255, 220, 70, 230 });
-            VisualsEngine::DrawPixelText(ch, lincX - ctw / 2, lincY - 14, 6, Color{ 255, 235, 90, 255 });
-        }
-
-        // B. Animated Bobbing Protest Signs on the Steps (Crunchy Granolas & Blue-Hairs)
-        struct ProtestSign { float tx; float ty; const char* label; Color col; };
-        ProtestSign signs[4] = {
-            { 170.0f, 290.0f, "FREE KALE", Color{ 160, 245, 130, 245 } },
-            { 295.0f, 325.0f, "PEACE NOW", Color{ 255, 225, 110, 245 } },
-            { 845.0f, 320.0f, "NO VETO!", Color{ 255, 150, 210, 245 } },
-            { 975.0f, 290.0f, "COEXIST", Color{ 130, 225, 255, 245 } }
-        };
-        for (int i = 0; i < 4; i++) {
-            float bob = sinf(time * (5.5f + i * 0.8f) + i * 1.7f) * 3.5f;
-            int sx = (int)BgX(signs[i].tx);
-            int sy = (int)BgY(signs[i].ty) + (int)bob;
-            int sw = MeasureText(signs[i].label, 5) + 6;
-            DrawLine(sx, sy + 9, sx, sy + 18, Color{ 140, 100, 55, 255 });
-            DrawRectangle(sx - sw / 2, sy, sw, 10, signs[i].col);
-            DrawRectangleLines(sx - sw / 2, sy, sw, 10, Color{ 30, 25, 25, 240 });
-            VisualsEngine::DrawPixelText(signs[i].label, sx - sw / 2 + 3, sy + 2, 5, Color{ 20, 20, 28, 255 });
+            DrawRectangle(lincX - ctw / 2 - 3, lincHeadY, ctw + 6, 9, Color{ 15, 20, 35, 225 });
+            DrawRectangleLines(lincX - ctw / 2 - 3, lincHeadY, ctw + 6, 9, Color{ 255, 220, 70, 240 });
+            VisualsEngine::DrawPixelText(ch, lincX - ctw / 2, lincHeadY + 2, 6, Color{ 255, 235, 90, 255 });
         }
     } else if (stageId == STAGE_SMITHSONIAN_AERO) {
-        // A. Suspended MQ-1 Predator Drone Overhead (Spinning Rear Propeller, Wingtip Strobes & Sensor Sweep)
-        int droneX = (int)BgX(565.0f);
-        int droneY = (int)BgY(92.0f);
-        float propSpan = sinf(time * 48.0f) * 11.0f;
-        DrawLine(droneX - (int)propSpan, droneY - 4, droneX + (int)propSpan, droneY + 4, Color{ 220, 235, 255, 200 });
-        if (fmodf(time * 2.6f, 1.0f) < 0.35f) {
-            DrawCircle((int)BgX(485.0f), droneY + 6, 2.5f, Color{ 255, 45, 45, 245 });
-            DrawCircle((int)BgX(645.0f), droneY + 6, 2.5f, Color{ 45, 255, 90, 245 });
+        // A. Suspended MQ-1 Predator Drone Overhead (Upper-Left Rafters: Strobes & Optical Sensor Laser)
+        int droneNoseX = (int)BgX(382.0f);
+        int droneNoseY = (int)BgY(148.0f);
+        int droneTailX = (int)BgX(198.0f);
+        int droneTailY = (int)BgY(122.0f);
+        float propSpan = sinf(time * 48.0f) * 8.0f;
+        DrawLine(droneTailX, droneTailY - (int)propSpan, droneTailX, droneTailY + (int)propSpan, Color{ 220, 235, 255, 210 });
+        if (fmodf(time * 2.6f, 1.0f) < 0.45f) {
+            DrawCircle((int)BgX(255.0f), (int)BgY(138.0f), 2.2f, Color{ 255, 45, 45, 245 });
+            DrawCircle((int)BgX(395.0f), (int)BgY(125.0f), 2.2f, Color{ 45, 255, 90, 245 });
         }
-        float scanX = droneX + sinf(time * 2.2f) * 42.0f;
-        DrawLine(droneX, droneY + 10, (int)scanX, (int)GROUND_Y - 12, Color{ 255, 40, 40, 45 });
-        DrawCircle((int)scanX, (int)GROUND_Y - 12, 2.5f, Color{ 255, 50, 50, 140 });
+        float scanX = droneNoseX + 25.0f + sinf(time * 2.2f) * 40.0f;
+        DrawLine(droneNoseX, droneNoseY, (int)scanX, (int)GROUND_Y - 8, Color{ 255, 45, 45, 70 });
+        DrawCircle((int)scanX, (int)GROUND_Y - 8, 2.5f, Color{ 255, 60, 60, 175 });
 
-        // B. Sally Ride by the Space Shuttle & Wright Brothers by the 1903 Wright Flyer Cheering Callouts
-        int sallyX = (int)BgX(235.0f);
-        int sallyY = (int)BgY(365.0f);
-        int wrightX = (int)BgX(915.0f);
-        int wrightY = (int)BgY(365.0f);
+        // B. Spinning P-51 Mustang Propeller in Center Rafters & Wright Flyer Twin Props
+        float p51Span = cosf(time * 44.0f) * 12.0f;
+        DrawLine((int)BgX(492.0f), (int)BgY(192.0f) - (int)p51Span, (int)BgX(492.0f), (int)BgY(192.0f) + (int)p51Span, Color{ 225, 235, 250, 195 });
 
-        // Spinning twin wooden propellers on the 1903 Wright Flyer
-        float wpSpan = cosf(time * 38.0f) * 8.0f;
-        DrawLine((int)BgX(870.0f), (int)BgY(235.0f) - (int)wpSpan, (int)BgX(870.0f), (int)BgY(235.0f) + (int)wpSpan, Color{ 210, 170, 105, 195 });
-        DrawLine((int)BgX(945.0f), (int)BgY(235.0f) - (int)wpSpan, (int)BgX(945.0f), (int)BgY(235.0f) + (int)wpSpan, Color{ 210, 170, 105, 195 });
-
-        if (fmodf(time, 3.6f) < 1.4f) {
+        // C. Sally Ride by the Space Shuttle & Wright Brothers by the 1903 Wright Flyer Cheering Callouts
+        int sallyX = (int)BgX(292.0f);
+        int sallyY = (int)BgY(320.0f);
+        int wrightX = (int)BgX(955.0f);
+        int wrightY = (int)BgY(295.0f);
+        if (fmodf(time, 3.6f) < 1.6f) {
             int stw = MeasureText("GO SALLY!", 5);
-            DrawRectangle(sallyX - stw / 2 - 2, sallyY - 12, stw + 4, 8, Color{ 15, 35, 90, 220 });
-            VisualsEngine::DrawPixelText("GO SALLY!", sallyX - stw / 2, sallyY - 10, 5, Color{ 120, 225, 255, 255 });
-        } else if (fmodf(time, 3.6f) > 1.8f && fmodf(time, 3.6f) < 3.2f) {
-            int wtw = MeasureText("1903 FLYER!", 5);
-            DrawRectangle(wrightX - wtw / 2 - 2, wrightY - 12, wtw + 4, 8, Color{ 50, 35, 18, 220 });
-            VisualsEngine::DrawPixelText("1903 FLYER!", wrightX - wtw / 2, wrightY - 10, 5, Color{ 255, 220, 120, 255 });
+            DrawRectangle(sallyX - stw / 2 - 2, sallyY - 12, stw + 4, 8, Color{ 15, 35, 90, 225 });
+            DrawRectangleLines(sallyX - stw / 2 - 2, sallyY - 12, stw + 4, 8, Color{ 100, 210, 255, 230 });
+            VisualsEngine::DrawPixelText("GO SALLY!", sallyX - stw / 2, sallyY - 10, 5, Color{ 140, 235, 255, 255 });
+        } else if (fmodf(time, 3.6f) > 1.8f && fmodf(time, 3.6f) < 3.4f) {
+            int wtw = MeasureText("FIRST FLIGHT!", 5);
+            DrawRectangle(wrightX - wtw / 2 - 2, wrightY - 12, wtw + 4, 8, Color{ 50, 35, 18, 225 });
+            DrawRectangleLines(wrightX - wtw / 2 - 2, wrightY - 12, wtw + 4, 8, Color{ 255, 215, 90, 230 });
+            VisualsEngine::DrawPixelText("FIRST FLIGHT!", wrightX - wtw / 2, wrightY - 10, 5, Color{ 255, 225, 120, 255 });
         }
     } else if (stageId == STAGE_TOMB_UNKNOWN) {
-        // A. The Eternal Flame Burning Brightly with Multi-Layer Flickering Fire & Rising Embers
-        float flameX = BgX(242.0f);
-        float flameY = BgY(352.0f);
-        float flicker1 = sinf(time * 17.0f) * 2.5f;
-        float flicker2 = cosf(time * 23.0f + 1.1f) * 2.0f;
-        DrawCircle((int)flameX, (int)flameY - 4, 16.0f + sinf(time * 9.0f) * 2.5f, Color{ 255, 140, 20, 55 });
+        // A. The Eternal Flame Burning Brightly in the Bronze Brazier Pedestal (Right Midground: BgX(918), BgY(298))
+        float flameX = BgX(918.0f);
+        float flameY = BgY(298.0f);
+        float flicker1 = sinf(time * 17.0f) * 3.0f;
+        float flicker2 = cosf(time * 23.0f + 1.1f) * 2.5f;
+        DrawCircle((int)flameX, (int)flameY - 8, 22.0f + sinf(time * 9.0f) * 3.0f, Color{ 255, 145, 25, 55 });
         DrawTriangle(
-            Vector2{ flameX + flicker1, flameY - 17.0f - fabsf(flicker2) },
-            Vector2{ flameX - 7.0f, flameY + 2.0f },
-            Vector2{ flameX + 7.0f, flameY + 2.0f },
-            Color{ 255, 85, 15, 235 }
+            Vector2{ flameX + flicker1, flameY - 22.0f - fabsf(flicker2) },
+            Vector2{ flameX - 9.0f, flameY + 2.0f },
+            Vector2{ flameX + 9.0f, flameY + 2.0f },
+            Color{ 255, 85, 15, 195 }
         );
         DrawTriangle(
-            Vector2{ flameX - flicker2 * 0.6f, flameY - 13.0f - fabsf(flicker1) * 0.5f },
-            Vector2{ flameX - 4.5f, flameY + 2.0f },
-            Vector2{ flameX + 4.5f, flameY + 2.0f },
-            Color{ 255, 195, 35, 245 }
+            Vector2{ flameX - flicker2 * 0.6f, flameY - 16.0f - fabsf(flicker1) * 0.5f },
+            Vector2{ flameX - 5.5f, flameY + 2.0f },
+            Vector2{ flameX + 5.5f, flameY + 2.0f },
+            Color{ 255, 205, 45, 220 }
         );
-        DrawCircle((int)flameX, (int)flameY - 2, 3.0f, Color{ 255, 250, 210, 255 });
-        for (int e = 0; e < 5; e++) {
-            float eLife = fmodf(time * 1.8f + e * 0.2f, 1.0f);
-            float ex = flameX + sinf(time * 8.0f + e * 2.0f) * 4.5f;
-            float ey = flameY - 6.0f - eLife * 22.0f;
-            DrawPixel((int)ex, (int)ey, (e % 2 == 0) ? Color{ 255, 230, 90, 230 } : Color{ 255, 120, 30, 210 });
+        DrawCircle((int)flameX, (int)flameY - 3, 4.0f, Color{ 255, 250, 215, 240 });
+        for (int e = 0; e < 6; e++) {
+            float eLife = fmodf(time * 1.8f + e * 0.17f, 1.0f);
+            float ex = flameX + sinf(time * 8.0f + e * 2.0f) * 6.0f;
+            float ey = flameY - 8.0f - eLife * 26.0f;
+            DrawCircle((int)ex, (int)ey, 1.2f, (e % 2 == 0) ? Color{ 255, 235, 95, 235 } : Color{ 255, 120, 30, 215 });
         }
 
-        // B. Tomb of the Unknown Soldier Sentinel Guard Marching Back & Forth Along the Black Mat
-        float patrolCycle = fmodf(time * 0.18f, 2.0f); // 0..1 walk right, 1..2 walk left
-        bool marchRight = (patrolCycle < 1.0f);
-        float rawT = marchRight ? patrolCycle : (2.0f - patrolCycle);
-        // Pause briefly at each end of the 21-step mat for heel-click & rifle shoulder turn
-        float clampedT = std::clamp((rawT - 0.08f) / 0.84f, 0.0f, 1.0f);
-        bool atMatEnd = (rawT < 0.08f || rawT > 0.92f);
-        float sentX = BgX(430.0f + clampedT * 280.0f);
-        float sentY = BgY(435.0f);
-        float stepSwing = atMatEnd ? 0.0f : sinf(time * 7.5f) * 3.5f;
-        float dirS = marchRight ? 1.0f : -1.0f;
-
-        // Sentinel Shadow on the Black Mat
-        DrawEllipse((int)sentX, (int)sentY + 1, 6.0f, 2.0f, Color{ 5, 5, 10, 180 });
-        // Legs (Dress Blue Trousers with high-step cadence)
-        DrawLineEx(Vector2{ sentX - 1.5f, sentY - 10.0f }, Vector2{ sentX - 1.5f - stepSwing, sentY }, 2.2f, Color{ 18, 26, 48, 255 });
-        DrawLineEx(Vector2{ sentX + 1.5f, sentY - 10.0f }, Vector2{ sentX + 1.5f + stepSwing, sentY }, 2.2f, Color{ 24, 34, 62, 255 });
-        // Torso (Army Dress Blue Coat + Gold Waist Belt)
-        DrawRectangle((int)sentX - 4, (int)sentY - 21, 8, 12, Color{ 16, 24, 46, 255 });
-        DrawRectangleLines((int)sentX - 4, (int)sentY - 21, 8, 12, Color{ 8, 10, 18, 255 });
-        DrawLine((int)sentX - 4, (int)sentY - 14, (int)sentX + 4, (int)sentY - 14, Color{ 235, 195, 50, 255 });
-        // Head, Sunglasses & Peaked Visor Cap
-        DrawCircle((int)sentX, (int)sentY - 24, 3.0f, Color{ 235, 195, 160, 255 });
-        DrawRectangle((int)sentX - 4, (int)sentY - 28, 8, 3, Color{ 16, 24, 46, 255 });
-        DrawLine((int)sentX - 4, (int)sentY - 25, (int)sentX + 4, (int)sentY - 25, Color{ 235, 195, 50, 255 });
-        // Ceremonial M14 Rifle on Outside Shoulder + Gleaming Silver Bayonet + White Glove
-        float rifleX = sentX - dirS * 3.0f;
-        DrawLineEx(Vector2{ rifleX, sentY - 13.0f }, Vector2{ rifleX - dirS * 2.0f, sentY - 31.0f }, 1.8f, Color{ 120, 75, 35, 255 });
-        DrawLineEx(Vector2{ rifleX - dirS * 2.0f, sentY - 31.0f }, Vector2{ rifleX - dirS * 2.8f, sentY - 36.0f }, 1.4f, Color{ 220, 230, 245, 255 });
-        DrawCircle((int)rifleX, (int)sentY - 15, 1.8f, WHITE);
-        if (atMatEnd && fmodf(time * 6.0f, 1.0f) < 0.35f) {
-            // Heel-click glint at the 21-step turn
-            DrawCircleLines((int)sentX, (int)sentY, 5.0f, Color{ 255, 230, 120, 200 });
+        // B. Tomb Sentinels Bayonet Glint & 21-Step Heel-Click Cadence Along the Black Mat
+        int bayonetX = (int)BgX(398.0f);
+        int bayonetY = (int)BgY(260.0f);
+        if (fmodf(time * 2.2f, 1.0f) < 0.35f) {
+            DrawCircle(bayonetX, bayonetY, 3.5f, WHITE);
+            DrawLine(bayonetX - 6, bayonetY, bayonetX + 6, bayonetY, Color{ 220, 240, 255, 230 });
+            DrawLine(bayonetX, bayonetY - 6, bayonetX, bayonetY + 6, Color{ 220, 240, 255, 230 });
+        }
+        int heelX = (int)BgX(442.0f);
+        int heelY = (int)BgY(555.0f);
+        float stepWave = fmodf(time * 1.5f, 1.0f);
+        if (stepWave < 0.28f) {
+            DrawCircleLines(heelX, heelY, 4.0f + stepWave * 22.0f, Color{ 255, 225, 120, 190 });
         }
     }
 }
@@ -1439,9 +1403,9 @@ inline void UpdateAndTrackFighters(Fighter& p1, Fighter& p2) {
     bool critical = (p1.GetHealth() > 0 && p1.GetHealth() < 30) || (p2.GetHealth() > 0 && p2.GetHealth() < 30);
     AudioEngine::SetCriticalTempo(critical);
 
-    // Update Verlet Neckties / Ribbons
-    s_ties[0].Update(Vector2{ p1.GetPosition().x + (p1.IsFacingRight() ? 3.0f : -3.0f), p1.GetPosition().y - (p1.IsCrouching() ? 30.0f : 44.0f) }, p1.GetVelocity(), p1.IsFacingRight());
-    s_ties[1].Update(Vector2{ p2.GetPosition().x + (p2.IsFacingRight() ? 3.0f : -3.0f), p2.GetPosition().y - (p2.IsCrouching() ? 30.0f : 44.0f) }, p2.GetVelocity(), p2.IsFacingRight());
+    // Update Verlet Neckties / Ribbons (anchored at collar height)
+    s_ties[0].Update(Vector2{ p1.GetPosition().x + (p1.IsFacingRight() ? 4.0f : -4.0f), p1.GetPosition().y - (p1.IsCrouching() ? 48.0f : 68.0f) }, p1.GetVelocity(), p1.IsFacingRight());
+    s_ties[1].Update(Vector2{ p2.GetPosition().x + (p2.IsFacingRight() ? 4.0f : -4.0f), p2.GetPosition().y - (p2.IsCrouching() ? 48.0f : 68.0f) }, p2.GetVelocity(), p2.IsFacingRight());
 
     // Record CPS-1 Afterimage Ghost Trails on Specials & Jumps
     const Fighter* fighters[2] = { &p1, &p2 };
