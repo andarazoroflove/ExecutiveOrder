@@ -3208,91 +3208,103 @@ struct FMVoiceState {
 };
 
 void AudioEngine::SynthesizeBgmTracks() {
-    // Championship Edition 4-Voice YM2151 / OKI6295 Arcade Soundboard
-    // Faster 64-step arcade tracker with slap-bass, FM brass leads, fast arpeggiators,
-    // harmonic chord stabs, and gated-reverb arcade drums!
-    constexpr int LOOP_SAMPLES = 96000;
-    constexpr int STEPS = 64;
+    // Championship Edition Warm & Heavy CPS-1 Remaster of the Original Tracks:
+    // - 32 steps over 86,400 samples (slower, heavier arcade groove, zero "deedle-dee" arpeggios)
+    // - Pitched down ~2-3 semitones (0.86x) with a warm lower-octave unison & power-fifth pad
+    // - Deep sub-bass reinforcement + smooth low-pass warmth filter
+    constexpr int LOOP_SAMPLES = 86400;
+    constexpr int STEPS = 32;
     constexpr int SAMPLES_PER_STEP = LOOP_SAMPLES / STEPS;
-
-    static const int ceBass[6][16] = {
-        // Track 0: Championship Edition Title / Select Overdrive Fanfare (A Minor / F / G / E)
-        { 110, 110, 220, 110, 87, 87, 175, 87, 98, 98, 196, 98, 82, 165, 123, 165 },
-        // Track 1: East Wing Turbo Funk (E Minor Slap Bass)
-        { 82, 82, 165, 98, 110, 110, 220, 98, 82, 82, 165, 123, 131, 123, 110, 98 },
-        // Track 2: Reflecting Pool CPS-1 Heroic Theme (C#m / A / B / G#m)
-        { 138, 138, 277, 138, 110, 110, 220, 110, 123, 123, 247, 123, 104, 208, 123, 138 },
-        // Track 3: Capitol & Press Room High-Stakes Showdown (D Minor Gallop)
-        { 73, 147, 147, 73, 87, 175, 175, 87, 98, 196, 196, 98, 110, 220, 110, 98 },
-        // Track 4: Final Boss / Pentagon / Island Theme (F Minor Doom Synth)
-        { 87, 175, 87, 175, 104, 208, 104, 208, 78, 156, 78, 156, 82, 165, 98, 131 },
-        // Track 5: Bonus Car / Hyper Turbo Theme (G Mixolydian)
-        { 98, 196, 123, 147, 165, 147, 123, 98, 110, 220, 138, 165, 185, 165, 138, 110 }
-    };
-
-    static const int ceLead[6][16] = {
-        // Track 0: Heroic Championship Brass Lead
-        { 440, 523, 659, 880, 784, 659, 523, 659, 587, 659, 784, 987, 880, 784, 659, 880 },
-        // Track 1: Syncopated FM Synth Lead
-        { 329, 392, 440, 494, 659, 587, 494, 440, 329, 392, 494, 659, 784, 659, 587, 494 },
-        // Track 2: Soaring Arcade Melody
-        { 554, 659, 740, 830, 740, 659, 554, 494, 554, 659, 830, 987, 880, 830, 740, 659 },
-        // Track 3: Intense Debate Lead
-        { 587, 698, 880, 698, 784, 880, 1046, 880, 784, 698, 659, 587, 659, 784, 880, 1174 },
-        // Track 4: Boss Cyber-Organ Lead
-        { 349, 415, 523, 698, 622, 523, 466, 415, 349, 466, 523, 698, 784, 698, 622, 523 },
-        // Track 5: Hyper Arcade Lead
-        { 392, 494, 587, 784, 659, 784, 880, 987, 880, 784, 659, 587, 659, 784, 987, 1174 }
-    };
+    constexpr float PITCH_DOWN = 0.86f; // Down ~2.5 semitones for a darker, weightier arcade tone
 
     for (int t = 0; t < 6; t++) {
         m_bgmTracks[t].resize(LOOP_SAMPLES);
         FMVoiceState bassVoice;
+        FMVoiceState subBassVoice;
         FMVoiceState leadVoice;
-        FMVoiceState arpVoice;
-        FMVoiceState chordVoice;
+        FMVoiceState warmPadVoice;
+        float lpfState = 0.0f;
 
         for (int step = 0; step < STEPS; step++) {
-            float bassFreq = (float)ceBass[t][step % 16];
-            float leadFreq = (float)ceLead[t][(step / 2) % 16];
-            if ((step >= 32) && (step % 4 == 0)) {
-                leadFreq *= 1.25f; // Second-half phrase lift
+            float bassFreq = 55.0f;
+            float leadFreq = 0.0f;
+
+            if (t == 0) {
+                int bassNotes[8] = { 55, 55, 65, 55, 73, 65, 55, 49 };
+                bassFreq = (float)bassNotes[step % 8];
+                int menuLead[16] = { 220, 0, 220, 261, 220, 0, 196, 0, 220, 0, 261, 293, 261, 220, 196, 0 };
+                leadFreq = (float)menuLead[step % 16];
+            } else if (t == 1) {
+                int bassRiff[16] = { 55, 55, 110, 55, 65, 55, 98, 55, 55, 55, 110, 65, 73, 65, 49, 52 };
+                bassFreq = (float)bassRiff[step % 16];
+                int leadRiff[16] = { 220, 0, 261, 293, 329, 0, 293, 261, 220, 261, 293, 349, 329, 293, 261, 196 };
+                leadFreq = (float)leadRiff[step % 16];
+            } else if (t == 2) {
+                int bassNotes[16] = { 65, 65, 65, 65, 58, 58, 58, 58, 49, 49, 49, 49, 55, 55, 62, 62 };
+                bassFreq = (float)bassNotes[step % 16];
+                int leadNotes[16] = { 261, 0, 293, 329, 329, 293, 261, 0, 329, 0, 392, 440, 392, 329, 293, 0 };
+                leadFreq = (float)leadNotes[step % 16];
+            } else if (t == 3) {
+                int bassNotes[16] = { 73, 73, 82, 73, 87, 73, 98, 73, 73, 82, 87, 98, 110, 98, 87, 82 };
+                bassFreq = (float)bassNotes[step % 16];
+                int leadNotes[16] = { 293, 0, 329, 349, 392, 349, 329, 0, 293, 349, 392, 440, 392, 349, 329, 0 };
+                leadFreq = (float)leadNotes[step % 16];
+            } else if (t == 4) {
+                int bassNotes[16] = { 41, 41, 82, 41, 49, 41, 73, 41, 41, 41, 82, 49, 55, 49, 41, 44 };
+                bassFreq = (float)bassNotes[step % 16];
+                int bossLead[16] = { 165, 0, 196, 165, 220, 0, 196, 185, 165, 0, 220, 247, 220, 196, 165, 0 };
+                leadFreq = (float)bossLead[step % 16];
+            } else {
+                int bonusBass[16] = { 65, 65, 130, 65, 78, 65, 116, 65, 73, 65, 146, 73, 82, 73, 65, 78 };
+                bassFreq = (float)bonusBass[step % 16];
+                int bonusLead[16] = { 261, 0, 329, 392, 329, 261, 0, 196, 293, 0, 349, 440, 349, 293, 0, 220 };
+                leadFreq = (float)bonusLead[step % 16];
             }
-            float arpMult = (step % 3 == 0) ? 2.0f : ((step % 3 == 1) ? 2.5f : 3.0f);
-            float arpFreq = bassFreq * arpMult;
-            float chordFreq = bassFreq * 1.5f;
+
+            bassFreq *= PITCH_DOWN;
+            leadFreq *= PITCH_DOWN;
 
             for (int s = 0; s < SAMPLES_PER_STEP; s++) {
                 int sampleIdx = step * SAMPLES_PER_STEP + s;
                 float stepT = (float)s / SAMPLES_PER_STEP;
 
                 float bassEnv = expf(-stepT * 4.2f);
-                float leadEnv = (stepT < 0.08f) ? (stepT / 0.08f) : expf(-(stepT - 0.08f) * 2.2f);
-                float arpEnv = expf(-stepT * 7.5f);
-                float chordEnv = ((step % 8 == 0) || (step % 8 == 3) || (step % 8 == 6)) ? expf(-stepT * 3.5f) : 0.0f;
+                float leadEnv = sinf(stepT * PI_F * 0.92f) * expf(-stepT * 1.4f);
 
-                // CPS-1 Gated Drums (Double-Kick, Snare, Tom Fills & Hi-Hats)
+                // Heavy Arcade Drums (Deep Punch Kick, Warm Low Snare, Subtle Hats)
                 float drum = 0.0f;
-                if ((step % 4 == 0) || (step % 16 == 14) || (step % 16 == 15)) {
-                    float kFreq = 165.0f * expf(-stepT * 22.0f) + 42.0f;
-                    drum += sinf(2.0f * PI_F * kFreq * ((float)s / SAMPLE_RATE)) * expf(-stepT * 8.0f) * 0.65f;
+                if ((step % 4) == 0 || (step % 16 == 11)) {
+                    float kFreq = 115.0f * expf(-stepT * 18.0f) + 36.0f;
+                    drum += sinf(2.0f * PI_F * kFreq * ((float)s / SAMPLE_RATE)) * expf(-stepT * 8.5f) * 0.68f;
                 }
-                if ((step % 4 == 2)) {
+                if ((step % 4) == 2) {
                     float noise = ((float)rand() / (float)RAND_MAX * 2.0f - 1.0f);
-                    float body = sinf(2.0f * PI_F * 195.0f * ((float)s / SAMPLE_RATE)) * expf(-stepT * 14.0f);
-                    drum += (noise * 0.72f + body * 0.45f) * expf(-stepT * 7.5f) * 0.50f;
+                    float snareBody = sinf(2.0f * PI_F * 145.0f * ((float)s / SAMPLE_RATE)) * expf(-stepT * 14.0f);
+                    drum += (noise * 0.42f + snareBody * 0.58f) * expf(-stepT * 9.0f) * 0.48f;
                 }
-                float hatNoise = ((float)rand() / (float)RAND_MAX * 2.0f - 1.0f);
-                float hatDecay = (step % 2 == 1) ? 18.0f : 36.0f;
-                drum += hatNoise * expf(-stepT * hatDecay) * 0.16f;
+                if ((step % 2) == 0) {
+                    float hatNoise = ((float)rand() / (float)RAND_MAX * 2.0f - 1.0f);
+                    drum += hatNoise * expf(-stepT * 34.0f) * 0.08f;
+                }
 
-                float bass = bassVoice.Process(bassFreq, 2.0f, 2.6f, bassEnv) * 0.42f;
-                float lead = leadVoice.Process(leadFreq, 1.0f, 1.8f, leadEnv) * 0.28f;
-                float arp = arpVoice.Process(arpFreq, 3.0f, 1.2f, arpEnv) * 0.16f;
-                float chord = chordVoice.Process(chordFreq, 2.0f, 1.1f, chordEnv) * 0.18f;
+                // Deep FM Bass + Sub-Octave Warm Reinforcement
+                float bass = bassVoice.Process(bassFreq, 2.0f, 1.6f, bassEnv) * 0.44f
+                           + subBassVoice.Process(bassFreq * 0.5f, 1.0f, 0.4f, bassEnv) * 0.28f;
 
-                float mix = (bass + lead + arp + chord + drum) * 0.62f;
-                m_bgmTracks[t][sampleIdx] = (int16_t)std::clamp(mix * 29500.0f, -32000.0f, 32000.0f);
+                // Warm Mid-Range Lead + Lower-Octave Brass Body (no high-pitched squeaks)
+                float lead = 0.0f;
+                if (leadFreq > 40.0f) {
+                    float mainLead = leadVoice.Process(leadFreq, 2.0f, 1.1f, leadEnv) * 0.22f;
+                    float warmOctave = warmPadVoice.Process(leadFreq * 0.5f, 1.5f, 0.8f, leadEnv) * 0.18f;
+                    lead = mainLead + warmOctave;
+                }
+
+                // Analog-style smoothing filter on melodic voices for rich, non-fatiguing CPS-1 warmth
+                float synthRaw = bass + lead;
+                lpfState += (synthRaw - lpfState) * 0.38f;
+
+                float mix = (lpfState + drum) * 0.62f;
+                m_bgmTracks[t][sampleIdx] = (int16_t)std::clamp(mix * 28500.0f, -32000.0f, 32000.0f);
             }
         }
     }
