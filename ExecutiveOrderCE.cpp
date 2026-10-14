@@ -62,7 +62,10 @@ enum StageId {
     STAGE_WTC_PLAZA = 6,
     STAGE_COMET_PING_PONG = 7,
     STAGE_FLORIDA_KEYS = 8,
-    STAGE_COUNT = 9
+    STAGE_LINCOLN_MEMORIAL = 9,
+    STAGE_SMITHSONIAN_AERO = 10,
+    STAGE_TOMB_UNKNOWN = 11,
+    STAGE_COUNT = 12
 };
 
 enum GameState {
@@ -1241,18 +1244,173 @@ inline void DrawStageUpgrades(StageId stageId, float camX, float time) {
     for (int p = 0; p < 16; p++) {
         float px = fmodf(p * 37.0f + time * (16.0f + (p % 4) * 4.0f) - camX * 0.6f + 1600.0f, (float)SCREEN_WIDTH);
         float py = fmodf(p * 23.0f + time * (18.0f + (p % 3) * 5.0f), GROUND_Y - 8.0f);
-        if (stageId == STAGE_REFLECTING_POOL || stageId == STAGE_FLORIDA_KEYS) {
-            // Drifting Cherry Blossom Petals
+        if (stageId == STAGE_REFLECTING_POOL || stageId == STAGE_FLORIDA_KEYS || stageId == STAGE_LINCOLN_MEMORIAL) {
+            // Drifting Cherry Blossom Petals / Confetti
             DrawCircle((int)px, (int)py, 2.0f, Color{ 255, 185, 215, 210 });
             DrawPixel((int)px + 1, (int)py, WHITE);
-        } else if (stageId == STAGE_CONGRESSIONAL_FLOOR || stageId == STAGE_PRESS_BRIEFING || stageId == STAGE_WTC_PLAZA) {
-            // Fluttering Legal Subpoenas / Press Notes
+        } else if (stageId == STAGE_CONGRESSIONAL_FLOOR || stageId == STAGE_PRESS_BRIEFING || stageId == STAGE_WTC_PLAZA || stageId == STAGE_SMITHSONIAN_AERO) {
+            // Fluttering Legal Subpoenas / Press Notes / Museum Pamphlets
             float sway = sinf(time * 5.0f + p) * 3.0f;
             DrawRectangle((int)(px + sway), (int)py, 4, 3, Color{ 250, 245, 220, 195 });
         } else {
-            // Rising Arcade Embers
+            // Rising Arcade Embers (East Wing, Pentagon, Comet, Tomb Eternal Flame)
             float ey = GROUND_Y - py;
             DrawCircle((int)px, (int)ey, 1.5f, (p % 2 == 0) ? Color{ 255, 190, 50, 200 } : Color{ 255, 90, 30, 190 });
+        }
+    }
+
+    // 5. Stage-Specific Live Animations for the 3 New Championship Edition Venues
+    float minCam = STAGE_MIN_X;
+    float maxCam = STAGE_MAX_X - SCREEN_WIDTH;
+    float scrollT = std::clamp((camX - minCam) / (maxCam - minCam), 0.0f, 1.0f);
+    float srcH = 640.0f;
+    float srcW = srcH * ((float)SCREEN_WIDTH / (float)SCREEN_HEIGHT);
+    float srcX = scrollT * (1140.0f - srcW);
+    auto BgX = [&](float tx) -> float { return (tx - srcX) * ((float)SCREEN_WIDTH / srcW); };
+    auto BgY = [&](float ty) -> float { return ty * ((float)SCREEN_HEIGHT / srcH); };
+
+    if (stageId == STAGE_LINCOLN_MEMORIAL) {
+        // A. Abraham Lincoln Seated in His Marble Chair Clapping & Cheering Along as the Fight Progresses!
+        float fightProgress = std::clamp((200.0f - (s_p1TrailHp + s_p2TrailHp)) / 160.0f, 0.0f, 1.0f);
+        float clapSpeed = 6.5f + fightProgress * 9.5f;
+        float clapWave = fabsf(sinf(time * clapSpeed));
+        float clapGap = clapWave * 7.5f;
+        int lincX = (int)BgX(570.0f);
+        int lincY = (int)BgY(216.0f) - (int)((1.0f - clapWave) * 2.0f);
+
+        // Animated marble hands clapping together in front of Lincoln's chest
+        Color marbleBase{ 242, 240, 234, 255 };
+        Color marbleShadow{ 155, 152, 146, 255 };
+        DrawCircle((int)(lincX - 3.0f - clapGap), lincY + 12, 4.0f, marbleShadow);
+        DrawCircle((int)(lincX - 3.0f - clapGap), lincY + 12, 3.0f, marbleBase);
+        DrawCircle((int)(lincX + 3.0f + clapGap), lincY + 12, 4.0f, marbleShadow);
+        DrawCircle((int)(lincX + 3.0f + clapGap), lincY + 12, 3.0f, marbleBase);
+
+        // Impact clap burst & Lincoln cheering callout as the fight intensifies
+        if (clapWave < 0.22f) {
+            DrawCircleLines(lincX, lincY + 12, 7.0f + (0.22f - clapWave) * 24.0f, Color{ 255, 235, 110, 220 });
+            DrawLine(lincX - 9, lincY + 6, lincX - 13, lincY + 2, Color{ 255, 245, 160, 230 });
+            DrawLine(lincX + 9, lincY + 6, lincX + 13, lincY + 2, Color{ 255, 245, 160, 230 });
+            const char* cheers[4] = { "CLAP! CLAP!", "BRAVO!", "FOUR SCORE!", "ENCORE!" };
+            const char* ch = cheers[((int)(time * 2.0f)) % 4];
+            int ctw = MeasureText(ch, 6);
+            DrawRectangle(lincX - ctw / 2 - 3, lincY - 16, ctw + 6, 9, Color{ 15, 20, 35, 215 });
+            DrawRectangleLines(lincX - ctw / 2 - 3, lincY - 16, ctw + 6, 9, Color{ 255, 220, 70, 230 });
+            VisualsEngine::DrawPixelText(ch, lincX - ctw / 2, lincY - 14, 6, Color{ 255, 235, 90, 255 });
+        }
+
+        // B. Animated Bobbing Protest Signs on the Steps (Crunchy Granolas & Blue-Hairs)
+        struct ProtestSign { float tx; float ty; const char* label; Color col; };
+        ProtestSign signs[4] = {
+            { 170.0f, 290.0f, "FREE KALE", Color{ 160, 245, 130, 245 } },
+            { 295.0f, 325.0f, "PEACE NOW", Color{ 255, 225, 110, 245 } },
+            { 845.0f, 320.0f, "NO VETO!", Color{ 255, 150, 210, 245 } },
+            { 975.0f, 290.0f, "COEXIST", Color{ 130, 225, 255, 245 } }
+        };
+        for (int i = 0; i < 4; i++) {
+            float bob = sinf(time * (5.5f + i * 0.8f) + i * 1.7f) * 3.5f;
+            int sx = (int)BgX(signs[i].tx);
+            int sy = (int)BgY(signs[i].ty) + (int)bob;
+            int sw = MeasureText(signs[i].label, 5) + 6;
+            DrawLine(sx, sy + 9, sx, sy + 18, Color{ 140, 100, 55, 255 });
+            DrawRectangle(sx - sw / 2, sy, sw, 10, signs[i].col);
+            DrawRectangleLines(sx - sw / 2, sy, sw, 10, Color{ 30, 25, 25, 240 });
+            VisualsEngine::DrawPixelText(signs[i].label, sx - sw / 2 + 3, sy + 2, 5, Color{ 20, 20, 28, 255 });
+        }
+    } else if (stageId == STAGE_SMITHSONIAN_AERO) {
+        // A. Suspended MQ-1 Predator Drone Overhead (Spinning Rear Propeller, Wingtip Strobes & Sensor Sweep)
+        int droneX = (int)BgX(565.0f);
+        int droneY = (int)BgY(92.0f);
+        float propSpan = sinf(time * 48.0f) * 11.0f;
+        DrawLine(droneX - (int)propSpan, droneY - 4, droneX + (int)propSpan, droneY + 4, Color{ 220, 235, 255, 200 });
+        if (fmodf(time * 2.6f, 1.0f) < 0.35f) {
+            DrawCircle((int)BgX(485.0f), droneY + 6, 2.5f, Color{ 255, 45, 45, 245 });
+            DrawCircle((int)BgX(645.0f), droneY + 6, 2.5f, Color{ 45, 255, 90, 245 });
+        }
+        float scanX = droneX + sinf(time * 2.2f) * 42.0f;
+        DrawLine(droneX, droneY + 10, (int)scanX, (int)GROUND_Y - 12, Color{ 255, 40, 40, 45 });
+        DrawCircle((int)scanX, (int)GROUND_Y - 12, 2.5f, Color{ 255, 50, 50, 140 });
+
+        // B. Sally Ride by the Space Shuttle & Wright Brothers by the 1903 Wright Flyer Cheering Callouts
+        int sallyX = (int)BgX(235.0f);
+        int sallyY = (int)BgY(365.0f);
+        int wrightX = (int)BgX(915.0f);
+        int wrightY = (int)BgY(365.0f);
+
+        // Spinning twin wooden propellers on the 1903 Wright Flyer
+        float wpSpan = cosf(time * 38.0f) * 8.0f;
+        DrawLine((int)BgX(870.0f), (int)BgY(235.0f) - (int)wpSpan, (int)BgX(870.0f), (int)BgY(235.0f) + (int)wpSpan, Color{ 210, 170, 105, 195 });
+        DrawLine((int)BgX(945.0f), (int)BgY(235.0f) - (int)wpSpan, (int)BgX(945.0f), (int)BgY(235.0f) + (int)wpSpan, Color{ 210, 170, 105, 195 });
+
+        if (fmodf(time, 3.6f) < 1.4f) {
+            int stw = MeasureText("GO SALLY!", 5);
+            DrawRectangle(sallyX - stw / 2 - 2, sallyY - 12, stw + 4, 8, Color{ 15, 35, 90, 220 });
+            VisualsEngine::DrawPixelText("GO SALLY!", sallyX - stw / 2, sallyY - 10, 5, Color{ 120, 225, 255, 255 });
+        } else if (fmodf(time, 3.6f) > 1.8f && fmodf(time, 3.6f) < 3.2f) {
+            int wtw = MeasureText("1903 FLYER!", 5);
+            DrawRectangle(wrightX - wtw / 2 - 2, wrightY - 12, wtw + 4, 8, Color{ 50, 35, 18, 220 });
+            VisualsEngine::DrawPixelText("1903 FLYER!", wrightX - wtw / 2, wrightY - 10, 5, Color{ 255, 220, 120, 255 });
+        }
+    } else if (stageId == STAGE_TOMB_UNKNOWN) {
+        // A. The Eternal Flame Burning Brightly with Multi-Layer Flickering Fire & Rising Embers
+        float flameX = BgX(242.0f);
+        float flameY = BgY(352.0f);
+        float flicker1 = sinf(time * 17.0f) * 2.5f;
+        float flicker2 = cosf(time * 23.0f + 1.1f) * 2.0f;
+        DrawCircle((int)flameX, (int)flameY - 4, 16.0f + sinf(time * 9.0f) * 2.5f, Color{ 255, 140, 20, 55 });
+        DrawTriangle(
+            Vector2{ flameX + flicker1, flameY - 17.0f - fabsf(flicker2) },
+            Vector2{ flameX - 7.0f, flameY + 2.0f },
+            Vector2{ flameX + 7.0f, flameY + 2.0f },
+            Color{ 255, 85, 15, 235 }
+        );
+        DrawTriangle(
+            Vector2{ flameX - flicker2 * 0.6f, flameY - 13.0f - fabsf(flicker1) * 0.5f },
+            Vector2{ flameX - 4.5f, flameY + 2.0f },
+            Vector2{ flameX + 4.5f, flameY + 2.0f },
+            Color{ 255, 195, 35, 245 }
+        );
+        DrawCircle((int)flameX, (int)flameY - 2, 3.0f, Color{ 255, 250, 210, 255 });
+        for (int e = 0; e < 5; e++) {
+            float eLife = fmodf(time * 1.8f + e * 0.2f, 1.0f);
+            float ex = flameX + sinf(time * 8.0f + e * 2.0f) * 4.5f;
+            float ey = flameY - 6.0f - eLife * 22.0f;
+            DrawPixel((int)ex, (int)ey, (e % 2 == 0) ? Color{ 255, 230, 90, 230 } : Color{ 255, 120, 30, 210 });
+        }
+
+        // B. Tomb of the Unknown Soldier Sentinel Guard Marching Back & Forth Along the Black Mat
+        float patrolCycle = fmodf(time * 0.18f, 2.0f); // 0..1 walk right, 1..2 walk left
+        bool marchRight = (patrolCycle < 1.0f);
+        float rawT = marchRight ? patrolCycle : (2.0f - patrolCycle);
+        // Pause briefly at each end of the 21-step mat for heel-click & rifle shoulder turn
+        float clampedT = std::clamp((rawT - 0.08f) / 0.84f, 0.0f, 1.0f);
+        bool atMatEnd = (rawT < 0.08f || rawT > 0.92f);
+        float sentX = BgX(430.0f + clampedT * 280.0f);
+        float sentY = BgY(435.0f);
+        float stepSwing = atMatEnd ? 0.0f : sinf(time * 7.5f) * 3.5f;
+        float dirS = marchRight ? 1.0f : -1.0f;
+
+        // Sentinel Shadow on the Black Mat
+        DrawEllipse((int)sentX, (int)sentY + 1, 6.0f, 2.0f, Color{ 5, 5, 10, 180 });
+        // Legs (Dress Blue Trousers with high-step cadence)
+        DrawLineEx(Vector2{ sentX - 1.5f, sentY - 10.0f }, Vector2{ sentX - 1.5f - stepSwing, sentY }, 2.2f, Color{ 18, 26, 48, 255 });
+        DrawLineEx(Vector2{ sentX + 1.5f, sentY - 10.0f }, Vector2{ sentX + 1.5f + stepSwing, sentY }, 2.2f, Color{ 24, 34, 62, 255 });
+        // Torso (Army Dress Blue Coat + Gold Waist Belt)
+        DrawRectangle((int)sentX - 4, (int)sentY - 21, 8, 12, Color{ 16, 24, 46, 255 });
+        DrawRectangleLines((int)sentX - 4, (int)sentY - 21, 8, 12, Color{ 8, 10, 18, 255 });
+        DrawLine((int)sentX - 4, (int)sentY - 14, (int)sentX + 4, (int)sentY - 14, Color{ 235, 195, 50, 255 });
+        // Head, Sunglasses & Peaked Visor Cap
+        DrawCircle((int)sentX, (int)sentY - 24, 3.0f, Color{ 235, 195, 160, 255 });
+        DrawRectangle((int)sentX - 4, (int)sentY - 28, 8, 3, Color{ 16, 24, 46, 255 });
+        DrawLine((int)sentX - 4, (int)sentY - 25, (int)sentX + 4, (int)sentY - 25, Color{ 235, 195, 50, 255 });
+        // Ceremonial M14 Rifle on Outside Shoulder + Gleaming Silver Bayonet + White Glove
+        float rifleX = sentX - dirS * 3.0f;
+        DrawLineEx(Vector2{ rifleX, sentY - 13.0f }, Vector2{ rifleX - dirS * 2.0f, sentY - 31.0f }, 1.8f, Color{ 120, 75, 35, 255 });
+        DrawLineEx(Vector2{ rifleX - dirS * 2.0f, sentY - 31.0f }, Vector2{ rifleX - dirS * 2.8f, sentY - 36.0f }, 1.4f, Color{ 220, 230, 245, 255 });
+        DrawCircle((int)rifleX, (int)sentY - 15, 1.8f, WHITE);
+        if (atMatEnd && fmodf(time * 6.0f, 1.0f) < 0.35f) {
+            // Heel-click glint at the 21-step turn
+            DrawCircleLines((int)sentX, (int)sentY, 5.0f, Color{ 255, 230, 120, 200 });
         }
     }
 }
@@ -4927,6 +5085,27 @@ StageManager::StageManager() {
         Color{ 240, 220, 130, 255 }, Color{ 225, 215, 180, 255 },
         Color{ 255, 215, 0, 255 }
     };
+
+    m_venues[STAGE_LINCOLN_MEMORIAL] = VenueDetails{
+        "LINCOLN MEMORIAL", "NATIONAL MALL - MEMORIAL STEPS",
+        Color{ 25, 45, 85, 255 }, Color{ 70, 110, 165, 255 },
+        Color{ 225, 220, 210, 255 }, Color{ 175, 172, 165, 255 },
+        Color{ 255, 215, 60, 255 }
+    };
+
+    m_venues[STAGE_SMITHSONIAN_AERO] = VenueDetails{
+        "SMITHSONIAN AEROSPACE", "NATIONAL AIR & SPACE MUSEUM",
+        Color{ 18, 28, 48, 255 }, Color{ 45, 70, 110, 255 },
+        Color{ 130, 145, 165, 255 }, Color{ 70, 75, 88, 255 },
+        Color{ 80, 220, 255, 255 }
+    };
+
+    m_venues[STAGE_TOMB_UNKNOWN] = VenueDetails{
+        "TOMB OF THE UNKNOWN", "ARLINGTON NATIONAL CEMETERY",
+        Color{ 22, 28, 52, 255 }, Color{ 85, 55, 70, 255 },
+        Color{ 215, 210, 205, 255 }, Color{ 145, 142, 140, 255 },
+        Color{ 255, 185, 50, 255 }
+    };
 }
 
 StageManager::~StageManager() {
@@ -4954,7 +5133,8 @@ void StageManager::Init() {
 
     const char* namedStages[STAGE_COUNT] = {
         "stage_0.png", "stage_1.png", "stage_2.png", "stage_3.png", "stage_4.png", "stage_5.png",
-        "stage_wtc_plaza.png", "stage_comet_ping_pong.png", "stage_florida_keys.png"
+        "stage_wtc_plaza.png", "stage_comet_ping_pong.png", "stage_florida_keys.png",
+        "stage_lincoln_memorial.png", "stage_smithsonian_aero.png", "stage_tomb_unknown.png"
     };
 
     for (int i = 0; i < STAGE_COUNT; i++) {
@@ -7067,25 +7247,37 @@ void VisualsEngine::DrawStageAndCharSelect(int selectedStage, int p1Char, int p2
     DrawPixelText("RADAR: DC SECTOR 01", 210, 22, 6, Color{ 0, 210, 190, 200 });
     DrawPixelText("38.89 N / 77.03 W", 210, 30, 6, Color{ 0, 170, 160, 180 });
 
-    Vector2 pins[6] = {
+    Vector2 pins[STAGE_COUNT] = {
         { 180, 48 },
         { 158, 88 },
         { 288, 78 },
         { 180, 64 },
         { 168, 42 },
-        { 82, 148 }
+        { 82, 148 },
+        { 295, 38 },
+        { 145, 36 },
+        { 260, 138 },
+        { 118, 88 },
+        { 228, 92 },
+        { 78, 118 }
     };
 
-    const char* pinNames[6] = {
+    const char* pinNames[STAGE_COUNT] = {
         "1. EAST WING DEMO",
         "2. REFLECTING POOL",
         "3. CONGRESS FLOOR",
         "4. WHITE HOUSE MMA",
         "5. PRESS BRIEFING",
-        "6. PENTAGON ALTAR"
+        "6. PENTAGON ALTAR",
+        "7. WTC PLAZA NYC",
+        "8. COMET PING PONG",
+        "9. TEMPLE ISLAND",
+        "10. LINCOLN MEMORIAL",
+        "11. SMITHSONIAN AERO",
+        "12. TOMB OF UNKNOWN"
     };
 
-    for (int i = 0; i < 6; i++) {
+    for (int i = 0; i < STAGE_COUNT; i++) {
         bool sel = (i == selectedStage);
         Color pinCol = sel ? Color{ 255, 230, 40, 255 } : Color{ 0, 180, 220, 255 };
 
@@ -7168,7 +7360,10 @@ void VisualsEngine::DrawStageAndCharSelect(int selectedStage, int p1Char, int p2
         "PENTAGON ALTAR",
         "WTC PLAZA (PRE-9/11)",
         "COMET PING PONG",
-        "TEMPLE ISLAND (FL KEYS)"
+        "TEMPLE ISLAND (FL KEYS)",
+        "LINCOLN MEMORIAL STEPS",
+        "SMITHSONIAN AIR & SPACE",
+        "TOMB OF THE UNKNOWN"
     };
 
     char venueBanner[64];
@@ -7525,7 +7720,10 @@ void VisualsEngine::DrawSecretSelectScreen(int step, int p1Char, int p2Char, int
         "6. PENTAGON ALTAR",
         "7. WTC PLAZA NYC",
         "8. COMET PING PONG",
-        "9. TEMPLE ISLAND"
+        "9. TEMPLE ISLAND",
+        "10. LINCOLN MEMORIAL",
+        "11. SMITHSONIAN AERO",
+        "12. TOMB OF UNKNOWN"
     };
 
     const char* stageCardTitles[STAGE_COUNT] = {
@@ -7537,7 +7735,10 @@ void VisualsEngine::DrawSecretSelectScreen(int step, int p1Char, int p2Char, int
         "6. PENTAGON",
         "7. WTC PLAZA",
         "8. COMET PING",
-        "9. TEMPLE ISLE"
+        "9. TEMPLE ISLE",
+        "10. LINCOLN MEM",
+        "11. AIR & SPACE",
+        "12. UNKNOWN TOMB"
     };
 
     const char* stageCardSub[STAGE_COUNT] = {
@@ -7549,7 +7750,10 @@ void VisualsEngine::DrawSecretSelectScreen(int step, int p1Char, int p2Char, int
         "War Altar",
         "Pre-9/11 NYC",
         "Basement Club",
-        "Florida Keys"
+        "Florida Keys",
+        "Memorial Steps",
+        "Smithsonian",
+        "Arlington, VA"
     };
 
     const char* stageVenues[STAGE_COUNT] = {
@@ -7561,7 +7765,10 @@ void VisualsEngine::DrawSecretSelectScreen(int step, int p1Char, int p2Char, int
         "Pentagon - War Altar",
         "NYC - WTC Plaza (1990s)",
         "Comet Ping Pong Basement",
-        "Florida Keys - Private Isle"
+        "Florida Keys - Private Isle",
+        "Lincoln Memorial Steps",
+        "Smithsonian Air & Space",
+        "Tomb of the Unknown Soldier"
     };
 
     int cardW = 62;
@@ -7747,12 +7954,12 @@ void VisualsEngine::DrawSecretSelectScreen(int step, int p1Char, int p2Char, int
     } else if (step == 2) {
 
         int cardW = 114;
-        int cardH = 26;
+        int cardH = 22;
         for (int i = 0; i < STAGE_COUNT; i++) {
             int col = i % 3;
             int row = i / 3;
             int cx = 16 + col * 120;
-            int cy = 92 + row * 30;
+            int cy = 89 + row * 28;
 
             bool isSelected = (i == selectedStage);
             DrawRectangle(cx, cy, cardW, cardH, isSelected ? Color{ 25, 45, 75, 255 } : Color{ 14, 20, 32, 255 });
@@ -8529,6 +8736,7 @@ void AIController::Update(InputManager& input, const Fighter& cpu, const Fighter
 #include <cstdlib>
 #include <cstring>
 #include <csignal>
+#include <ctime>
 
 static volatile sig_atomic_t s_quitRequested = 0;
 
@@ -8559,6 +8767,7 @@ static void CrashSignalHandler(int sig) {
 }
 
 int main(int argc, char* argv[]) {
+    std::srand((unsigned int)std::time(nullptr));
     std::signal(SIGTERM, CleanExitSignalHandler);
     std::signal(SIGINT, CleanExitSignalHandler);
     std::signal(SIGSEGV, CrashSignalHandler);
@@ -8679,14 +8888,34 @@ int main(int argc, char* argv[]) {
         return count;
     };
 
+    static StageId s_lastRandomStage = STAGE_COUNT;
     auto GetStageForOpponent = [&](CharacterId opp) -> StageId {
         if (opp == CHAR_SUCKRATERY_RKF) return STAGE_PRESS_BRIEFING;
         if (opp == CHAR_WAR_PIG) return STAGE_PENTAGON_ALTAR;
         if (opp == CHAR_SOCIALIST) return STAGE_WTC_PLAZA;
         if (opp == CHAR_BILLARY) return STAGE_COMET_PING_PONG;
         if (opp == CHAR_PALM_BEACH_PETE) return STAGE_FLORIDA_KEYS;
-        return homeStages[(int)opp];
+        static const StageId randomStagePool[10] = {
+            STAGE_LINCOLN_MEMORIAL,
+            STAGE_SMITHSONIAN_AERO,
+            STAGE_TOMB_UNKNOWN,
+            STAGE_LINCOLN_MEMORIAL,
+            STAGE_SMITHSONIAN_AERO,
+            STAGE_TOMB_UNKNOWN,
+            STAGE_DEMOLISHED_EAST_WING,
+            STAGE_REFLECTING_POOL,
+            STAGE_CONGRESSIONAL_FLOOR,
+            STAGE_WHITE_HOUSE_MMA
+        };
+        StageId picked = randomStagePool[std::rand() % 10];
+        for (int tries = 0; tries < 6 && picked == s_lastRandomStage; tries++) {
+            picked = randomStagePool[std::rand() % 10];
+        }
+        s_lastRandomStage = picked;
+        return picked;
     };
+    currentStage = GetStageForOpponent(p2CharId);
+    stageMgr.SetStage(currentStage);
 
     auto PickNextAvailableOpponent = [&](int startIdx) -> CharacterId {
         int origDefeated = CountDefeatedOriginals();
@@ -8868,7 +9097,7 @@ int main(int argc, char* argv[]) {
                     choosingOpponent = false;
                     p1CharId = CHAR_COMMANDER;
                     p2CharId = PickNextAvailableOpponent(1);
-                    currentStage = homeStages[(int)p1CharId];
+                    currentStage = GetStageForOpponent(p1CharId);
                     stageMgr.SetStage(currentStage);
                     stateTimer = 0.0f;
                 }
@@ -8944,7 +9173,7 @@ int main(int argc, char* argv[]) {
                 if (p1Changed) {
                     p1CharId = (CharacterId)(p1Row * 5 + p1Col);
 
-                    currentStage = homeStages[(int)p1CharId];
+                    currentStage = GetStageForOpponent(p1CharId);
                     stageMgr.SetStage(currentStage);
                     AudioEngine::Instance().PlaySfx(SFX_SELECT_CURSOR);
                 }
@@ -8988,7 +9217,7 @@ int main(int argc, char* argv[]) {
                 }
 
                 if (p2Changed) {
-                    currentStage = homeStages[(int)p2CharId];
+                    currentStage = GetStageForOpponent(p2CharId);
                     stageMgr.SetStage(currentStage);
                     AudioEngine::Instance().PlaySfx(SFX_SELECT_CURSOR);
                 }
@@ -9025,7 +9254,7 @@ int main(int argc, char* argv[]) {
                     playerLocked = true;
                     choosingOpponent = true;
                     p2CharId = PickNextAvailableOpponent((int)p1CharId + 1);
-                    currentStage = homeStages[(int)p2CharId];
+                    currentStage = GetStageForOpponent(p2CharId);
                     stageMgr.SetStage(currentStage);
                     AudioEngine::Instance().PlaySfx(SFX_SELECT_CONFIRM);
                     stateTimer = 0.0f;
@@ -9177,7 +9406,7 @@ int main(int argc, char* argv[]) {
 
                     gameState = STATE_FIGHT;
                     stateTimer = 0.0f;
-                    int bgmTrack = (currentStage >= 4) ? ((currentStage == STAGE_PRESS_BRIEFING) ? 3 : 4) : ((int)currentStage + 1);
+                    int bgmTrack = (currentStage == STAGE_LINCOLN_MEMORIAL) ? 2 : ((currentStage == STAGE_SMITHSONIAN_AERO) ? 1 : ((currentStage == STAGE_TOMB_UNKNOWN) ? 3 : ((currentStage >= 4) ? ((currentStage == STAGE_PRESS_BRIEFING) ? 3 : 4) : ((int)currentStage + 1))));
                     AudioEngine::Instance().SetBgmTrack(bgmTrack);
                     AudioEngine::Instance().PlaySfx(SFX_VOICE_ROUND1);
                 }
@@ -9202,7 +9431,7 @@ int main(int argc, char* argv[]) {
                 p2->ResetRound(480.0f, false);
                 cpuAI.Reset();
                 inputP2.Reset();
-                int bgmTrack = (currentStage >= 4) ? ((currentStage == STAGE_PRESS_BRIEFING) ? 3 : 4) : ((int)currentStage + 1);
+                int bgmTrack = (currentStage == STAGE_LINCOLN_MEMORIAL) ? 2 : ((currentStage == STAGE_SMITHSONIAN_AERO) ? 1 : ((currentStage == STAGE_TOMB_UNKNOWN) ? 3 : ((currentStage >= 4) ? ((currentStage == STAGE_PRESS_BRIEFING) ? 3 : 4) : ((int)currentStage + 1))));
                 AudioEngine::Instance().SetBgmTrack(bgmTrack);
                 AudioEngine::Instance().PlaySfx(SFX_VOICE_ROUND1);
             }
@@ -9537,7 +9766,7 @@ int main(int argc, char* argv[]) {
 
                 p1CharId = CHAR_COMMANDER;
                 p2CharId = PickNextAvailableOpponent(1);
-                currentStage = homeStages[(int)p2CharId];
+                currentStage = GetStageForOpponent(p2CharId);
                 stageMgr.SetStage(currentStage);
                 gameState = STATE_SELECT_MAP;
                 stateTimer = 0.0f;
@@ -9559,7 +9788,7 @@ int main(int argc, char* argv[]) {
 
                 p1CharId = CHAR_COMMANDER;
                 p2CharId = PickNextAvailableOpponent(1);
-                currentStage = homeStages[(int)p2CharId];
+                currentStage = GetStageForOpponent(p2CharId);
                 stageMgr.SetStage(currentStage);
                 gameState = STATE_SPLASH;
                 stateTimer = 0.0f;
@@ -9598,7 +9827,7 @@ int main(int argc, char* argv[]) {
 
                     p1CharId = CHAR_COMMANDER;
                     p2CharId = PickNextAvailableOpponent(1);
-                    currentStage = homeStages[(int)p2CharId];
+                    currentStage = GetStageForOpponent(p2CharId);
                     stageMgr.SetStage(currentStage);
                     gameState = STATE_SPLASH;
                     stateTimer = 0.0f;
