@@ -1,5 +1,6 @@
 #include "Stages.h"
 #include "AssetManager.h"
+#include "Visuals.h"
 #include <cmath>
 #include <cstdio>
 #include <cstring>
@@ -68,6 +69,41 @@ StageManager::StageManager() {
         Color{ 240, 220, 130, 255 }, Color{ 225, 215, 180, 255 },
         Color{ 255, 215, 0, 255 }
     };
+
+    m_venues[STAGE_LINCOLN_MEMORIAL] = VenueDetails{
+        "LINCOLN MEMORIAL", "NATIONAL MALL - MEMORIAL STEPS",
+        Color{ 25, 45, 85, 255 }, Color{ 70, 110, 165, 255 },
+        Color{ 225, 220, 210, 255 }, Color{ 175, 172, 165, 255 },
+        Color{ 255, 215, 60, 255 }
+    };
+
+    m_venues[STAGE_SMITHSONIAN_AERO] = VenueDetails{
+        "SMITHSONIAN AEROSPACE", "NATIONAL AIR & SPACE MUSEUM",
+        Color{ 18, 28, 48, 255 }, Color{ 45, 70, 110, 255 },
+        Color{ 130, 145, 165, 255 }, Color{ 70, 75, 88, 255 },
+        Color{ 80, 220, 255, 255 }
+    };
+
+    m_venues[STAGE_TOMB_UNKNOWN] = VenueDetails{
+        "TOMB OF THE UNKNOWN", "ARLINGTON NATIONAL CEMETERY",
+        Color{ 22, 28, 52, 255 }, Color{ 85, 55, 70, 255 },
+        Color{ 215, 210, 205, 255 }, Color{ 145, 142, 140, 255 },
+        Color{ 255, 185, 50, 255 }
+    };
+
+    m_venues[STAGE_ENN_NEWS_STUDIO] = VenueDetails{
+        "ENN NEWS STUDIO", "EXECUTIVE NEWS NETWORK - LIVE",
+        Color{ 14, 22, 48, 255 }, Color{ 30, 55, 110, 255 },
+        Color{ 195, 25, 35, 255 }, Color{ 25, 35, 60, 255 },
+        Color{ 255, 60, 60, 255 }
+    };
+
+    m_venues[STAGE_CHICAGO_WRIGLEY] = VenueDetails{
+        "WRIGLEYVILLE", "CHICAGO, IL - WRIGLEY FIELD",
+        Color{ 20, 32, 68, 255 }, Color{ 125, 65, 85, 255 },
+        Color{ 195, 25, 35, 255 }, Color{ 145, 78, 55, 255 },
+        Color{ 255, 215, 50, 255 }
+    };
 }
 
 StageManager::~StageManager() {
@@ -95,7 +131,9 @@ void StageManager::Init() {
 
     const char* namedStages[STAGE_COUNT] = {
         "stage_0.png", "stage_1.png", "stage_2.png", "stage_3.png", "stage_4.png", "stage_5.png",
-        "stage_wtc_plaza.png", "stage_comet_ping_pong.png", "stage_florida_keys.png"
+        "stage_wtc_plaza.png", "stage_comet_ping_pong.png", "stage_florida_keys.png",
+        "stage_lincoln_memorial.png", "stage_smithsonian_aero.png", "stage_tomb_unknown.png",
+        "stage_enn_news_studio.png", "stage_chicago_wrigley.png"
     };
 
     for (int i = 0; i < STAGE_COUNT; i++) {
@@ -475,6 +513,7 @@ void StageManager::DrawMidLayer(float camX, float time) {
 }
 
 void StageManager::DrawPlayfield(float camX, float time) {
+    ChampionshipEdition::DrawStageUpgrades(m_stageId, camX, time);
     if (m_texturesLoaded && m_stageTextures[m_stageId].id > 0) {
 
         switch (m_stageId) {

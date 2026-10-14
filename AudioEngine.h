@@ -67,6 +67,7 @@ public:
     void SetBgmTrack(int trackId);
     void StopBgm();
     void Update();
+    static void SetCriticalTempo(bool critical);
 
 private:
     AudioEngine() = default;

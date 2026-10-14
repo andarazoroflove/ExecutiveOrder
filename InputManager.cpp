@@ -275,6 +275,20 @@ SpecialMotionType InputManager::CheckSpecialMotion(int& outButtonUsed) {
 
     outButtonUsed = curr.buttonsPressed;
 
+    if (curr.buttonsPressed & (BTN_LP | BTN_HP | BTN_LK | BTN_HK)) {
+        int sStage = 0;
+        for (int i = 26; i >= 0; i--) {
+            int idx = (m_head - i + BUFFER_SIZE) % BUFFER_SIZE;
+            RelativeDirection d = m_history[idx].relDir;
+            if (sStage == 0 && d == DIR_REL_DOWN) sStage = 1;
+            else if (sStage == 1 && (d == DIR_REL_DOWN_FORWARD || d == DIR_REL_FORWARD)) sStage = 2;
+            else if (sStage == 2 && d == DIR_REL_DOWN) sStage = 3;
+            else if (sStage == 3 && (d == DIR_REL_DOWN_FORWARD || d == DIR_REL_FORWARD)) {
+                return MOTION_SUPER_OMNIBUS;
+            }
+        }
+    }
+
     auto GetPastFrame = [&](int framesAgo) -> const BufferedFrame& {
         int idx = (m_head - framesAgo + BUFFER_SIZE) % BUFFER_SIZE;
         return m_history[idx];

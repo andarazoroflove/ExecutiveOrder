@@ -141,6 +141,15 @@ public:
     bool IsHoldingDownBack() const { return m_isHoldingDownBack; }
     const AttackData& GetCurrentAttack() const { return m_currentAttack; }
     int GetSpecialIndex() const { return m_specialIndex; }
+    int GetComboCount() const { return m_comboCount; }
+    void AddComboHit() { m_comboCount++; m_comboResetTimer = 50; }
+    void ResetCombo() { m_comboCount = 0; m_comboResetTimer = 0; }
+    int GetLastFrameAdvantage() const { return m_lastFrameAdvantage; }
+    void SetLastFrameAdvantage(int adv) { m_lastFrameAdvantage = adv; }
+    bool IsSuperMoveActive() const { return m_isSuperMove; }
+    bool PopSuperFlashTrigger() { bool v = m_triggerSuperFlash; m_triggerSuperFlash = false; return v; }
+    bool PopCancelCallout() { bool v = m_justCanceled; m_justCanceled = false; return v; }
+    bool PopReversalCallout() { bool v = m_justReversal; m_justReversal = false; return v; }
 
     Color GetPrimaryColor() const { return m_color1; }
     Color GetSecondaryColor() const { return m_color2; }
@@ -185,6 +194,15 @@ private:
     float m_pushbackVel = 0.0f;
     bool m_hitConnected = false;
     int m_armor = 0;
+    int m_comboCount = 0;
+    int m_comboResetTimer = 0;
+    int m_lastFrameAdvantage = 0;
+    int m_invincibleFrames = 0;
+    bool m_isSuperMove = false;
+    bool m_triggerSuperFlash = false;
+    bool m_justCanceled = false;
+    bool m_justReversal = false;
+    int m_multiHitsRemaining = 0;
 
     bool m_isHoldingBack = false;
     bool m_isHoldingDownBack = false;

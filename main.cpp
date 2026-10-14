@@ -14,6 +14,7 @@
 #include <cstdlib>
 #include <cstring>
 #include <csignal>
+#include <ctime>
 
 static volatile sig_atomic_t s_quitRequested = 0;
 
@@ -44,6 +45,7 @@ static void CrashSignalHandler(int sig) {
 }
 
 int main(int argc, char* argv[]) {
+    std::srand((unsigned int)std::time(nullptr));
     std::signal(SIGTERM, CleanExitSignalHandler);
     std::signal(SIGINT, CleanExitSignalHandler);
     std::signal(SIGSEGV, CrashSignalHandler);
@@ -59,7 +61,7 @@ int main(int argc, char* argv[]) {
     ChangeDirectory(GetApplicationDirectory());
 
     SetConfigFlags(FLAG_VSYNC_HINT | FLAG_WINDOW_HIGHDPI);
-    InitWindow(WINDOW_WIDTH, WINDOW_HEIGHT, "Executive Order II: Total Veto");
+    InitWindow(WINDOW_WIDTH, WINDOW_HEIGHT, "Executive Order II: Total Veto - Championship Edition");
     if (!IsWindowReady()) {
         TraceLog(LOG_FATAL, "ExecutiveOrder: Failed to initialize window / graphics context.");
         return 1;
@@ -137,21 +139,23 @@ int main(int argc, char* argv[]) {
 
     bool defeatedFighters[CHARACTER_COUNT] = { false };
     int matchesWon = 0;
+    int continuesRemaining = 2;
     bool bonusStagePlayed = false;
     bool playerLocked = false;
     bool choosingOpponent = false;
+    bool opponentLocked = false;
 
     static const StageId homeStages[PLAYABLE_CHARACTER_COUNT] = {
         STAGE_WHITE_HOUSE_MMA,
         STAGE_CONGRESSIONAL_FLOOR,
         STAGE_DEMOLISHED_EAST_WING,
         STAGE_REFLECTING_POOL,
-        STAGE_REFLECTING_POOL,
+        STAGE_SMITHSONIAN_AERO,
         STAGE_CONGRESSIONAL_FLOOR,
-        STAGE_WHITE_HOUSE_MMA,
-        STAGE_DEMOLISHED_EAST_WING,
-        STAGE_REFLECTING_POOL,
-        STAGE_CONGRESSIONAL_FLOOR
+        STAGE_LINCOLN_MEMORIAL,
+        STAGE_LINCOLN_MEMORIAL,
+        STAGE_TOMB_UNKNOWN,
+        STAGE_DEMOLISHED_EAST_WING
     };
 
     auto CountDefeatedOriginals = [&]() -> int {
@@ -166,23 +170,28 @@ int main(int argc, char* argv[]) {
 
     auto GetStageForOpponent = [&](CharacterId opp) -> StageId {
         if (opp == CHAR_SUCKRATERY_RKF) return STAGE_PRESS_BRIEFING;
+        if (opp == CHAR_THE_PUNDIT) return STAGE_ENN_NEWS_STUDIO;
         if (opp == CHAR_WAR_PIG) return STAGE_PENTAGON_ALTAR;
         if (opp == CHAR_SOCIALIST) return STAGE_WTC_PLAZA;
+        if (opp == CHAR_A_NEW_HOPE) return STAGE_CHICAGO_WRIGLEY;
         if (opp == CHAR_BILLARY) return STAGE_COMET_PING_PONG;
         if (opp == CHAR_PALM_BEACH_PETE) return STAGE_FLORIDA_KEYS;
-        return homeStages[(int)opp];
+        if ((int)opp >= 0 && (int)opp < PLAYABLE_CHARACTER_COUNT) return homeStages[(int)opp];
+        return STAGE_DEMOLISHED_EAST_WING;
     };
 
     auto PickNextAvailableOpponent = [&](int startIdx) -> CharacterId {
         int origDefeated = CountDefeatedOriginals();
         if (defeatedFighters[CHAR_WAR_PIG]) {
             if (!defeatedFighters[CHAR_SOCIALIST]) return CHAR_SOCIALIST;
+            if (!defeatedFighters[CHAR_A_NEW_HOPE]) return CHAR_A_NEW_HOPE;
             if (!defeatedFighters[CHAR_BILLARY]) return CHAR_BILLARY;
             if (!defeatedFighters[CHAR_PALM_BEACH_PETE]) return CHAR_PALM_BEACH_PETE;
             return CHAR_PALM_BEACH_PETE;
         }
         if (origDefeated >= 9) {
             if (!defeatedFighters[CHAR_SUCKRATERY_RKF]) return CHAR_SUCKRATERY_RKF;
+            if (!defeatedFighters[CHAR_THE_PUNDIT]) return CHAR_THE_PUNDIT;
             if (!defeatedFighters[CHAR_WAR_PIG]) return CHAR_WAR_PIG;
             return CHAR_WAR_PIG;
         }
@@ -241,6 +250,7 @@ int main(int argc, char* argv[]) {
 
     while (!WindowShouldClose() && !s_quitRequested) {
         float dt = GetFrameTime();
+        if (IsKeyPressed(KEY_F2)) enableCrt = !enableCrt;
         stateTimer += dt;
         AudioEngine::Instance().Update();
 
@@ -348,7 +358,11 @@ int main(int argc, char* argv[]) {
                     AudioEngine::Instance().PlaySfx(SFX_COIN);
                     gameState = STATE_SELECT_MAP;
                     isSecretMode = false;
+                    continuesRemaining = 2;
+                    ChampionshipEdition::s_continuesRemaining = 2;
                     playerLocked = false;
+                    opponentLocked = false;
+                    ChampionshipEdition::s_opponentLocked = false;
                     choosingOpponent = false;
                     p1CharId = CHAR_COMMANDER;
                     p2CharId = PickNextAvailableOpponent(1);
@@ -362,13 +376,19 @@ int main(int argc, char* argv[]) {
 
         case STATE_SELECT_MAP: {
             inputP1.Update(0, true);
+            ChampionshipEdition::s_opponentLocked = opponentLocked;
 
             int origDefeated = CountDefeatedOriginals();
 
             if (defeatedFighters[CHAR_WAR_PIG]) {
+                opponentLocked = true;
+                ChampionshipEdition::s_opponentLocked = true;
                 if (!defeatedFighters[CHAR_SOCIALIST]) {
                     p2CharId = CHAR_SOCIALIST;
                     currentStage = STAGE_WTC_PLAZA;
+                } else if (!defeatedFighters[CHAR_A_NEW_HOPE]) {
+                    p2CharId = CHAR_A_NEW_HOPE;
+                    currentStage = STAGE_CHICAGO_WRIGLEY;
                 } else if (!defeatedFighters[CHAR_BILLARY]) {
                     p2CharId = CHAR_BILLARY;
                     currentStage = STAGE_COMET_PING_PONG;
@@ -376,7 +396,6 @@ int main(int argc, char* argv[]) {
                     p2CharId = CHAR_PALM_BEACH_PETE;
                     currentStage = STAGE_FLORIDA_KEYS;
                 } else {
-
                     if (p1CharId == CHAR_COMMANDER && !isSecretMode) {
                         gameState = STATE_CTHULHU_ENDING;
                         stateTimer = 0.0f;
@@ -392,21 +411,24 @@ int main(int argc, char* argv[]) {
                 }
                 stageMgr.SetStage(currentStage);
             } else if (origDefeated >= 9) {
+                opponentLocked = true;
+                ChampionshipEdition::s_opponentLocked = true;
                 if (!defeatedFighters[CHAR_SUCKRATERY_RKF]) {
                     p2CharId = CHAR_SUCKRATERY_RKF;
                     currentStage = STAGE_PRESS_BRIEFING;
+                } else if (!defeatedFighters[CHAR_THE_PUNDIT]) {
+                    p2CharId = CHAR_THE_PUNDIT;
+                    currentStage = STAGE_ENN_NEWS_STUDIO;
                 } else if (!defeatedFighters[CHAR_WAR_PIG]) {
                     p2CharId = CHAR_WAR_PIG;
                     currentStage = STAGE_PENTAGON_ALTAR;
                 } else {
-
                     gameState = STATE_MATCH_OVER;
                     stateTimer = 0.0f;
                     break;
                 }
                 stageMgr.SetStage(currentStage);
             } else if (!playerLocked) {
-
                 int p1Col = (int)p1CharId % 5;
                 int p1Row = (int)p1CharId / 5;
                 bool p1Changed = false;
@@ -427,13 +449,11 @@ int main(int argc, char* argv[]) {
 
                 if (p1Changed) {
                     p1CharId = (CharacterId)(p1Row * 5 + p1Col);
-
                     currentStage = homeStages[(int)p1CharId];
                     stageMgr.SetStage(currentStage);
                     AudioEngine::Instance().PlaySfx(SFX_SELECT_CURSOR);
                 }
-            } else {
-
+            } else if (!opponentLocked) {
                 bool p2Changed = false;
 
                 if (IsKeyPressed(KEY_RIGHT) || IsKeyPressed(KEY_D) || inputP1.IsRightPressed()) {
@@ -476,6 +496,38 @@ int main(int argc, char* argv[]) {
                     stageMgr.SetStage(currentStage);
                     AudioEngine::Instance().PlaySfx(SFX_SELECT_CURSOR);
                 }
+            } else {
+                static const StageId normalStages[7] = {
+                    STAGE_DEMOLISHED_EAST_WING,
+                    STAGE_REFLECTING_POOL,
+                    STAGE_CONGRESSIONAL_FLOOR,
+                    STAGE_WHITE_HOUSE_MMA,
+                    STAGE_LINCOLN_MEMORIAL,
+                    STAGE_SMITHSONIAN_AERO,
+                    STAGE_TOMB_UNKNOWN
+                };
+                int curIdx = 0;
+                for (int k = 0; k < 7; k++) {
+                    if (normalStages[k] == currentStage) {
+                        curIdx = k;
+                        break;
+                    }
+                }
+                bool stageChanged = false;
+                if (IsKeyPressed(KEY_RIGHT) || IsKeyPressed(KEY_D) || inputP1.IsRightPressed() ||
+                    IsKeyPressed(KEY_DOWN) || IsKeyPressed(KEY_S) || inputP1.IsDownPressed()) {
+                    curIdx = (curIdx + 1) % 7;
+                    stageChanged = true;
+                } else if (IsKeyPressed(KEY_LEFT) || IsKeyPressed(KEY_A) || inputP1.IsLeftPressed() ||
+                           IsKeyPressed(KEY_UP) || IsKeyPressed(KEY_W) || inputP1.IsUpPressed()) {
+                    curIdx = (curIdx + 6) % 7;
+                    stageChanged = true;
+                }
+                if (stageChanged) {
+                    currentStage = normalStages[curIdx];
+                    stageMgr.SetStage(currentStage);
+                    AudioEngine::Instance().PlaySfx(SFX_SELECT_CURSOR);
+                }
             }
 
             if (inputP1.IsTriggerEasterEggPressed()) {
@@ -505,20 +557,31 @@ int main(int argc, char* argv[]) {
                 inputP1.IsButtonPressed(BTN_HK) || IsKeyPressed(KEY_ENTER) || IsKeyPressed(KEY_SPACE))) {
 
                 if (!playerLocked) {
-
                     playerLocked = true;
+                    opponentLocked = false;
+                    ChampionshipEdition::s_opponentLocked = false;
                     choosingOpponent = true;
                     p2CharId = PickNextAvailableOpponent((int)p1CharId + 1);
+                    currentStage = GetStageForOpponent(p2CharId);
+                    stageMgr.SetStage(currentStage);
+                    AudioEngine::Instance().PlaySfx(SFX_SELECT_CONFIRM);
+                    stateTimer = 0.0f;
+                } else if (!opponentLocked && !defeatedFighters[CHAR_WAR_PIG] && origDefeated < 9) {
+                    opponentLocked = true;
+                    ChampionshipEdition::s_opponentLocked = true;
                     currentStage = homeStages[(int)p2CharId];
                     stageMgr.SetStage(currentStage);
                     AudioEngine::Instance().PlaySfx(SFX_SELECT_CONFIRM);
                     stateTimer = 0.0f;
                 } else {
-
                     AudioEngine::Instance().PlaySfx(SFX_SELECT_CONFIRM);
 
-                    currentStage = GetStageForOpponent(p2CharId);
+                    if (defeatedFighters[CHAR_WAR_PIG] || origDefeated >= 9) {
+                        currentStage = GetStageForOpponent(p2CharId);
+                    }
                     stageMgr.SetStage(currentStage);
+                    opponentLocked = false;
+                    ChampionshipEdition::s_opponentLocked = false;
 
                     cpuAI.SetDifficulty((p2CharId == CHAR_WAR_PIG || p2CharId == CHAR_PALM_BEACH_PETE) ? AI_DIFF_HARD : AI_DIFF_NORMAL);
                     cpuAI.Reset();
@@ -557,10 +620,10 @@ int main(int argc, char* argv[]) {
                     AudioEngine::Instance().PlaySfx(SFX_SELECT_CURSOR);
                 } else if (inputP1.IsUpPressed()) {
                     if (secretP1 >= 8) secretP1 = std::min(7, secretP1 - 8);
-                    else secretP1 = std::min(14, secretP1 + 8);
+                    else secretP1 = std::min(16, secretP1 + 8);
                     AudioEngine::Instance().PlaySfx(SFX_SELECT_CURSOR);
                 } else if (inputP1.IsDownPressed()) {
-                    if (secretP1 < 8) secretP1 = std::min(14, secretP1 + 8);
+                    if (secretP1 < 8) secretP1 = std::min(16, secretP1 + 8);
                     else secretP1 = secretP1 - 8;
                     AudioEngine::Instance().PlaySfx(SFX_SELECT_CURSOR);
                 }
@@ -583,10 +646,10 @@ int main(int argc, char* argv[]) {
                     AudioEngine::Instance().PlaySfx(SFX_SELECT_CURSOR);
                 } else if (inputP1.IsUpPressed()) {
                     if (secretP2 >= 8) secretP2 = std::min(7, secretP2 - 8);
-                    else secretP2 = std::min(14, secretP2 + 8);
+                    else secretP2 = std::min(16, secretP2 + 8);
                     AudioEngine::Instance().PlaySfx(SFX_SELECT_CURSOR);
                 } else if (inputP1.IsDownPressed()) {
-                    if (secretP2 < 8) secretP2 = std::min(14, secretP2 + 8);
+                    if (secretP2 < 8) secretP2 = std::min(16, secretP2 + 8);
                     else secretP2 = secretP2 - 8;
                     AudioEngine::Instance().PlaySfx(SFX_SELECT_CURSOR);
                 }
@@ -608,10 +671,10 @@ int main(int argc, char* argv[]) {
                     secretStage = (secretStage + 1) % STAGE_COUNT;
                     AudioEngine::Instance().PlaySfx(SFX_SELECT_CURSOR);
                 } else if (inputP1.IsUpPressed()) {
-                    secretStage = (secretStage - 3 + STAGE_COUNT) % STAGE_COUNT;
+                    secretStage = (secretStage - 4 + STAGE_COUNT) % STAGE_COUNT;
                     AudioEngine::Instance().PlaySfx(SFX_SELECT_CURSOR);
                 } else if (inputP1.IsDownPressed()) {
-                    secretStage = (secretStage + 3) % STAGE_COUNT;
+                    secretStage = (secretStage + 4) % STAGE_COUNT;
                     AudioEngine::Instance().PlaySfx(SFX_SELECT_CURSOR);
                 }
 
@@ -661,7 +724,7 @@ int main(int argc, char* argv[]) {
 
                     gameState = STATE_FIGHT;
                     stateTimer = 0.0f;
-                    int bgmTrack = (currentStage >= 4) ? ((currentStage == STAGE_PRESS_BRIEFING) ? 3 : 4) : ((int)currentStage + 1);
+                    int bgmTrack = (currentStage == STAGE_LINCOLN_MEMORIAL || currentStage == STAGE_CHICAGO_WRIGLEY) ? 2 : ((currentStage == STAGE_SMITHSONIAN_AERO) ? 1 : ((currentStage == STAGE_TOMB_UNKNOWN || currentStage == STAGE_ENN_NEWS_STUDIO) ? 3 : ((currentStage >= 4) ? ((currentStage == STAGE_PRESS_BRIEFING) ? 3 : 4) : ((int)currentStage + 1))));
                     AudioEngine::Instance().SetBgmTrack(bgmTrack);
                     AudioEngine::Instance().PlaySfx(SFX_VOICE_ROUND1);
                 }
@@ -681,11 +744,12 @@ int main(int argc, char* argv[]) {
                 roundNumber = 1;
                 p1WasKo = false;
                 p2WasKo = false;
+                ChampionshipEdition::ResetRoundFX();
                 p1->ResetRound(320.0f, true);
                 p2->ResetRound(480.0f, false);
                 cpuAI.Reset();
                 inputP2.Reset();
-                int bgmTrack = (currentStage >= 4) ? ((currentStage == STAGE_PRESS_BRIEFING) ? 3 : 4) : ((int)currentStage + 1);
+                int bgmTrack = (currentStage == STAGE_LINCOLN_MEMORIAL || currentStage == STAGE_CHICAGO_WRIGLEY) ? 2 : ((currentStage == STAGE_SMITHSONIAN_AERO) ? 1 : ((currentStage == STAGE_TOMB_UNKNOWN || currentStage == STAGE_ENN_NEWS_STUDIO) ? 3 : ((currentStage >= 4) ? ((currentStage == STAGE_PRESS_BRIEFING) ? 3 : 4) : ((int)currentStage + 1))));
                 AudioEngine::Instance().SetBgmTrack(bgmTrack);
                 AudioEngine::Instance().PlaySfx(SFX_VOICE_ROUND1);
             }
@@ -746,11 +810,16 @@ int main(int argc, char* argv[]) {
                     if (roundSeconds > 0) roundSeconds--;
                 }
 
-                p1->UpdatePhysics(inputP1, *p2);
-                p2->UpdatePhysics(inputP2, *p1);
+                if (ChampionshipEdition::s_superFlashTimer > 0) {
+                    ChampionshipEdition::s_superFlashTimer--;
+                } else {
+                    p1->UpdatePhysics(inputP1, *p2);
+                    p2->UpdatePhysics(inputP2, *p1);
 
-                CollisionSystem::ResolvePushboxes(*p1, *p2);
-                CollisionSystem::ResolveCombat(*p1, *p2, sparks, cameraShake);
+                    CollisionSystem::ResolvePushboxes(*p1, *p2);
+                    CollisionSystem::ResolveCombat(*p1, *p2, sparks, cameraShake);
+                }
+                ChampionshipEdition::UpdateAndTrackFighters(*p1, *p2);
 
                 if (p1->GetHealth() <= 0 || p2->GetHealth() <= 0 || roundSeconds <= 0) {
                     fightActive = false;
@@ -771,13 +840,15 @@ int main(int argc, char* argv[]) {
                 matchEndTimer += dt;
                 p1->UpdatePhysics(inputP1, *p2);
                 p2->UpdatePhysics(inputP2, *p1);
+                ChampionshipEdition::UpdateAndTrackFighters(*p1, *p2);
 
                 if (matchEndTimer >= 1.5f) {
 
-                    int roundsNeeded = (p2CharId == CHAR_WAR_PIG || p2CharId == CHAR_PALM_BEACH_PETE) ? 1 : 2;
-                    if (p1->GetRoundsWon() >= roundsNeeded || p2->GetRoundsWon() >= roundsNeeded) {
+                    int p1RoundsNeeded = (p2CharId == CHAR_WAR_PIG || p2CharId == CHAR_PALM_BEACH_PETE) ? 1 : 2;
+                    int p2RoundsNeeded = 2;
+                    if (p1->GetRoundsWon() >= p1RoundsNeeded || p2->GetRoundsWon() >= p2RoundsNeeded) {
                         stateTimer = 0.0f;
-                        if (p1->GetRoundsWon() >= roundsNeeded) {
+                        if (p1->GetRoundsWon() >= p1RoundsNeeded) {
                             if (!isSecretMode) {
                                 matchesWon++;
                                 defeatedFighters[(int)p2CharId] = true;
@@ -805,6 +876,7 @@ int main(int argc, char* argv[]) {
                         fightIntroTimer = 110;
                         fightActive = false;
                         roundOver = false;
+                        ChampionshipEdition::ResetRoundFX();
                         p1->ResetRound(320.0f, true, p1Died);
                         p2->ResetRound(480.0f, false, p2Died);
                         cpuAI.Reset();
@@ -875,6 +947,8 @@ int main(int argc, char* argv[]) {
                         AudioEngine::Instance().PlaySfx(SFX_JESUS_FANFARE);
                     }
                 } else {
+                    opponentLocked = false;
+                    ChampionshipEdition::s_opponentLocked = false;
                     p2CharId = PickNextAvailableOpponent((int)p2CharId + 1);
                     currentStage = GetStageForOpponent(p2CharId);
                     stageMgr.SetStage(currentStage);
@@ -971,6 +1045,8 @@ int main(int argc, char* argv[]) {
                 p1->UpdatePhysics(inputP1, carDummy);
 
                 if (bonusPostTimer >= 2.0f) {
+                    opponentLocked = false;
+                    ChampionshipEdition::s_opponentLocked = false;
                     p2CharId = PickNextAvailableOpponent((int)p2CharId + 1);
                     currentStage = GetStageForOpponent(p2CharId);
                     stageMgr.SetStage(currentStage);
@@ -993,32 +1069,80 @@ int main(int argc, char* argv[]) {
 
         case STATE_MATCH_OVER: {
             inputP1.Update(0, true);
-            if (stateTimer >= 5.0f || IsKeyPressed(KEY_ENTER) || IsKeyPressed(KEY_SPACE) ||
-                inputP1.IsButtonPressed(BTN_START) || inputP1.IsButtonPressed(BTN_LP) ||
-                inputP1.IsButtonPressed(BTN_HP) || inputP1.IsButtonPressed(BTN_LK) ||
-                inputP1.IsButtonPressed(BTN_HK)) {
+            ChampionshipEdition::s_continuesRemaining = continuesRemaining;
+            ChampionshipEdition::s_isSecretMatch = isSecretMode;
 
-                if (isSecretMode) {
+            bool actionPressed = (IsKeyPressed(KEY_ENTER) || IsKeyPressed(KEY_SPACE) ||
+                inputP1.IsButtonPressed(BTN_START) || inputP1.IsButtonPressed(BTN_COIN) ||
+                inputP1.IsButtonPressed(BTN_LP) || inputP1.IsButtonPressed(BTN_HP) ||
+                inputP1.IsButtonPressed(BTN_LK) || inputP1.IsButtonPressed(BTN_HK));
+
+            if (isSecretMode) {
+                if (stateTimer >= 5.0f || actionPressed) {
                     gameState = STATE_SECRET_SELECT;
                     secretStep = 0;
                     stateTimer = 0.0f;
                     AudioEngine::Instance().SetBgmTrack(0);
+                }
+                break;
+            }
+
+            if (continuesRemaining > 0) {
+                if (actionPressed && stateTimer >= 0.35f) {
+                    continuesRemaining--;
+                    ChampionshipEdition::s_continuesRemaining = continuesRemaining;
+                    AudioEngine::Instance().PlaySfx(SFX_COIN);
+                    AudioEngine::Instance().PlaySfx(SFX_MATCH_START_FANFARE);
+
+                    cpuAI.Reset();
+                    inputP2.Reset();
+                    p1 = std::make_unique<Fighter>(0, p1CharId, 320.0f);
+                    p2 = std::make_unique<Fighter>(1, p2CharId, 480.0f);
+                    AudioEngine::Instance().StopBgm();
+
+                    gameState = STATE_VERSUS;
+                    stateTimer = 0.0f;
                     break;
                 }
+                if (stateTimer >= 10.0f) {
+                    continuesRemaining = 2;
+                    ChampionshipEdition::s_continuesRemaining = 2;
+                    matchesWon = 0;
+                    bonusStagePlayed = false;
+                    playerLocked = false;
+                    opponentLocked = false;
+                    ChampionshipEdition::s_opponentLocked = false;
+                    choosingOpponent = false;
+                    for (int i = 0; i < CHARACTER_COUNT; i++) defeatedFighters[i] = false;
 
-                matchesWon = 0;
-                bonusStagePlayed = false;
-                playerLocked = false;
-                choosingOpponent = false;
-                for (int i = 0; i < CHARACTER_COUNT; i++) defeatedFighters[i] = false;
+                    p1CharId = CHAR_COMMANDER;
+                    p2CharId = PickNextAvailableOpponent(1);
+                    currentStage = GetStageForOpponent(p2CharId);
+                    stageMgr.SetStage(currentStage);
+                    gameState = STATE_SELECT_MAP;
+                    stateTimer = 0.0f;
+                    AudioEngine::Instance().SetBgmTrack(0);
+                }
+            } else {
+                if (stateTimer >= 5.0f || (actionPressed && stateTimer >= 0.35f)) {
+                    continuesRemaining = 2;
+                    ChampionshipEdition::s_continuesRemaining = 2;
+                    matchesWon = 0;
+                    bonusStagePlayed = false;
+                    playerLocked = false;
+                    opponentLocked = false;
+                    ChampionshipEdition::s_opponentLocked = false;
+                    choosingOpponent = false;
+                    for (int i = 0; i < CHARACTER_COUNT; i++) defeatedFighters[i] = false;
 
-                p1CharId = CHAR_COMMANDER;
-                p2CharId = PickNextAvailableOpponent(1);
-                currentStage = homeStages[(int)p2CharId];
-                stageMgr.SetStage(currentStage);
-                gameState = STATE_SELECT_MAP;
-                stateTimer = 0.0f;
-                AudioEngine::Instance().SetBgmTrack(0);
+                    p1CharId = CHAR_COMMANDER;
+                    p2CharId = PickNextAvailableOpponent(1);
+                    currentStage = GetStageForOpponent(p2CharId);
+                    stageMgr.SetStage(currentStage);
+                    gameState = STATE_SELECT_MAP;
+                    stateTimer = 0.0f;
+                    AudioEngine::Instance().SetBgmTrack(0);
+                }
             }
             break;
         }
@@ -1070,6 +1194,8 @@ int main(int argc, char* argv[]) {
                     matchesWon = 0;
                     bonusStagePlayed = false;
                     playerLocked = false;
+                    opponentLocked = false;
+                    ChampionshipEdition::s_opponentLocked = false;
                     choosingOpponent = false;
                     for (int i = 0; i < CHARACTER_COUNT; i++) defeatedFighters[i] = false;
 
@@ -1114,7 +1240,8 @@ int main(int argc, char* argv[]) {
             break;
         }
         case STATE_VICTORY_SPLASH: {
-            int winnerChar = (p1 && p2 && p2->GetRoundsWon() > p1->GetRoundsWon()) ? (int)p2CharId : (int)p1CharId;
+            int p1RoundsToWin = (p2CharId == CHAR_WAR_PIG || p2CharId == CHAR_PALM_BEACH_PETE) ? 1 : 2;
+            int winnerChar = (p1 && p1->GetRoundsWon() >= p1RoundsToWin) ? (int)p1CharId : (int)p2CharId;
             int loserChar = (winnerChar == (int)p1CharId) ? (int)p2CharId : (int)p1CharId;
             VisualsEngine::DrawVictorySplash(winnerChar, loserChar, stateTimer);
             break;
@@ -1147,12 +1274,14 @@ int main(int argc, char* argv[]) {
             VisualsEngine::DrawProjectiles(*p2);
 
             VisualsEngine::DrawSparks(sparks);
+            ChampionshipEdition::DrawWorldParticlesAndDebug(*p1, *p2);
 
             rlPopMatrix();
 
             stageMgr.DrawForeground(camRenderX, stateTimer);
 
             VisualsEngine::DrawBattleHUD(*p1, *p2, roundSeconds, roundNumber, fightIntroTimer, p1WasKo, p2WasKo);
+            ChampionshipEdition::DrawScreenHUDAndSuperFlash(*p1, *p2, inputP1);
 
             if (!fightActive && fightIntroTimer > 0) {
                 if (fightIntroTimer > 50) {
@@ -1192,7 +1321,7 @@ int main(int argc, char* argv[]) {
             VisualsEngine::DrawFighterSprite(*p2);
             rlPopMatrix();
 
-            int roundsToWin = (p2CharId == CHAR_WAR_PIG) ? 1 : 2;
+            int roundsToWin = (p2CharId == CHAR_WAR_PIG || p2CharId == CHAR_PALM_BEACH_PETE) ? 1 : 2;
             const Fighter& winner = (p1->GetRoundsWon() >= roundsToWin) ? *p1 : *p2;
             VisualsEngine::DrawMatchOver(winner, stateTimer);
             break;
@@ -1229,7 +1358,7 @@ int main(int argc, char* argv[]) {
             DrawTexturePro(screenTarget.texture, srcRec, dstRec, Vector2{ 0.0f, 0.0f }, 0.0f, WHITE);
         }
 
-        DrawText(enableCrt ? "[F1: CRT ON]" : "[F1: CRT OFF]", 10, 8, 12, Color{ 140, 140, 150, 200 });
+        DrawText(ChampionshipEdition::s_debugHitboxes ? "[F1: BOXES ON] [F2: CRT] [F3: 12-PART RIG]" : "[F1: DEBUG BOXES] [F2: CRT] [F3: 12-PART RIG]", 10, 8, 12, Color{ 140, 220, 180, 220 });
 
         char padStatus[96];
         if (InputManager::IsGamepadActive()) {

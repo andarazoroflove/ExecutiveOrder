@@ -26,7 +26,8 @@ enum SpecialMotionType {
     MOTION_CHARGE_B_F_P,
     MOTION_CHARGE_B_F_K,
     MOTION_CHARGE_D_U_K,
-    MOTION_COMMAND_GRAB
+    MOTION_COMMAND_GRAB,
+    MOTION_SUPER_OMNIBUS
 };
 
 struct RawInputState {
@@ -85,6 +86,7 @@ public:
 
     void ConsumeMotion();
     void Reset();
+    const BufferedFrame& GetHistoryFrame(int age) const { int idx = (m_head - age + BUFFER_SIZE) % BUFFER_SIZE; return m_history[idx]; }
 
     static bool IsGamepadActive();
     static const char* GetActiveControllerName(int playerIndex = 0);

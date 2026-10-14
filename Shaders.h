@@ -11,9 +11,9 @@ varying vec4 fragColor;
 uniform sampler2D texture0;
 uniform vec2 resolution;
 uniform float time;
-uniform float scanlineIntensity; // default ~0.35
-uniform float curvature;         // default ~0.02
-uniform float bloom;             // default ~0.15
+uniform float scanlineIntensity;
+uniform float curvature;
+uniform float bloom;
 
 void main()
 {
@@ -84,19 +84,18 @@ out vec4 finalColor;
 uniform sampler2D texture0;
 uniform vec2 resolution;
 uniform float time;
-uniform float scanlineIntensity; // default ~0.35
-uniform float curvature;         // default ~0.02
-uniform float bloom;             // default ~0.15
+uniform float scanlineIntensity;
+uniform float curvature;
+uniform float bloom;
 
 void main()
 {
-    // Barrel distortion (subtle 1-pixel curve like a genuine Sony Trinitron / arcade tube)
+
     vec2 uv = fragTexCoord;
     vec2 dc = uv - 0.5;
     float dist = dot(dc, dc);
     uv = uv + dc * (dist * curvature);
 
-    // Hard clip out-of-bounds screen bezel
     if (uv.x < 0.0 || uv.x > 1.0 || uv.y < 0.0 || uv.y > 1.0) {
         finalColor = vec4(0.0, 0.0, 0.0, 1.0);
         return;
@@ -104,12 +103,10 @@ void main()
 
     vec4 col = texture(texture0, uv);
 
-    // Horizontal scanline rasterization (alternating dark lines at native 224 scanline pitch)
     float scanline = sin(uv.y * 224.0 * 3.14159265 * 2.0);
     float scanMod = 1.0 - (scanlineIntensity * (0.5 + 0.5 * scanline));
     col.rgb *= scanMod;
 
-    // Subpixel aperture grille / phosphor triad bloom simulation (RGB columns)
     float subpixel = mod(floor(uv.x * 384.0 * 3.0), 3.0);
     vec3 mask = vec3(0.9, 0.9, 0.9);
     if (subpixel < 1.0) mask = vec3(1.15, 0.88, 0.88);
@@ -117,7 +114,6 @@ void main()
     else mask = vec3(0.88, 0.88, 1.15);
     col.rgb *= mix(vec3(1.0), mask, bloom);
 
-    // Subtle edge vignette (smooth polynomial approximation - 10x faster than pow)
     float vx = uv.x * (1.0 - uv.x);
     float vy = uv.y * (1.0 - uv.y);
     float vig = clamp(16.0 * vx * vy, 0.0, 1.0);
@@ -138,14 +134,14 @@ uniform float time;
 void main()
 {
     vec2 uv = fragTexCoord;
-    // Horizontal wind ripples stronger on free right edge
+
     float ripple = sin(uv.x * 12.0 - time * 6.0) * 0.04 * (uv.x + 0.2);
     float rippleY = cos(uv.x * 8.0 - time * 5.0) * 0.02 * (uv.x + 0.2);
     uv.y += ripple;
     uv.x += rippleY;
 
     vec4 col = texture(texture0, uv);
-    // Light shading on wave crests
+
     float shadow = 1.0 + (cos(uv.x * 12.0 - time * 6.0) * 0.15 * uv.x);
     col.rgb *= shadow;
 

@@ -131,6 +131,22 @@ void Fighter::InitCharacterProfile() {
         m_color2 = Color{ 215, 185, 70, 255 };
         m_colorSkin = Color{ 235, 190, 160, 255 };
         break;
+    case CHAR_THE_PUNDIT:
+        m_name = "The Pundit";
+        m_walkFwdSpeed = 1.95f;
+        m_walkBackSpeed = 1.45f;
+        m_color1 = Color{ 25, 42, 85, 255 };
+        m_color2 = Color{ 215, 35, 45, 255 };
+        m_colorSkin = Color{ 245, 200, 175, 255 };
+        break;
+    case CHAR_A_NEW_HOPE:
+        m_name = "A New Hope";
+        m_walkFwdSpeed = 2.15f;
+        m_walkBackSpeed = 1.65f;
+        m_color1 = Color{ 245, 245, 250, 255 };
+        m_color2 = Color{ 210, 180, 130, 255 };
+        m_colorSkin = Color{ 165, 110, 75, 255 };
+        break;
     default:
         break;
     }
@@ -148,6 +164,16 @@ void Fighter::ResetRound(float startX, bool faceRight, bool wasKnockedOut) {
     m_pushbackVel = 0.0f;
     m_hitConnected = false;
     m_armor = 0;
+    m_invincibleFrames = 0;
+    m_isSuperMove = false;
+    m_triggerSuperFlash = false;
+    m_justCanceled = false;
+    m_justReversal = false;
+    m_multiHitsRemaining = 0;
+    m_comboCount = 0;
+    m_comboResetTimer = 0;
+    m_tauntTimer = 0;
+    m_activeTaunt = "";
     m_health = 100;
     m_refillCount = 0;
     m_isHoldingBack = false;
@@ -173,6 +199,18 @@ void Fighter::SpawnProjectile(int type, float vx, float vy, int damage) {
 
         p.pos.y = GROUND_Y - 32.0f;
         p.pos.x = m_pos.x + (m_facingRight ? -30.0f : 30.0f);
+    } else if (type == 9) {
+
+        p.pos.x = m_pos.x + (m_facingRight ? 34.0f : -34.0f);
+        p.pos.y = m_pos.y - 40.0f;
+        p.width = 26.0f;
+        p.height = 20.0f;
+    } else if (type == 10) {
+
+        p.pos.x = m_pos.x + (m_facingRight ? 16.0f : -16.0f);
+        p.pos.y = m_pos.y - 74.0f;
+        p.width = 22.0f;
+        p.height = 22.0f;
     }
     p.damage = damage;
     p.lifetime = (type == 3) ? 180 : ((type == 7) ? 80 : 140);
@@ -184,10 +222,30 @@ void Fighter::SpawnProjectile(int type, float vx, float vy, int damage) {
 }
 
 void Fighter::ExecuteSpecial(SpecialMotionType motion, int buttonUsed, const Fighter& opponent) {
+    bool wasInHitstunWakeup = (m_stateFrame <= 5);
     m_state = FSTATE_SPECIAL;
     m_stateFrame = 0;
     m_hitConnected = false;
     m_armor = 0;
+    m_isSuperMove = false;
+    m_multiHitsRemaining = 1;
+
+    if (motion == MOTION_SUPER_OMNIBUS) {
+        m_isSuperMove = true;
+        m_triggerSuperFlash = true;
+        m_invincibleFrames = 18;
+        m_multiHitsRemaining = 5;
+        m_specialIndex = 2;
+        m_currentAttack = AttackData{ "TOTAL VETO FLURRY", 4, 28, 18, 6, ATTACK_MID, 14, 30, 18, 5.2f, true, true, 44.0f, -34.0f, 46.0f, 38.0f, true, MOVE_SPECIAL };
+        m_vel = Vector2{ m_facingRight ? 5.2f : -5.2f, -2.5f };
+        AudioEngine::Instance().PlaySfx(SFX_VOICE_TOTAL_VETO, 1.0f);
+        AudioEngine::Instance().PlaySfx(SFX_UPPERCUT, 1.1f);
+        return;
+    }
+    if (motion == MOTION_DP_P || motion == MOTION_DP_K || motion == MOTION_CHARGE_D_U_K) {
+        m_invincibleFrames = 10;
+        if (wasInHitstunWakeup) m_justReversal = true;
+    }
 
     bool isHeavy = (buttonUsed & (BTN_HP | BTN_HK)) != 0;
 
@@ -491,6 +549,48 @@ void Fighter::ExecuteSpecial(SpecialMotionType motion, int buttonUsed, const Fig
             AudioEngine::Instance().PlaySfx(SFX_HIT_HEAVY, 1.0f);
         }
         break;
+
+    case CHAR_THE_PUNDIT:
+        if (motion == MOTION_DP_P || motion == MOTION_DP_K) {
+            m_specialIndex = 2;
+            m_currentAttack = AttackData{ "Karl's Polling Slam", 5, 12, 16, 20, ATTACK_OVERHEAD, 12, 26, 14, 4.4f, true, true, 42.0f, -36.0f, 40.0f, 30.0f };
+            m_vel = Vector2{ m_facingRight ? 2.2f : -2.2f, -6.5f };
+            AudioEngine::Instance().PlaySfx(SFX_GAVEL_SLAM, 1.15f);
+        } else {
+
+            m_specialIndex = 1;
+            m_currentAttack = AttackData{ "DECISION 2028 MAP", 10, 20, 16, 18, ATTACK_PROJECTILE, 12, 24, 14, 4.2f, true, true, 0.0f, 0.0f, 0.0f, 0.0f };
+            SpawnProjectile(9, isHeavy ? 4.8f : 3.8f, -0.25f, 10);
+            AudioEngine::Instance().PlaySfx(SFX_ELECTRO_GLITCH, 1.3f);
+            AudioEngine::Instance().PlaySfx(SFX_FIREBALL_LAUNCH, 1.05f);
+        }
+        break;
+
+    case CHAR_A_NEW_HOPE:
+        if (motion == MOTION_DP_P || motion == MOTION_DP_K) {
+            m_specialIndex = 2;
+            m_currentAttack = AttackData{ "Windy City Dunk", 5, 12, 16, 20, ATTACK_OVERHEAD, 12, 28, 14, 4.4f, true, true, 40.0f, -42.0f, 38.0f, 32.0f };
+            m_vel = Vector2{ m_facingRight ? 2.6f : -2.6f, -7.2f };
+            AudioEngine::Instance().PlaySfx(SFX_UPPERCUT, 1.1f);
+        } else {
+
+            m_specialIndex = 1;
+            m_currentAttack = AttackData{ "HOPE JUMP SHOT", 8, 14, 16, 18, ATTACK_PROJECTILE, 12, 48, 14, 3.8f, false, true, 0.0f, 0.0f, 0.0f, 0.0f };
+            float startX = m_pos.x + (m_facingRight ? 16.0f : -16.0f);
+            float startY = m_pos.y - 74.0f;
+            float targetX = opponent.GetPosition().x;
+            float targetY = opponent.GetPosition().y - 52.0f;
+            float dx = std::abs(targetX - startX);
+            float flightFrames = std::clamp(dx / 4.2f, 22.0f, 36.0f);
+            float vx = std::clamp(dx / flightFrames, 2.2f, 6.2f);
+            float vy = ((targetY - startY) - 0.5f * 0.24f * flightFrames * flightFrames) / flightFrames;
+            SpawnProjectile(10, vx, vy, 16);
+            m_activeTaunt = "How's that for hope and change?";
+            m_tauntTimer = 95;
+            AudioEngine::Instance().PlaySfx(SFX_WHOOSH_HEAVY, 1.15f);
+            AudioEngine::Instance().PlaySfx(SFX_FIREBALL_LAUNCH, 0.95f);
+        }
+        break;
     }
 
     m_currentAttack.isSpecial = true;
@@ -560,6 +660,8 @@ void Fighter::TriggerSignatureSpecial(const Fighter& opponent) {
         ExecuteSpecial(MOTION_QCF_P, BTN_HP, opponent);
         break;
     case CHAR_PALM_BEACH_PETE:
+    case CHAR_THE_PUNDIT:
+    case CHAR_A_NEW_HOPE:
         ExecuteSpecial(MOTION_QCF_P, BTN_HP, opponent);
         break;
     default:
@@ -624,6 +726,8 @@ bool Fighter::HasSpeechTaunt() const {
     case CHAR_BILLARY:
     case CHAR_SLEEPY_JOE:
     case CHAR_MTG:
+    case CHAR_THE_PUNDIT:
+    case CHAR_A_NEW_HOPE:
         return true;
     default:
         return false;
@@ -643,6 +747,8 @@ const char* Fighter::GetTauntQuote() const {
     case CHAR_POPULIST:         return "SMILE! :)";
     case CHAR_WAR_PIG:          return "BRING IT!";
     case CHAR_BILLARY:          return m_facingRight ? "OH YEAH!" : "DELETED!";
+    case CHAR_THE_PUNDIT:       return (rand() % 2 == 0) ? "DECISION 2028: 270!" : "CHECK THE WHITEBOARD!";
+    case CHAR_A_NEW_HOPE:       return "How's that for hope and change?";
     case CHAR_SLEEPY_JOE:       return (rand() % 2 == 0) ? "this is a big fkin deal." : "Hunter's Laptop!";
     case CHAR_MTG: {
         static int mtgTauntCycle = 0;
@@ -672,8 +778,11 @@ bool Fighter::TryExecuteBufferedMove(const Fighter& opponent) {
         bool crouch = m_buffer.isCrouch;
         m_buffer = BufferedInput{};
 
-        if (btn == BTN_LP) {
-
+        if (btn == (BTN_LP | BTN_LK)) {
+            StartNormalAttack(MOVE_HEAVY_PUNCH, "Bipartisan Toss", 3, 4, 14, 20, ATTACK_THROW, 14, 28, 0, 5.2f, true, 24.0f, -30.0f, 26.0f, 30.0f);
+            m_currentAttack.causesKnockdown = true;
+            return true;
+        } else if (btn == BTN_LP) {
             const char* name = (m_charId == CHAR_BILLARY) ?
                 (m_facingRight ? "Presidential Point" : "Gavel Jab") :
                 (crouch ? "Crouch Jab" : "Stand Jab");
@@ -681,15 +790,13 @@ bool Fighter::TryExecuteBufferedMove(const Fighter& opponent) {
             else StartNormalAttack(MOVE_LIGHT_PUNCH, name, 3, 3, 5, 7, ATTACK_MID, 6, 12, 8, 2.2f, false, 32.0f, -34.0f, 24.0f, 14.0f);
             return true;
         } else if (btn == BTN_HP) {
-
             const char* name = (m_charId == CHAR_BILLARY) ?
                 (m_facingRight ? "Executive Haymaker" : "Gavel Smash") :
                 (crouch ? "Crouch Haymaker" : "Stand Haymaker");
-            if (crouch) StartNormalAttack(MOVE_HEAVY_PUNCH, name, 5, 4, 12, 16, ATTACK_MID, 10, 22, 14, 3.8f, true, 30.0f, -24.0f, 28.0f, 24.0f);
-            else StartNormalAttack(MOVE_HEAVY_PUNCH, name, 5, 4, 12, 18, ATTACK_MID, 10, 24, 16, 4.2f, true, 36.0f, -36.0f, 32.0f, 20.0f);
+            if (crouch) StartNormalAttack(MOVE_HEAVY_PUNCH, name, 5, 4, 12, 16, ATTACK_MID, 11, 22, 14, 3.8f, true, 30.0f, -24.0f, 28.0f, 24.0f);
+            else StartNormalAttack(MOVE_HEAVY_PUNCH, name, 5, 4, 12, 18, ATTACK_OVERHEAD, 11, 24, 16, 4.2f, true, 36.0f, -36.0f, 32.0f, 20.0f);
             return true;
         } else if (btn == BTN_LK) {
-
             const char* name = (m_charId == CHAR_BILLARY) ?
                 (m_facingRight ? "Cabinet Kick" : "Low Subpoena") :
                 (crouch ? "Crouch Light Kick" : "Stand Light Kick");
@@ -697,12 +804,15 @@ bool Fighter::TryExecuteBufferedMove(const Fighter& opponent) {
             else StartNormalAttack(MOVE_LIGHT_KICK, name, 4, 3, 5, 8, ATTACK_MID, 6, 13, 9, 2.4f, false, 34.0f, -22.0f, 26.0f, 14.0f);
             return true;
         } else if (btn == BTN_HK) {
-
             const char* name = (m_charId == CHAR_BILLARY) ?
                 (m_facingRight ? "Arkansas Roundhouse" : "Executive Veto") :
                 (crouch ? "Crouch Strong Kick Sweep" : "Stand Strong Kick");
-            if (crouch) StartNormalAttack(MOVE_HEAVY_KICK, name, 6, 4, 14, 17, ATTACK_LOW, 10, 24, 14, 4.5f, true, 38.0f, -8.0f, 36.0f, 16.0f);
-            else StartNormalAttack(MOVE_HEAVY_KICK, name, 6, 4, 13, 18, ATTACK_MID, 10, 25, 15, 4.4f, true, 36.0f, -38.0f, 30.0f, 22.0f);
+            if (crouch) {
+                StartNormalAttack(MOVE_HEAVY_KICK, name, 6, 4, 14, 17, ATTACK_LOW, 11, 24, 14, 4.5f, true, 38.0f, -8.0f, 36.0f, 16.0f);
+                m_currentAttack.causesKnockdown = true;
+            } else {
+                StartNormalAttack(MOVE_HEAVY_KICK, name, 6, 4, 13, 18, ATTACK_MID, 11, 25, 15, 4.4f, true, 36.0f, -38.0f, 30.0f, 22.0f);
+            }
             return true;
         }
     }
@@ -742,6 +852,9 @@ bool Fighter::CheckCanBlock(AttackType type) const {
 }
 
 void Fighter::ApplyHit(int damage, AttackType type, int hitstop, int hitstun, float pushback, bool knockdown) {
+    if (m_invincibleFrames > 0) {
+        return;
+    }
 
     if (m_charId == CHAR_SLEEPY_JOE && m_state == FSTATE_SPECIAL && m_specialIndex == 1) {
         AudioEngine::Instance().PlaySfx(SFX_SECRET_SERVICE, 1.0f);
@@ -795,6 +908,9 @@ void Fighter::ApplyHit(int damage, AttackType type, int hitstop, int hitstun, fl
     if (m_health <= 0) {
         m_state = FSTATE_KNOCKDOWN_AIR;
         m_stateFrame = 0;
+        m_tauntTimer = 0;
+        m_activeTaunt = "";
+        m_cosmeticPuffs.clear();
         m_vel = Vector2{ m_facingRight ? -3.0f : 3.0f, -7.0f };
         return;
     }
@@ -848,6 +964,13 @@ void Fighter::UpdatePhysics(const InputManager& input, const Fighter& opponent) 
             if (p.pos.y >= p.bounceY) {
                 p.pos.y = p.bounceY;
                 p.vel.y = -p.vel.y * 0.65f;
+            }
+        } else if (p.type == 10) {
+
+            p.vel.y += 0.24f;
+            if (p.pos.y >= p.bounceY) {
+                p.pos.y = p.bounceY;
+                p.vel.y = -std::abs(p.vel.y) * 0.68f;
             }
         }
 
@@ -921,7 +1044,18 @@ void Fighter::UpdatePhysics(const InputManager& input, const Fighter& opponent) 
         m_buffer.timer = 12;
     }
 
-    if (input.IsButtonPressed(BTN_LP)) {
+    if (m_invincibleFrames > 0) m_invincibleFrames--;
+    if (m_comboResetTimer > 0) {
+        m_comboResetTimer--;
+        if (m_comboResetTimer <= 0) m_comboCount = 0;
+    }
+
+    if ((input.IsButtonPressed(BTN_LP) && input.IsButtonHeld(BTN_LK)) ||
+        (input.IsButtonPressed(BTN_LK) && input.IsButtonHeld(BTN_LP))) {
+        m_buffer.button = (BTN_LP | BTN_LK);
+        m_buffer.isCrouch = false;
+        m_buffer.timer = 10;
+    } else if (input.IsButtonPressed(BTN_LP)) {
         m_buffer.button = BTN_LP;
         m_buffer.isCrouch = crouching;
         m_buffer.timer = 10;
@@ -942,7 +1076,8 @@ void Fighter::UpdatePhysics(const InputManager& input, const Fighter& opponent) 
     if (input.IsButtonPressed(BTN_SPECIAL)) {
         if (grounded && (m_state == FSTATE_IDLE || m_state == FSTATE_WALK_FWD || m_state == FSTATE_WALK_BACK || m_state == FSTATE_CROUCH)) {
             TriggerSignatureSpecial(opponent);
-        } else if (m_state == FSTATE_ATTACK && (m_hitConnected || m_stateFrame < m_currentAttack.startupFrames + m_currentAttack.activeFrames)) {
+        } else if (m_state == FSTATE_ATTACK && (m_hitConnected || m_stateFrame < m_currentAttack.startupFrames + m_currentAttack.activeFrames + 4)) {
+            m_justCanceled = true;
             TriggerSignatureSpecial(opponent);
         }
     }
@@ -1031,10 +1166,11 @@ void Fighter::UpdatePhysics(const InputManager& input, const Fighter& opponent) 
 
     case FSTATE_ATTACK: {
 
-        if (m_buffer.motion != MOTION_NONE && (m_hitConnected || m_stateFrame < m_currentAttack.startupFrames + m_currentAttack.activeFrames)) {
+        if (m_buffer.motion != MOTION_NONE && (m_hitConnected || m_stateFrame < m_currentAttack.startupFrames + m_currentAttack.activeFrames + 4)) {
             SpecialMotionType mot = m_buffer.motion;
             int btn = m_buffer.motionButton;
             m_buffer = BufferedInput{};
+            m_justCanceled = true;
             ExecuteSpecial(mot, btn, opponent);
             break;
         }
@@ -1059,6 +1195,15 @@ void Fighter::UpdatePhysics(const InputManager& input, const Fighter& opponent) 
 
     case FSTATE_SPECIAL: {
         int totalFrames = m_currentAttack.startupFrames + m_currentAttack.activeFrames + m_currentAttack.recoveryFrames;
+        if (m_multiHitsRemaining > 1 && m_stateFrame > m_currentAttack.startupFrames && (m_stateFrame % 5 == 0)) {
+            m_hitConnected = false;
+            m_multiHitsRemaining--;
+        }
+
+        if (m_charId == CHAR_THE_PUNDIT && m_specialIndex == 1 && (m_stateFrame == 12 || m_stateFrame == 20)) {
+            SpawnProjectile(9, (m_stateFrame == 12) ? 4.4f : 5.3f, (m_stateFrame == 12) ? 0.22f : 0.0f, 10);
+            AudioEngine::Instance().PlaySfx(SFX_FIREBALL_LAUNCH, 1.15f);
+        }
 
         if (m_charId == CHAR_TECH_VISIONARY && m_specialIndex == 3 && m_stateFrame == 12) {
             m_pos.x = opponent.GetPosition().x + (opponent.IsFacingRight() ? -45.0f : 45.0f);

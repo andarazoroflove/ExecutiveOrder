@@ -9,6 +9,8 @@ static constexpr int SAMPLE_RATE = 22050;
 
 std::atomic<int> AudioEngine::s_currentTrack{ -1 };
 std::atomic<size_t> AudioEngine::s_trackPlayhead{ 0 };
+inline std::atomic<bool> s_ceCriticalTempo{ false };
+void AudioEngine::SetCriticalTempo(bool critical) { s_ceCriticalTempo.store(critical, std::memory_order_relaxed); }
 std::vector<int16_t>* AudioEngine::s_trackDataPtr = nullptr;
 
 AudioEngine& AudioEngine::Instance() {
@@ -98,51 +100,58 @@ void AudioEngine::SynthesizeAll() {
     }
 
     {
-        int count = (int)(SAMPLE_RATE * 0.15f);
+
+        int count = (int)(SAMPLE_RATE * 0.18f);
         std::vector<int16_t> pcm(count);
-        float phase = 0.0f;
+        float phase = 0.0f, fmPhase = 0.0f;
         for (int i = 0; i < count; i++) {
             float t = (float)i / count;
-            float env = expf(-t * 18.0f);
-            float freq = 140.0f * expf(-t * 12.0f) + 45.0f;
-            phase += 2.0f * PI_F * freq / SAMPLE_RATE;
-            float bass = sinf(phase);
-            float snap = RandFloat() * expf(-t * 40.0f);
-            float s = (bass * 0.65f + snap * 0.45f) * env * 24000.0f;
+            float env = expf(-t * 15.0f);
+            float freq = 260.0f * expf(-t * 18.0f) + 58.0f;
+            fmPhase += 2.0f * PI_F * (freq * 3.5f) / SAMPLE_RATE;
+            phase += 2.0f * PI_F * (freq + sinf(fmPhase) * 180.0f * expf(-t * 25.0f)) / SAMPLE_RATE;
+            float punch = sinf(phase);
+            float crack = RandFloat() * expf(-t * 28.0f);
+            float s = (punch * 0.72f + crack * 0.65f) * env * 30000.0f;
             pcm[i] = (int16_t)std::clamp(s, -32000.0f, 32000.0f);
         }
         m_sounds[SFX_HIT_LIGHT] = BuildWaveformSound(SAMPLE_RATE, count, pcm.data());
     }
 
     {
-        int count = (int)(SAMPLE_RATE * 0.28f);
+
+        int count = (int)(SAMPLE_RATE * 0.34f);
         std::vector<int16_t> pcm(count);
-        float phase = 0.0f;
+        float phase = 0.0f, ringPhase = 0.0f;
         for (int i = 0; i < count; i++) {
             float t = (float)i / count;
-            float env = expf(-t * 10.0f);
-            float freq = 120.0f * expf(-t * 9.0f) + 36.0f;
+            float env = expf(-t * 8.5f);
+            float freq = 340.0f * expf(-t * 20.0f) + 42.0f;
             phase += 2.0f * PI_F * freq / SAMPLE_RATE;
-            float bass = sinf(phase) + 0.35f * sinf(phase * 0.5f);
-            float snap = RandFloat() * expf(-t * 30.0f);
-            float raw = (bass * 0.7f + snap * 0.5f) * env * 1.8f;
-            if (raw > 0.9f) raw = 0.9f + (raw - 0.9f) * 0.2f;
-            if (raw < -0.9f) raw = -0.9f + (raw + 0.9f) * 0.2f;
-            pcm[i] = (int16_t)(raw * 28000.0f);
+            ringPhase += 2.0f * PI_F * 520.0f / SAMPLE_RATE;
+            float sub = sinf(phase);
+            float sq = (sinf(phase * 1.5f) >= 0.0f) ? 0.85f : -0.85f;
+            float ring = sinf(ringPhase) * sinf(phase * 3.0f) * expf(-t * 18.0f);
+            float crunch = RandFloat() * expf(-t * 12.0f);
+            float s = (sub * 0.65f + sq * 0.38f + ring * 0.35f + crunch * 0.62f) * env * 31000.0f;
+            pcm[i] = (int16_t)std::clamp(s, -32000.0f, 32000.0f);
         }
         m_sounds[SFX_HIT_HEAVY] = BuildWaveformSound(SAMPLE_RATE, count, pcm.data());
     }
 
     {
-        int count = (int)(SAMPLE_RATE * 0.12f);
+
+        int count = (int)(SAMPLE_RATE * 0.18f);
         std::vector<int16_t> pcm(count);
+        float p1 = 0.0f, p2 = 0.0f, p3 = 0.0f;
         for (int i = 0; i < count; i++) {
             float t = (float)i / count;
-            float env = expf(-t * 28.0f);
-            float tone1 = sinf(2.0f * PI_F * 1150.0f * i / SAMPLE_RATE);
-            float tone2 = sinf(2.0f * PI_F * 1720.0f * i / SAMPLE_RATE);
-            float click = RandFloat() * expf(-t * 60.0f);
-            float s = (tone1 * 0.4f + tone2 * 0.3f + click * 0.5f) * env * 22000.0f;
+            float env = expf(-t * 16.0f);
+            p1 += 2.0f * PI_F * 780.0f / SAMPLE_RATE;
+            p2 += 2.0f * PI_F * 1240.0f / SAMPLE_RATE;
+            p3 += 2.0f * PI_F * 1890.0f / SAMPLE_RATE;
+            float fm = sinf(p1 + sinf(p2) * 2.2f) + sinf(p3) * 0.5f;
+            float s = (fm * 0.65f + RandFloat() * expf(-t * 35.0f) * 0.35f) * env * 28000.0f;
             pcm[i] = (int16_t)std::clamp(s, -32000.0f, 32000.0f);
         }
         m_sounds[SFX_BLOCK] = BuildWaveformSound(SAMPLE_RATE, count, pcm.data());
@@ -948,84 +957,95 @@ struct FMVoiceState {
 
 void AudioEngine::SynthesizeBgmTracks() {
 
-    constexpr int LOOP_SAMPLES = 78400;
+    constexpr int LOOP_SAMPLES = 86400;
     constexpr int STEPS = 32;
     constexpr int SAMPLES_PER_STEP = LOOP_SAMPLES / STEPS;
+    constexpr float PITCH_DOWN = 0.86f;
 
     for (int t = 0; t < 6; t++) {
         m_bgmTracks[t].resize(LOOP_SAMPLES);
         FMVoiceState bassVoice;
+        FMVoiceState subBassVoice;
         FMVoiceState leadVoice;
+        FMVoiceState warmPadVoice;
+        float lpfState = 0.0f;
 
         for (int step = 0; step < STEPS; step++) {
             float bassFreq = 55.0f;
             float leadFreq = 0.0f;
 
             if (t == 0) {
-
                 int bassNotes[8] = { 55, 55, 65, 55, 73, 65, 55, 49 };
                 bassFreq = (float)bassNotes[step % 8];
-                leadFreq = bassFreq * 4.0f;
+                int menuLead[16] = { 220, 0, 220, 261, 220, 0, 196, 0, 220, 0, 261, 293, 261, 220, 196, 0 };
+                leadFreq = (float)menuLead[step % 16];
             } else if (t == 1) {
-
                 int bassRiff[16] = { 55, 55, 110, 55, 65, 55, 98, 55, 55, 55, 110, 65, 73, 65, 49, 52 };
                 bassFreq = (float)bassRiff[step % 16];
                 int leadRiff[16] = { 220, 0, 261, 293, 329, 0, 293, 261, 220, 261, 293, 349, 329, 293, 261, 196 };
                 leadFreq = (float)leadRiff[step % 16];
             } else if (t == 2) {
-
                 int bassNotes[16] = { 65, 65, 65, 65, 58, 58, 58, 58, 49, 49, 49, 49, 55, 55, 62, 62 };
                 bassFreq = (float)bassNotes[step % 16];
-                int leadNotes[16] = { 261, 293, 329, 392, 329, 293, 261, 293, 329, 392, 440, 523, 440, 392, 329, 293 };
+                int leadNotes[16] = { 261, 0, 293, 329, 329, 293, 261, 0, 329, 0, 392, 440, 392, 329, 293, 0 };
                 leadFreq = (float)leadNotes[step % 16];
             } else if (t == 3) {
-
                 int bassNotes[16] = { 73, 73, 82, 73, 87, 73, 98, 73, 73, 82, 87, 98, 110, 98, 87, 82 };
                 bassFreq = (float)bassNotes[step % 16];
-                int leadNotes[16] = { 293, 329, 349, 392, 440, 392, 349, 329, 293, 349, 440, 523, 587, 523, 440, 349 };
+                int leadNotes[16] = { 293, 0, 329, 349, 392, 349, 329, 0, 293, 349, 392, 440, 392, 349, 329, 0 };
                 leadFreq = (float)leadNotes[step % 16];
             } else if (t == 4) {
-
                 int bassNotes[16] = { 41, 41, 82, 41, 49, 41, 73, 41, 41, 41, 82, 49, 55, 49, 41, 44 };
                 bassFreq = (float)bassNotes[step % 16];
-                leadFreq = bassFreq * 6.0f;
+                int bossLead[16] = { 165, 0, 196, 165, 220, 0, 196, 185, 165, 0, 220, 247, 220, 196, 165, 0 };
+                leadFreq = (float)bossLead[step % 16];
             } else {
-
                 int bonusBass[16] = { 65, 65, 130, 65, 78, 65, 116, 65, 73, 65, 146, 73, 82, 73, 65, 78 };
                 bassFreq = (float)bonusBass[step % 16];
-                int bonusLead[16] = { 261, 329, 392, 523, 392, 329, 261, 392, 293, 349, 440, 587, 440, 349, 293, 440 };
+                int bonusLead[16] = { 261, 0, 329, 392, 329, 261, 0, 196, 293, 0, 349, 440, 349, 293, 0, 220 };
                 leadFreq = (float)bonusLead[step % 16];
             }
+
+            bassFreq *= PITCH_DOWN;
+            leadFreq *= PITCH_DOWN;
 
             for (int s = 0; s < SAMPLES_PER_STEP; s++) {
                 int sampleIdx = step * SAMPLES_PER_STEP + s;
                 float stepT = (float)s / SAMPLES_PER_STEP;
 
-                float bassEnv = expf(-stepT * 5.0f);
-                float leadEnv = sinf(stepT * PI_F * 0.9f);
+                float bassEnv = expf(-stepT * 4.2f);
+                float leadEnv = sinf(stepT * PI_F * 0.92f) * expf(-stepT * 1.4f);
 
                 float drum = 0.0f;
-
-                if ((step % 4) == 0) {
-                    drum += sinf(2.0f * PI_F * (130.0f * expf(-stepT * 20.0f)) * ((float)s / SAMPLE_RATE)) * expf(-stepT * 10.0f) * 0.55f;
+                if ((step % 4) == 0 || (step % 16 == 11)) {
+                    float kFreq = 115.0f * expf(-stepT * 18.0f) + 36.0f;
+                    drum += sinf(2.0f * PI_F * kFreq * ((float)s / SAMPLE_RATE)) * expf(-stepT * 8.5f) * 0.68f;
                 }
-
                 if ((step % 4) == 2) {
                     float noise = ((float)rand() / (float)RAND_MAX * 2.0f - 1.0f);
-                    drum += noise * expf(-stepT * 10.0f) * 0.38f;
+                    float snareBody = sinf(2.0f * PI_F * 145.0f * ((float)s / SAMPLE_RATE)) * expf(-stepT * 14.0f);
+                    drum += (noise * 0.42f + snareBody * 0.58f) * expf(-stepT * 9.0f) * 0.48f;
+                }
+                if ((step % 2) == 0) {
+                    float hatNoise = ((float)rand() / (float)RAND_MAX * 2.0f - 1.0f);
+                    drum += hatNoise * expf(-stepT * 34.0f) * 0.08f;
                 }
 
-                float hatNoise = ((float)rand() / (float)RAND_MAX * 2.0f - 1.0f);
-                drum += hatNoise * expf(-stepT * 32.0f) * 0.12f;
+                float bass = bassVoice.Process(bassFreq, 2.0f, 1.6f, bassEnv) * 0.44f
+                           + subBassVoice.Process(bassFreq * 0.5f, 1.0f, 0.4f, bassEnv) * 0.28f;
 
-                float bass = bassVoice.Process(bassFreq, 2.0f, 2.0f, bassEnv) * 0.42f;
                 float lead = 0.0f;
-                if (leadFreq > 50.0f) {
-                    lead = leadVoice.Process(leadFreq, 3.0f, 1.4f, leadEnv) * 0.22f;
+                if (leadFreq > 40.0f) {
+                    float mainLead = leadVoice.Process(leadFreq, 2.0f, 1.1f, leadEnv) * 0.22f;
+                    float warmOctave = warmPadVoice.Process(leadFreq * 0.5f, 1.5f, 0.8f, leadEnv) * 0.18f;
+                    lead = mainLead + warmOctave;
                 }
 
-                float mix = (bass + lead + drum) * 0.55f;
-                m_bgmTracks[t][sampleIdx] = (int16_t)std::clamp(mix * 28000.0f, -32000.0f, 32000.0f);
+                float synthRaw = bass + lead;
+                lpfState += (synthRaw - lpfState) * 0.38f;
+
+                float mix = (lpfState + drum) * 0.62f;
+                m_bgmTracks[t][sampleIdx] = (int16_t)std::clamp(mix * 28500.0f, -32000.0f, 32000.0f);
             }
         }
     }
@@ -1040,10 +1060,18 @@ void AudioEngine::BgmAudioCallback(void* bufferData, unsigned int frames) {
         size_t sz = pcm.size();
         size_t pos = s_trackPlayhead.load(std::memory_order_relaxed);
 
+        bool fast = s_ceCriticalTempo.load(std::memory_order_relaxed);
+        static unsigned int fracAcc = 0;
         for (unsigned int i = 0; i < frames; i++) {
             if (pos >= sz) pos = 0;
             out[i] = pcm[pos];
-            pos++;
+            if (fast) {
+                fracAcc += 5;
+                pos += (fracAcc >> 2);
+                fracAcc &= 3;
+            } else {
+                pos++;
+            }
         }
         s_trackPlayhead.store(pos, std::memory_order_relaxed);
     } else {

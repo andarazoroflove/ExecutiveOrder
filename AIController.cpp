@@ -100,6 +100,12 @@ void AIController::TriggerSpecial(InputManager& input, CharacterId charId, int r
         else input.InjectSpecialMotion(MOTION_QCB_P, BTN_HP);
         break;
 
+    case CHAR_THE_PUNDIT:
+    case CHAR_A_NEW_HOPE:
+        if (role == 1) input.InjectSpecialMotion(MOTION_DP_P, BTN_HP);
+        else input.InjectSpecialMotion(MOTION_QCF_P, BTN_HP);
+        break;
+
     default:
         input.InjectSpecialMotion(MOTION_QCF_P, BTN_HP);
         break;

@@ -85,20 +85,28 @@ static void TestStrike(Fighter& attacker, Fighter& defender,
 
             attacker.SetHitConnected(true);
 
+            int remFrames = std::max(1, (attack.startupFrames + attack.activeFrames + attack.recoveryFrames) - attacker.GetStateFrame());
             if (isBlocking) {
                 int chip = attack.isSpecial ? std::max(1, attack.damage / 5) : 0;
                 defender.ApplyBlock(chip, 6, attack.blockstunFrames, attack.pushback);
                 attacker.SetHitstop(6);
-                cameraShake = 1.0f;
+                attacker.SetLastFrameAdvantage(attack.blockstunFrames - remFrames);
+                defender.SetLastFrameAdvantage(remFrames - attack.blockstunFrames);
+                cameraShake = 1.2f;
 
-                sparks.push_back(SparkEffect{ sparkPos, true, 0, 6, true });
+                sparks.push_back(SparkEffect{ sparkPos, true, 0, 8, true });
                 AudioEngine::Instance().PlaySfx(SFX_BLOCK, 1.0f);
             } else {
-                defender.ApplyHit(attack.damage, attack.type, attack.hitstopFrames, attack.hitstunFrames, attack.pushback, attack.causesKnockdown);
-                attacker.SetHitstop(attack.hitstopFrames);
-                cameraShake = attack.isHeavy ? 2.5f : 1.5f;
+                int hs = attack.isSpecial ? 14 : (attack.isHeavy ? 11 : 6);
+                defender.ApplyHit(attack.damage, attack.type, hs, attack.hitstunFrames, attack.pushback, attack.causesKnockdown);
+                attacker.SetHitstop(hs);
+                attacker.AddComboHit();
+                defender.ResetCombo();
+                attacker.SetLastFrameAdvantage(attack.hitstunFrames - remFrames);
+                defender.SetLastFrameAdvantage(remFrames - attack.hitstunFrames);
+                cameraShake = attack.isSpecial ? 4.2f : (attack.isHeavy ? 2.8f : 1.5f);
 
-                sparks.push_back(SparkEffect{ sparkPos, false, 0, 6, true });
+                sparks.push_back(SparkEffect{ sparkPos, false, 0, 10, true });
                 AudioEngine::Instance().PlaySfx(attack.isHeavy ? SFX_HIT_HEAVY : SFX_HIT_LIGHT, 1.0f);
             }
             break;
@@ -128,7 +136,7 @@ static void TestProjectiles(Fighter& owner, Fighter& opponent,
                     sparks.push_back(SparkEffect{ sparkPos, true, 0, 6, true });
                     AudioEngine::Instance().PlaySfx(SFX_BLOCK, 1.0f);
                 } else {
-                    opponent.ApplyHit(p.damage, ATTACK_PROJECTILE, 10, 16, 3.8f, false);
+                    opponent.ApplyHit(p.damage, (p.type == 10) ? ATTACK_OVERHEAD : ATTACK_PROJECTILE, (p.type == 10) ? 12 : 10, (p.type == 10) ? 52 : 16, 3.8f, false);
                     sparks.push_back(SparkEffect{ sparkPos, false, 0, 6, true });
                     AudioEngine::Instance().PlaySfx(SFX_FIREBALL_IMPACT, 1.0f);
                     cameraShake = 2.0f;
