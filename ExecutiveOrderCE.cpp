@@ -1,16 +1,3 @@
-// ============================================================================
-// EXECUTIVE ORDER II: TOTAL VETO - CHAMPIONSHIP EDITION (ExecutiveOrderCE.cpp)
-// Complete Single-File C++17 / Raylib 5.0 16-Bit Arcade Fighting Game Engine
-// ============================================================================
-// Embedded Raylib / zlib License Notice:
-// Copyright (c) 2013-2024 Ramon Santamaria (@raysan5)
-// This software is provided "as-is", without any express or implied warranty.
-// Permission is granted to anyone to use this software for any purpose,
-// including commercial applications, and to alter it and redistribute it
-// freely, subject to the standard zlib/libpng license restrictions.
-// ============================================================================
-
-// --- Common.h ---
 #include <cstdint>
 #include <string>
 #include <vector>
@@ -137,8 +124,6 @@ inline Vector2 MakeVec2(float x, float y) {
     return Vector2{ x, y };
 }
 
-// --- Shaders.h ---
-
 #if defined(GRAPHICS_API_OPENGL_ES2) || defined(GRAPHICS_API_OPENGL_ES3)
 
 inline const char* CRT_FRAGMENT_SHADER = R"(#version 100
@@ -150,9 +135,9 @@ varying vec4 fragColor;
 uniform sampler2D texture0;
 uniform vec2 resolution;
 uniform float time;
-uniform float scanlineIntensity; // default ~0.35
-uniform float curvature;         // default ~0.02
-uniform float bloom;             // default ~0.15
+uniform float scanlineIntensity;
+uniform float curvature;
+uniform float bloom;
 
 void main()
 {
@@ -223,19 +208,18 @@ out vec4 finalColor;
 uniform sampler2D texture0;
 uniform vec2 resolution;
 uniform float time;
-uniform float scanlineIntensity; // default ~0.35
-uniform float curvature;         // default ~0.02
-uniform float bloom;             // default ~0.15
+uniform float scanlineIntensity;
+uniform float curvature;
+uniform float bloom;
 
 void main()
 {
-    // Barrel distortion (subtle 1-pixel curve like a genuine Sony Trinitron / arcade tube)
+
     vec2 uv = fragTexCoord;
     vec2 dc = uv - 0.5;
     float dist = dot(dc, dc);
     uv = uv + dc * (dist * curvature);
 
-    // Hard clip out-of-bounds screen bezel
     if (uv.x < 0.0 || uv.x > 1.0 || uv.y < 0.0 || uv.y > 1.0) {
         finalColor = vec4(0.0, 0.0, 0.0, 1.0);
         return;
@@ -243,12 +227,10 @@ void main()
 
     vec4 col = texture(texture0, uv);
 
-    // Horizontal scanline rasterization (alternating dark lines at native 224 scanline pitch)
     float scanline = sin(uv.y * 224.0 * 3.14159265 * 2.0);
     float scanMod = 1.0 - (scanlineIntensity * (0.5 + 0.5 * scanline));
     col.rgb *= scanMod;
 
-    // Subpixel aperture grille / phosphor triad bloom simulation (RGB columns)
     float subpixel = mod(floor(uv.x * 384.0 * 3.0), 3.0);
     vec3 mask = vec3(0.9, 0.9, 0.9);
     if (subpixel < 1.0) mask = vec3(1.15, 0.88, 0.88);
@@ -256,7 +238,6 @@ void main()
     else mask = vec3(0.88, 0.88, 1.15);
     col.rgb *= mix(vec3(1.0), mask, bloom);
 
-    // Subtle edge vignette (smooth polynomial approximation - 10x faster than pow)
     float vx = uv.x * (1.0 - uv.x);
     float vy = uv.y * (1.0 - uv.y);
     float vig = clamp(16.0 * vx * vy, 0.0, 1.0);
@@ -277,14 +258,14 @@ uniform float time;
 void main()
 {
     vec2 uv = fragTexCoord;
-    // Horizontal wind ripples stronger on free right edge
+
     float ripple = sin(uv.x * 12.0 - time * 6.0) * 0.04 * (uv.x + 0.2);
     float rippleY = cos(uv.x * 8.0 - time * 5.0) * 0.02 * (uv.x + 0.2);
     uv.y += ripple;
     uv.x += rippleY;
 
     vec4 col = texture(texture0, uv);
-    // Light shading on wave crests
+
     float shadow = 1.0 + (cos(uv.x * 12.0 - time * 6.0) * 0.15 * uv.x);
     col.rgb *= shadow;
 
@@ -293,8 +274,6 @@ void main()
 )";
 
 #endif
-
-// --- AssetManager.h ---
 #include "raylib.h"
 
 namespace AssetManager {
@@ -304,8 +283,6 @@ namespace AssetManager {
     Texture2D LoadTexture(const char* path);
     Image LoadImage(const char* path);
 }
-
-// --- InputManager.h ---
 #include <array>
 #include <vector>
 
@@ -413,8 +390,6 @@ private:
     SpecialMotionType m_injectedMotion = MOTION_NONE;
     uint16_t m_injectedButton = 0;
 };
-
-// --- AudioEngine.h ---
 #include <vector>
 #include <atomic>
 
@@ -505,8 +480,6 @@ private:
     static std::atomic<size_t> s_trackPlayhead;
     static std::vector<int16_t>* s_trackDataPtr;
 };
-
-// --- Fighter.h ---
 #include <vector>
 #include <string>
 
@@ -737,8 +710,6 @@ private:
     Color m_colorSkin{ 240, 190, 150, 255 };
 };
 
-// --- Collision.h ---
-
 struct BoxAABB {
     Rectangle rect;
     bool active = false;
@@ -763,8 +734,6 @@ public:
 
     static void ResolveCombat(Fighter& p1, Fighter& p2, std::vector<SparkEffect>& sparks, float& cameraShake);
 };
-
-// --- Stages.h ---
 #include <string>
 
 struct VenueDetails {
@@ -805,8 +774,6 @@ private:
     Texture2D m_stageTextures[STAGE_COUNT]{};
     bool m_texturesLoaded = false;
 };
-
-// --- Visuals.h ---
 #include <vector>
 
 class VisualsEngine {
@@ -861,60 +828,21 @@ private:
     static Texture2D s_endingCthulhuNap;
 };
 
-// --- AIController.h ---
-
-class AIController {
-public:
-    AIController();
-    void Reset();
-    void Update(InputManager& input, const Fighter& cpu, const Fighter& opponent, float dt);
-
-    void SetDifficulty(AIDifficulty diff) { m_difficulty = diff; }
-    AIDifficulty GetDifficulty() const { return m_difficulty; }
-
-private:
-    void MakeDecision(InputManager& input, const Fighter& cpu, const Fighter& opponent, float dist, bool oppAirborne, bool oppAttacking);
-    void TriggerSpecial(InputManager& input, CharacterId charId, int role);
-
-    AIDifficulty m_difficulty = AI_DIFF_EASY;
-    int m_actionCooldown = 30;
-    int m_movementTimer = 0;
-    int m_moveDir = 0;
-
-    bool m_isBlocking = false;
-    int m_blockDuration = 0;
-
-    int m_footsiesPhase = 0;
-    int m_footsiesTimer = 0;
-
-    RawInputState m_simInput{};
-};
-
-
-// ============================================================================
-// CHAMPIONSHIP EDITION (CE) UPGRADE SUITE:
-// - 12-Part Articulated Hierarchical Character Rig & 5-Node Verlet Tie Physics
-// - CPS-1 3-Tone Silhouette Rim, Specular Bevels & Afterimage Shadow Trails
-// - Dynamic Stage Searchlights, Paparazzi Flashes, Weather & Perspective Floor
-// - Live Stage Animations (Clapping Lincoln, Predator Drone, Eternal Flame, ENN Studio)
-// - Karl Rove ("The Pundit") Real-Time "DECISION 2028" Whiteboard Map Markup
-// - 2-Continue Campaign Rematch System
-// - F1 Live Hitbox/Hurtbox/Pushbox & Frame-Advantage Debug Overlay
-// ============================================================================
 #include <cstdlib>
 #include <cstdio>
 
 namespace ChampionshipEdition {
 
-static bool s_debugHitboxes = false;
-static bool s_forceProceduralRig = false;
-static int  s_superFlashTimer = 0;
-static int  s_superFlashPlayer = 0;
-static std::string s_superFlashMove = "TOTAL VETO FLURRY!";
-static float s_p1TrailHp = 100.0f;
-static float s_p2TrailHp = 100.0f;
-static int   s_continuesRemaining = 2;
-static bool  s_isSecretMatch = false;
+inline bool s_debugHitboxes = false;
+inline bool s_forceProceduralRig = false;
+inline int  s_superFlashTimer = 0;
+inline int  s_superFlashPlayer = 0;
+inline std::string s_superFlashMove = "TOTAL VETO FLURRY!";
+inline float s_p1TrailHp = 100.0f;
+inline float s_p2TrailHp = 100.0f;
+inline int   s_continuesRemaining = 2;
+inline bool  s_isSecretMatch = false;
+inline bool  s_opponentLocked = false;
 
 struct CEAfterimage {
     Vector2 pos;
@@ -1012,14 +940,14 @@ struct CEVerletTie {
     }
 };
 
-static CEVerletTie s_ties[2];
-static std::vector<CEAfterimage> s_afterimages[2];
-static std::vector<CEStamp> s_stamps;
-static std::vector<CEParticle> s_particles;
-static std::vector<CECalloutBanner> s_banners;
-static bool s_firstStrikeAwarded = false;
-static int s_prevP1Hits = 0;
-static int s_prevP2Hits = 0;
+inline CEVerletTie s_ties[2];
+inline std::vector<CEAfterimage> s_afterimages[2];
+inline std::vector<CEStamp> s_stamps;
+inline std::vector<CEParticle> s_particles;
+inline std::vector<CECalloutBanner> s_banners;
+inline bool s_firstStrikeAwarded = false;
+inline int s_prevP1Hits = 0;
+inline int s_prevP2Hits = 0;
 
 inline void ResetRoundFX() {
     s_stamps.clear();
@@ -1087,17 +1015,148 @@ inline void SpawnImpactJuice(Vector2 pos, bool heavy, bool isSpecial, const char
     }
     if (stampText != nullptr && stampText[0] != '\0') {
         CEStamp st{};
-        st.pos = Vector2{ pos.x, pos.y - 20.0f };
+        st.pos = pos;
         st.text = stampText;
         st.color = isSpecial ? Color{ 255, 55, 55, 255 } : Color{ 255, 220, 40, 255 };
         st.frame = 0;
-        st.maxFrames = 34;
+        st.maxFrames = 24;
         st.alive = true;
         s_stamps.push_back(st);
     }
 }
 
-// 3-Tone CPS-1 Beveled Limb Segment Helper for 12-Part Hierarchical Rig
+inline void DrawComicThoughtBubble(const char* text, int centerX, int bottomY, int tailTargetX, int tailTargetY, int fontSize, Color textCol, Color cloudCol = Color{ 255, 255, 248, 238 }) {
+    if (!text || text[0] == '\0') return;
+    int tw = MeasureText(text, fontSize);
+    int padX = 5;
+    int padY = 3;
+    int halfW = tw / 2 + padX;
+    int halfH = fontSize / 2 + padY;
+
+    int cx = std::clamp(centerX, (int)STAGE_MIN_X + halfW, (int)STAGE_MAX_X - halfW);
+    int cy = std::clamp(bottomY - halfH, 16 + halfH, (int)GROUND_Y - 24);
+
+    int numTop = std::max(4, (tw + 10) / 8);
+    Color outlineCol{ 18, 22, 34, 245 };
+    Color shadowCol{ 0, 0, 0, 70 };
+
+    auto drawCloudPass = [&](int ox, int oy, float rGrow, Color col) {
+        DrawRectangle(cx - halfW + 3 + ox, cy - halfH + 2 + oy, (halfW - 3) * 2, (halfH - 2) * 2, col);
+        DrawCircle(cx - halfW + 3 + ox, cy + oy, (float)halfH - 0.5f + rGrow, col);
+        DrawCircle(cx + halfW - 3 + ox, cy + oy, (float)halfH - 0.5f + rGrow, col);
+        for (int i = 0; i < numTop; i++) {
+            float t = (numTop == 1) ? 0.5f : (float)i / (float)(numTop - 1);
+            float lx = (cx - halfW + 4) + t * ((halfW - 4) * 2.0f);
+            float arch = sinf(t * PI_F) * 1.6f;
+            float rTop = ((i % 2 == 0) ? (halfH * 0.68f) : (halfH * 0.78f)) + rGrow;
+            float rBot = ((i % 2 == 1) ? (halfH * 0.64f) : (halfH * 0.74f)) + rGrow;
+            DrawCircle((int)lx + ox, (int)(cy - halfH + 2 - arch) + oy, rTop, col);
+            DrawCircle((int)lx + ox, (int)(cy + halfH - 2 + arch * 0.6f) + oy, rBot, col);
+        }
+    };
+
+    drawCloudPass(1, 1, 1.1f, shadowCol);
+    drawCloudPass(0, 0, 1.2f, outlineCol);
+    drawCloudPass(0, 0, 0.0f, cloudCol);
+
+    for (int i = 0; i < numTop; i++) {
+        float t = (numTop == 1) ? 0.5f : (float)i / (float)(numTop - 1);
+        float lx = (cx - halfW + 4) + t * ((halfW - 4) * 2.0f);
+        float arch = sinf(t * PI_F) * 1.6f;
+        float rTop = (i % 2 == 0) ? (halfH * 0.48f) : (halfH * 0.56f);
+        DrawCircle((int)lx, (int)(cy - halfH + 2 - arch), rTop, WHITE);
+    }
+
+    float startX = (float)std::clamp(tailTargetX, cx - halfW + 6, cx + halfW - 6);
+    float startY = (float)(cy + halfH + 1);
+    float endX = (float)tailTargetX;
+    float endY = (float)std::max((int)startY + 4, tailTargetY);
+    float radii[3] = { 2.3f, 1.6f, 1.0f };
+    for (int p = 0; p < 3; p++) {
+        float u = (float)(p + 1) / 3.3f;
+        float px = startX + (endX - startX) * u + ((p == 1) ? 1.0f : 0.0f);
+        float py = startY + (endY - startY) * u;
+        DrawCircle((int)px + 1, (int)py + 1, radii[p] + 0.8f, shadowCol);
+        DrawCircle((int)px, (int)py, radii[p] + 1.0f, outlineCol);
+        DrawCircle((int)px, (int)py, radii[p], cloudCol);
+    }
+
+    VisualsEngine::DrawPixelText(text, cx - tw / 2, cy - fontSize / 2, fontSize, textCol);
+}
+
+inline void DrawBatmanActionBurst(const char* text, int centerX, int centerY, int fontSize, Color burstOuter, Color burstInner, Color textCol, float scale = 1.0f) {
+    if (!text || text[0] == '\0') return;
+    int tw = MeasureText(text, fontSize);
+    float rx = (tw * 0.50f + 7.5f) * scale;
+    float ry = (fontSize * 0.52f + 5.5f) * scale;
+
+    float cx = std::clamp((float)centerX, STAGE_MIN_X + rx, STAGE_MAX_X - rx);
+    float cy = std::clamp((float)centerY, ry + 18.0f, GROUND_Y - ry - 8.0f);
+
+    const int N = 16;
+    auto buildBurstPts = [&](float mult, Vector2 outPts[N]) {
+        for (int i = 0; i < N; i++) {
+            float ang = (float)i * (2.0f * PI_F / (float)N) - 0.14f;
+            bool isSpike = (i % 2 == 0);
+            float spikeBoost = isSpike ? (((i % 4 == 0) ? 1.24f : 1.12f)) : 0.68f;
+            outPts[i] = Vector2{
+                cx + cosf(ang) * rx * spikeBoost * mult,
+                cy + sinf(ang) * ry * spikeBoost * mult
+            };
+        }
+    };
+
+    auto fillStarburst = [&](float mult, Color col, float ox, float oy) {
+        Vector2 pts[N];
+        buildBurstPts(mult, pts);
+        Vector2 c{ cx + ox, cy + oy };
+        for (int i = 0; i < N; i++) {
+            Vector2 p1{ pts[i].x + ox, pts[i].y + oy };
+            Vector2 p2{ pts[(i + 1) % N].x + ox, pts[(i + 1) % N].y + oy };
+            DrawTriangle(c, p1, p2, col);
+            DrawTriangle(c, p2, p1, col);
+        }
+    };
+
+    fillStarburst(1.12f, Color{ 0, 0, 0, 95 }, 1.5f, 1.5f);
+    fillStarburst(1.13f, Color{ 12, 12, 18, 250 }, 0.0f, 0.0f);
+    fillStarburst(1.00f, burstOuter, 0.0f, 0.0f);
+    fillStarburst(0.74f, burstInner, 0.0f, 0.0f);
+
+    Vector2 outerPts[N];
+    buildBurstPts(1.01f, outerPts);
+    for (int i = 0; i < N; i++) {
+        DrawLineEx(outerPts[i], outerPts[(i + 1) % N], 1.2f, Color{ 12, 12, 18, 250 });
+    }
+
+    int tx = (int)(cx - tw * 0.5f);
+    int ty = (int)(cy - fontSize * 0.5f);
+    VisualsEngine::DrawPixelText(text, tx + 1, ty + 1, fontSize, Color{ 10, 10, 16, 255 });
+    for (int dy = -1; dy <= 1; dy++) {
+        for (int dx = -1; dx <= 1; dx++) {
+            if (dx != 0 || dy != 0) {
+                VisualsEngine::DrawPixelText(text, tx + dx, ty + dy, fontSize, Color{ 12, 12, 18, 255 });
+            }
+        }
+    }
+    VisualsEngine::DrawPixelText(text, tx, ty, fontSize, textCol);
+}
+
+inline void DrawArcade3DText(const char* text, int x, int y, int fontSize, Color topCol, Color botCol) {
+    if (!text || text[0] == '\0') return;
+    VisualsEngine::DrawPixelText(text, x + 2, y + 2, fontSize, Color{ 8, 10, 20, 245 });
+    VisualsEngine::DrawPixelText(text, x + 1, y + 2, fontSize, Color{ 8, 10, 20, 245 });
+    for (int dy = -1; dy <= 1; dy++) {
+        for (int dx = -1; dx <= 1; dx++) {
+            if (dx != 0 || dy != 0) {
+                VisualsEngine::DrawPixelText(text, x + dx, y + dy, fontSize, Color{ 14, 16, 28, 255 });
+            }
+        }
+    }
+    VisualsEngine::DrawPixelText(text, x, y + 1, fontSize, botCol);
+    VisualsEngine::DrawPixelText(text, x, y, fontSize, topCol);
+}
+
 inline void DrawLimb3Tone(Vector2 a, Vector2 b, float rA, float rB, Color baseCol) {
     Color darkCol{ (unsigned char)(baseCol.r * 0.58f), (unsigned char)(baseCol.g * 0.58f), (unsigned char)(baseCol.b * 0.58f), 255 };
     Color hiCol{ (unsigned char)std::min(255, (int)(baseCol.r * 1.28f + 18)), (unsigned char)std::min(255, (int)(baseCol.g * 1.28f + 18)), (unsigned char)std::min(255, (int)(baseCol.b * 1.28f + 18)), 255 };
@@ -1117,7 +1176,6 @@ inline void DrawLimb3Tone(Vector2 a, Vector2 b, float rA, float rB, Color baseCo
     DrawLineEx(hA, hB, std::max(1.0f, rAvg * 0.55f), hiCol);
 }
 
-// Articulated 12-Part Hierarchical Character Rig (F3 Mode / Fallback)
 inline void DrawArticulated12PartRig(const Fighter& f) {
     Vector2 pos = f.GetPosition();
     bool fr = f.IsFacingRight();
@@ -1204,10 +1262,8 @@ inline void DrawArticulated12PartRig(const Fighter& f) {
     DrawCircleV(handR, 3.6f, skin);
 }
 
-// Upgraded Championship Edition Stage Atmosphere (Searchlights, Paparazzi Flashes,
-// Drifting Cherry Blossoms / Subpoenas / Embers & Perspective Floor Grid Lines)
 inline void DrawStageUpgrades(StageId stageId, float camX, float time) {
-    // 1. Sweeping Tactical Sky / Arena Searchlights
+
     for (int b = 0; b < 2; b++) {
         float pivotX = (b == 0) ? 75.0f : (SCREEN_WIDTH - 75.0f);
         float sway = sinf(time * (1.3f + b * 0.4f) + b * 2.2f) * 95.0f;
@@ -1222,7 +1278,6 @@ inline void DrawStageUpgrades(StageId stageId, float camX, float time) {
         );
     }
 
-    // 2. Animated Press Corps / Crowd Paparazzi Camera Flashes
     for (int c = 0; c < 10; c++) {
         float flashPhase = fmodf(time * 3.4f + c * 1.37f, 2.4f);
         if (flashPhase < 0.08f) {
@@ -1235,43 +1290,24 @@ inline void DrawStageUpgrades(StageId stageId, float camX, float time) {
         }
     }
 
-    // 3. 3D Perspective Floor Depth Lines & Stage Horizon Rim
-    int gy = (int)GROUND_Y;
-    DrawLine(0, gy, SCREEN_WIDTH, gy, Color{ 255, 225, 110, 95 });
-    for (int r = 1; r <= 4; r++) {
-        int ry = gy + r * 6;
-        if (ry < SCREEN_HEIGHT) {
-            DrawLine(0, ry, SCREEN_WIDTH, ry, Color{ 255, 255, 255, (unsigned char)(18 + r * 6) });
-        }
-    }
-    float floorScroll = fmodf(-camX, 32.0f);
-    for (int i = -4; i < 18; i++) {
-        float topX = i * 32.0f + floorScroll;
-        float distFromCenter = (topX - SCREEN_WIDTH * 0.5f);
-        float botX = SCREEN_WIDTH * 0.5f + distFromCenter * 1.48f;
-        DrawLine((int)topX, gy, (int)botX, SCREEN_HEIGHT, Color{ 255, 255, 255, 32 });
-    }
-
-    // 4. Drifting Stage WeatherParticles (Cherry Blossoms, Subpoenas, Embers)
     for (int p = 0; p < 16; p++) {
         float px = fmodf(p * 37.0f + time * (16.0f + (p % 4) * 4.0f) - camX * 0.6f + 1600.0f, (float)SCREEN_WIDTH);
         float py = fmodf(p * 23.0f + time * (18.0f + (p % 3) * 5.0f), GROUND_Y - 8.0f);
         if (stageId == STAGE_REFLECTING_POOL || stageId == STAGE_FLORIDA_KEYS || stageId == STAGE_LINCOLN_MEMORIAL) {
-            // Drifting Cherry Blossom Petals / Confetti
+
             DrawCircle((int)px, (int)py, 2.0f, Color{ 255, 185, 215, 210 });
             DrawPixel((int)px + 1, (int)py, WHITE);
         } else if (stageId == STAGE_CONGRESSIONAL_FLOOR || stageId == STAGE_PRESS_BRIEFING || stageId == STAGE_WTC_PLAZA || stageId == STAGE_SMITHSONIAN_AERO || stageId == STAGE_ENN_NEWS_STUDIO) {
-            // Fluttering Legal Subpoenas / Press Notes / Broadcast Script Pages
+
             float sway = sinf(time * 5.0f + p) * 3.0f;
             DrawRectangle((int)(px + sway), (int)py, 4, 3, Color{ 250, 245, 220, 195 });
         } else {
-            // Rising Arcade Embers (East Wing, Pentagon, Comet, Tomb Eternal Flame)
+
             float ey = GROUND_Y - py;
             DrawCircle((int)px, (int)ey, 1.5f, (p % 2 == 0) ? Color{ 255, 190, 50, 200 } : Color{ 255, 90, 30, 190 });
         }
     }
 
-    // 5. Stage-Specific Live Animations for the 4 New Championship Edition Venues
     float minCam = STAGE_MIN_X;
     float maxCam = STAGE_MAX_X - SCREEN_WIDTH;
     float scrollT = std::clamp((camX - minCam) / (maxCam - minCam), 0.0f, 1.0f);
@@ -1282,7 +1318,7 @@ inline void DrawStageUpgrades(StageId stageId, float camX, float time) {
     auto BgY = [&](float ty) -> float { return ty * ((float)SCREEN_HEIGHT / srcH); };
 
     if (stageId == STAGE_LINCOLN_MEMORIAL) {
-        // A. Abraham Lincoln Seated in His Marble Chair Clapping & Cheering Along as the Fight Progresses!
+
         float fightProgress = std::clamp((200.0f - (s_p1TrailHp + s_p2TrailHp)) / 160.0f, 0.0f, 1.0f);
         float clapSpeed = 6.5f + fightProgress * 9.5f;
         float clapWave = fabsf(sinf(time * clapSpeed));
@@ -1302,89 +1338,120 @@ inline void DrawStageUpgrades(StageId stageId, float camX, float time) {
             DrawCircleLines(lincX, lincHandsY, 6.0f + (0.35f - clapWave) * 22.0f, Color{ 255, 235, 110, 225 });
             DrawLine(lincX - 8, lincHandsY - 5, lincX - 13, lincHandsY - 9, Color{ 255, 245, 160, 235 });
             DrawLine(lincX + 8, lincHandsY - 5, lincX + 13, lincHandsY - 9, Color{ 255, 245, 160, 235 });
-            const char* cheers[4] = { "CLAP! CLAP!", "BRAVO!", "FOUR SCORE!", "ENCORE!" };
-            const char* ch = cheers[((int)(time * 2.0f)) % 4];
-            int ctw = MeasureText(ch, 6);
-            DrawRectangle(lincX - ctw / 2 - 3, lincHeadY, ctw + 6, 9, Color{ 15, 20, 35, 225 });
-            DrawRectangleLines(lincX - ctw / 2 - 3, lincHeadY, ctw + 6, 9, Color{ 255, 220, 70, 240 });
-            VisualsEngine::DrawPixelText(ch, lincX - ctw / 2, lincHeadY + 2, 6, Color{ 255, 235, 90, 255 });
         }
     } else if (stageId == STAGE_SMITHSONIAN_AERO) {
-        // A. Suspended MQ-1 Predator Drone Overhead (Upper-Left Rafters: Strobes & Optical Sensor Laser)
-        int droneNoseX = (int)BgX(382.0f);
-        int droneNoseY = (int)BgY(148.0f);
-        int droneTailX = (int)BgX(198.0f);
-        int droneTailY = (int)BgY(122.0f);
-        float propSpan = sinf(time * 48.0f) * 8.0f;
-        DrawLine(droneTailX, droneTailY - (int)propSpan, droneTailX, droneTailY + (int)propSpan, Color{ 220, 235, 255, 210 });
         if (fmodf(time * 2.6f, 1.0f) < 0.45f) {
-            DrawCircle((int)BgX(255.0f), (int)BgY(138.0f), 2.2f, Color{ 255, 45, 45, 245 });
-            DrawCircle((int)BgX(395.0f), (int)BgY(125.0f), 2.2f, Color{ 45, 255, 90, 245 });
-        }
-        float scanX = droneNoseX + 25.0f + sinf(time * 2.2f) * 40.0f;
-        DrawLine(droneNoseX, droneNoseY, (int)scanX, (int)GROUND_Y - 8, Color{ 255, 45, 45, 70 });
-        DrawCircle((int)scanX, (int)GROUND_Y - 8, 2.5f, Color{ 255, 60, 60, 175 });
-
-        float p51Span = cosf(time * 44.0f) * 12.0f;
-        DrawLine((int)BgX(492.0f), (int)BgY(192.0f) - (int)p51Span, (int)BgX(492.0f), (int)BgY(192.0f) + (int)p51Span, Color{ 225, 235, 250, 195 });
-
-        int sallyX = (int)BgX(292.0f);
-        int sallyY = (int)BgY(320.0f);
-        int wrightX = (int)BgX(955.0f);
-        int wrightY = (int)BgY(295.0f);
-        if (fmodf(time, 3.6f) < 1.6f) {
-            int stw = MeasureText("GO SALLY!", 5);
-            DrawRectangle(sallyX - stw / 2 - 2, sallyY - 12, stw + 4, 8, Color{ 15, 35, 90, 225 });
-            DrawRectangleLines(sallyX - stw / 2 - 2, sallyY - 12, stw + 4, 8, Color{ 100, 210, 255, 230 });
-            VisualsEngine::DrawPixelText("GO SALLY!", sallyX - stw / 2, sallyY - 10, 5, Color{ 140, 235, 255, 255 });
-        } else if (fmodf(time, 3.6f) > 1.8f && fmodf(time, 3.6f) < 3.4f) {
-            int wtw = MeasureText("FIRST FLIGHT!", 5);
-            DrawRectangle(wrightX - wtw / 2 - 2, wrightY - 12, wtw + 4, 8, Color{ 50, 35, 18, 225 });
-            DrawRectangleLines(wrightX - wtw / 2 - 2, wrightY - 12, wtw + 4, 8, Color{ 255, 215, 90, 230 });
-            VisualsEngine::DrawPixelText("FIRST FLIGHT!", wrightX - wtw / 2, wrightY - 10, 5, Color{ 255, 225, 120, 255 });
+            DrawPixel((int)BgX(255.0f), (int)BgY(62.0f), Color{ 255, 45, 45, 225 });
+            DrawPixel((int)BgX(395.0f), (int)BgY(56.0f), Color{ 45, 255, 90, 225 });
         }
     } else if (stageId == STAGE_TOMB_UNKNOWN) {
-        // A. The Eternal Flame Burning Brightly in the Bronze Brazier Pedestal
-        float flameX = BgX(918.0f);
-        float flameY = BgY(298.0f);
-        float flicker1 = sinf(time * 17.0f) * 3.0f;
-        float flicker2 = cosf(time * 23.0f + 1.1f) * 2.5f;
-        DrawCircle((int)flameX, (int)flameY - 8, 22.0f + sinf(time * 9.0f) * 3.0f, Color{ 255, 145, 25, 55 });
+
+        float flameX = BgX(992.0f);
+        float flameY = BgY(188.0f);
+        float flicker1 = sinf(time * 17.0f) * 2.5f;
+        float flicker2 = cosf(time * 23.0f + 1.1f) * 2.0f;
+        DrawCircle((int)flameX, (int)flameY - 6, 16.0f + sinf(time * 9.0f) * 2.5f, Color{ 255, 145, 25, 55 });
         DrawTriangle(
-            Vector2{ flameX + flicker1, flameY - 22.0f - fabsf(flicker2) },
-            Vector2{ flameX - 9.0f, flameY + 2.0f },
-            Vector2{ flameX + 9.0f, flameY + 2.0f },
+            Vector2{ flameX + flicker1, flameY - 16.0f - fabsf(flicker2) },
+            Vector2{ flameX - 7.0f, flameY + 2.0f },
+            Vector2{ flameX + 7.0f, flameY + 2.0f },
             Color{ 255, 85, 15, 195 }
         );
         DrawTriangle(
-            Vector2{ flameX - flicker2 * 0.6f, flameY - 16.0f - fabsf(flicker1) * 0.5f },
-            Vector2{ flameX - 5.5f, flameY + 2.0f },
-            Vector2{ flameX + 5.5f, flameY + 2.0f },
+            Vector2{ flameX - flicker2 * 0.6f, flameY - 12.0f - fabsf(flicker1) * 0.5f },
+            Vector2{ flameX - 4.5f, flameY + 2.0f },
+            Vector2{ flameX + 4.5f, flameY + 2.0f },
             Color{ 255, 205, 45, 220 }
         );
-        DrawCircle((int)flameX, (int)flameY - 3, 4.0f, Color{ 255, 250, 215, 240 });
-        for (int e = 0; e < 6; e++) {
+        DrawCircle((int)flameX, (int)flameY - 2, 3.2f, Color{ 255, 250, 215, 240 });
+        for (int e = 0; e < 5; e++) {
             float eLife = fmodf(time * 1.8f + e * 0.17f, 1.0f);
-            float ex = flameX + sinf(time * 8.0f + e * 2.0f) * 6.0f;
-            float ey = flameY - 8.0f - eLife * 26.0f;
-            DrawCircle((int)ex, (int)ey, 1.2f, (e % 2 == 0) ? Color{ 255, 235, 95, 235 } : Color{ 255, 120, 30, 215 });
+            float ex = flameX + sinf(time * 8.0f + e * 2.0f) * 4.5f;
+            float ey = flameY - 6.0f - eLife * 18.0f;
+            DrawCircle((int)ex, (int)ey, 1.1f, (e % 2 == 0) ? Color{ 255, 235, 95, 235 } : Color{ 255, 120, 30, 215 });
         }
 
-        int bayonetX = (int)BgX(398.0f);
-        int bayonetY = (int)BgY(260.0f);
-        if (fmodf(time * 2.2f, 1.0f) < 0.35f) {
-            DrawCircle(bayonetX, bayonetY, 3.5f, WHITE);
-            DrawLine(bayonetX - 6, bayonetY, bayonetX + 6, bayonetY, Color{ 220, 240, 255, 230 });
-            DrawLine(bayonetX, bayonetY - 6, bayonetX, bayonetY + 6, Color{ 220, 240, 255, 230 });
+        static Texture2D s_sentinelTex = { 0 };
+        static bool s_sentinelTexChecked = false;
+        if (!s_sentinelTexChecked) {
+            s_sentinelTexChecked = true;
+            AssetManager::Init();
+            const char* paths[3] = {
+                "assets/spr_tomb_sentinel.png",
+                "../assets/spr_tomb_sentinel.png",
+                "spr_tomb_sentinel.png"
+            };
+            for (int p = 0; p < 3; p++) {
+                if (AssetManager::FileExists(paths[p])) {
+                    s_sentinelTex = AssetManager::LoadTexture(paths[p]);
+                    if (s_sentinelTex.id != 0) {
+                        SetTextureFilter(s_sentinelTex, TEXTURE_FILTER_POINT);
+                        break;
+                    }
+                }
+            }
         }
-        int heelX = (int)BgX(442.0f);
-        int heelY = (int)BgY(555.0f);
-        float stepWave = fmodf(time * 1.5f, 1.0f);
-        if (stepWave < 0.28f) {
-            DrawCircleLines(heelX, heelY, 4.0f + stepWave * 22.0f, Color{ 255, 225, 120, 190 });
-        }
+
+        auto drawMarchingSentinel = [&](float xA, float xB, float phaseOffset) {
+            float cyc = fmodf(time * 0.12f + phaseOffset, 1.0f);
+            float tPos = 0.0f;
+            bool facingRight = true;
+            bool isHalted = false;
+            float haltProg = 0.0f;
+
+            if (cyc < 0.40f) {
+                tPos = cyc / 0.40f;
+                facingRight = (xB >= xA);
+            } else if (cyc < 0.50f) {
+                tPos = 1.0f;
+                facingRight = (xB < xA);
+                isHalted = true;
+                haltProg = (cyc - 0.40f) / 0.10f;
+            } else if (cyc < 0.90f) {
+                tPos = 1.0f - (cyc - 0.50f) / 0.40f;
+                facingRight = (xA > xB);
+            } else {
+                tPos = 0.0f;
+                facingRight = (xB >= xA);
+                isHalted = true;
+                haltProg = (cyc - 0.90f) / 0.10f;
+            }
+
+            float texX = xA + (xB - xA) * tPos;
+            float sx = BgX(texX);
+            float sy = BgY(285.0f);
+            float dir = facingRight ? 1.0f : -1.0f;
+
+            static const int stepCycle[4] = { 0, 1, 2, 1 };
+            int frameIdx = isHalted ? 1 : stepCycle[((int)(time * 4.2f + phaseOffset * 8.0f)) & 3];
+            int bobPx = (!isHalted && frameIdx != 1) ? 1 : 0;
+
+            DrawEllipse((int)sx, (int)sy, 7.0f, 1.8f, Color{ 0, 0, 0, 135 });
+            if (isHalted && haltProg < 0.45f) {
+                DrawEllipseLines((int)sx, (int)sy, 4.0f + haltProg * 18.0f, 1.4f + haltProg * 5.0f, Color{ 255, 225, 110, 205 });
+            }
+
+            if (s_sentinelTex.id != 0) {
+                float cellW = (float)s_sentinelTex.width / 3.0f;
+                float cellH = (float)s_sentinelTex.height;
+                Rectangle srcRec{ frameIdx * cellW, 0.0f, facingRight ? cellW : -cellW, cellH };
+                Rectangle dstRec{ (float)((int)(sx - 17.0f)), (float)((int)(sy - 49.0f - bobPx)), 34.0f, 50.0f };
+                DrawTexturePro(s_sentinelTex, srcRec, dstRec, Vector2{ 0.0f, 0.0f }, 0.0f, WHITE);
+            }
+
+            if (fmodf(time * 2.2f + phaseOffset, 1.0f) < 0.28f) {
+                int bx = (int)(sx - dir * 13.0f);
+                int by = (int)(sy - 46.0f - bobPx);
+                DrawPixel(bx, by, WHITE);
+                DrawLine(bx - 3, by, bx + 3, by, Color{ 220, 240, 255, 230 });
+                DrawLine(bx, by - 3, bx, by + 3, Color{ 220, 240, 255, 230 });
+            }
+        };
+
+        drawMarchingSentinel(175.0f, 465.0f, 0.0f);
+        drawMarchingSentinel(815.0f, 525.0f, 0.45f);
     } else if (stageId == STAGE_ENN_NEWS_STUDIO) {
-        // A. Blinking Red "ON AIR" Pedestal Camera Tally Lights & Lens Glints
+
         if (fmodf(time * 2.4f, 1.0f) < 0.65f) {
             int cam1X = (int)BgX(118.0f);
             int cam1Y = (int)BgY(276.0f);
@@ -1396,40 +1463,12 @@ inline void DrawStageUpgrades(StageId stageId, float camX, float time) {
             DrawCircle(cam2X, cam2Y, 1.8f, WHITE);
         }
 
-        // B. Glowing ENN News Desk Pulse & Live Talking Heads Callouts (Sean Hannity, Anderson Cooper, Laura Ingraham)
         int deskX = (int)BgX(565.0f);
         int deskY = (int)BgY(418.0f);
         float deskPulse = 0.5f + 0.5f * sinf(time * 6.0f);
         DrawCircle(deskX, deskY, 16.0f + deskPulse * 6.0f, Color{ 255, 40, 50, (unsigned char)(28 + deskPulse * 35) });
-
-        int cycle = ((int)(time * 0.9f)) % 3;
-        if (cycle == 0) {
-            // Sean Hannity (Seated in Left Studio Audience)
-            int hx = (int)BgX(268.0f);
-            int hy = (int)BgY(218.0f);
-            int tw = MeasureText("HANNITY: BREAKING!", 5);
-            DrawRectangle(hx - tw / 2 - 2, hy, tw + 4, 8, Color{ 15, 25, 65, 230 });
-            DrawRectangleLines(hx - tw / 2 - 2, hy, tw + 4, 8, Color{ 255, 70, 70, 240 });
-            VisualsEngine::DrawPixelText("HANNITY: BREAKING!", hx - tw / 2, hy + 2, 5, Color{ 255, 225, 90, 255 });
-        } else if (cycle == 1) {
-            // Anderson Cooper (Seated in Left-Center Studio Audience)
-            int cx = (int)BgX(352.0f);
-            int cy = (int)BgY(216.0f);
-            int tw = MeasureText("COOPER: ENN 360!", 5);
-            DrawRectangle(cx - tw / 2 - 2, cy, tw + 4, 8, Color{ 15, 35, 75, 230 });
-            DrawRectangleLines(cx - tw / 2 - 2, cy, tw + 4, 8, Color{ 90, 215, 255, 240 });
-            VisualsEngine::DrawPixelText("COOPER: ENN 360!", cx - tw / 2, cy + 2, 5, Color{ 150, 235, 255, 255 });
-        } else {
-            // Laura Ingraham (Seated in Right Studio Audience)
-            int ix = (int)BgX(795.0f);
-            int iy = (int)BgY(216.0f);
-            int tw = MeasureText("INGRAHAM: THE ANGLE!", 5);
-            DrawRectangle(ix - tw / 2 - 2, iy, tw + 4, 8, Color{ 65, 15, 35, 230 });
-            DrawRectangleLines(ix - tw / 2 - 2, iy, tw + 4, 8, Color{ 255, 195, 60, 240 });
-            VisualsEngine::DrawPixelText("INGRAHAM: THE ANGLE!", ix - tw / 2, iy + 2, 5, Color{ 255, 230, 110, 255 });
-        }
     } else if (stageId == STAGE_CHICAGO_WRIGLEY) {
-        // 1. Wrigley Field Art-Deco Marquee Chaser Bulbs & Stadium Lights
+
         for (int b = 0; b < 8; b++) {
             float bx = BgX(370.0f + b * 38.0f);
             float by = BgY(212.0f);
@@ -1437,49 +1476,12 @@ inline void DrawStageUpgrades(StageId stageId, float camX, float time) {
             DrawCircle((int)bx, (int)by, lit ? 2.2f : 1.4f, lit ? Color{ 255, 240, 110, 250 } : Color{ 180, 60, 60, 190 });
         }
 
-        // 2. Steaming Vienna Beef Hot Dog Cart (Left Plaza)
         for (int s = 0; s < 4; s++) {
             float phase = fmodf(time * 1.8f + s * 0.45f, 1.8f);
             float sx = BgX(88.0f + s * 9.0f) + sinf(time * 5.0f + s) * 2.5f;
             float sy = BgY(355.0f) - phase * 16.0f;
             unsigned char sa = (unsigned char)std::clamp((int)((1.8f - phase) * 110.0f), 0, 180);
             DrawCircle((int)sx, (int)sy, 2.5f + phase * 1.5f, Color{ 245, 250, 255, sa });
-        }
-
-        // 3. Famous Chicagoans & Michelle Obama Cheering in the Wrigleyville Crowd!
-        int cycle = ((int)(time * 0.7f)) % 4;
-        if (cycle == 0) {
-            // Michelle Obama Cheering Him On! (Blue sleeveless dress at tx=408)
-            int mx = (int)BgX(408.0f);
-            int my = (int)BgY(302.0f);
-            int tw = MeasureText("MICHELLE: YES WE CAN!", 5);
-            DrawRectangle(mx - tw / 2 - 2, my, tw + 4, 9, Color{ 20, 45, 95, 235 });
-            DrawRectangleLines(mx - tw / 2 - 2, my, tw + 4, 9, Color{ 255, 220, 70, 245 });
-            VisualsEngine::DrawPixelText("MICHELLE: YES WE CAN!", mx - tw / 2, my + 1, 5, Color{ 255, 240, 110, 255 });
-        } else if (cycle == 1) {
-            // John Candy in the Audience! (Tan trenchcoat & fedora at tx=630)
-            int jx = (int)BgX(630.0f);
-            int jy = (int)BgY(302.0f);
-            int tw = MeasureText("JOHN CANDY: HEY CHICAGO!", 5);
-            DrawRectangle(jx - tw / 2 - 2, jy, tw + 4, 9, Color{ 65, 35, 18, 235 });
-            DrawRectangleLines(jx - tw / 2 - 2, jy, tw + 4, 9, Color{ 255, 210, 80, 245 });
-            VisualsEngine::DrawPixelText("JOHN CANDY: HEY CHICAGO!", jx - tw / 2, jy + 1, 5, Color{ 255, 235, 120, 255 });
-        } else if (cycle == 2) {
-            // Dan Aykroyd (Elwood Blues at tx=515) in the Audience!
-            int ax = (int)BgX(515.0f);
-            int ay = (int)BgY(302.0f);
-            int tw = MeasureText("AYKROYD: ON A MISSION!", 5);
-            DrawRectangle(ax - tw / 2 - 2, ay, tw + 4, 9, Color{ 15, 20, 32, 235 });
-            DrawRectangleLines(ax - tw / 2 - 2, ay, tw + 4, 9, Color{ 110, 220, 255, 245 });
-            VisualsEngine::DrawPixelText("AYKROYD: ON A MISSION!", ax - tw / 2, ay + 1, 5, Color{ 165, 235, 255, 255 });
-        } else {
-            // Coach Mike Ditka & Chicago Fans! (Bears sweater vest at tx=750)
-            int dx = (int)BgX(750.0f);
-            int dy = (int)BgY(302.0f);
-            int tw = MeasureText("DITKA: DA BEARS!", 5);
-            DrawRectangle(dx - tw / 2 - 2, dy, tw + 4, 9, Color{ 18, 30, 62, 235 });
-            DrawRectangleLines(dx - tw / 2 - 2, dy, tw + 4, 9, Color{ 255, 135, 40, 245 });
-            VisualsEngine::DrawPixelText("DITKA: DA BEARS!", dx - tw / 2, dy + 1, 5, Color{ 255, 195, 80, 255 });
         }
     }
 }
@@ -1492,7 +1494,6 @@ inline void UpdateAndTrackFighters(Fighter& p1, Fighter& p2) {
         s_forceProceduralRig = !s_forceProceduralRig;
     }
 
-    // Smooth Red-Life Damage Trail on HUD
     if (s_p1TrailHp > (float)p1.GetHealth()) {
         s_p1TrailHp = std::max((float)p1.GetHealth(), s_p1TrailHp - 0.35f);
     } else {
@@ -1504,32 +1505,33 @@ inline void UpdateAndTrackFighters(Fighter& p1, Fighter& p2) {
         s_p2TrailHp = (float)p2.GetHealth();
     }
 
-    // 1.25x BGM Tempo Overdrive when either fighter drops below 30% HP
     bool critical = (p1.GetHealth() > 0 && p1.GetHealth() < 30) || (p2.GetHealth() > 0 && p2.GetHealth() < 30);
     AudioEngine::SetCriticalTempo(critical);
 
-    // Update Verlet Neckties / Ribbons (anchored at collar height)
     s_ties[0].Update(Vector2{ p1.GetPosition().x + (p1.IsFacingRight() ? 4.0f : -4.0f), p1.GetPosition().y - (p1.IsCrouching() ? 48.0f : 68.0f) }, p1.GetVelocity(), p1.IsFacingRight());
     s_ties[1].Update(Vector2{ p2.GetPosition().x + (p2.IsFacingRight() ? 4.0f : -4.0f), p2.GetPosition().y - (p2.IsCrouching() ? 48.0f : 68.0f) }, p2.GetVelocity(), p2.IsFacingRight());
 
-    // Record CPS-1 Afterimage Ghost Trails on Specials & Jumps
     const Fighter* fighters[2] = { &p1, &p2 };
     for (int i = 0; i < 2; i++) {
+        const Fighter& f = *fighters[i];
+        FighterState st = f.GetState();
+        if (f.GetHealth() <= 0 || st == FSTATE_KNOCKDOWN_AIR || st == FSTATE_KNOCKDOWN_GROUND || st == FSTATE_DEFEAT || st == FSTATE_WAKEUP || st == FSTATE_HITSTUN) {
+            s_afterimages[i].clear();
+            continue;
+        }
         for (auto& ai : s_afterimages[i]) ai.life--;
         s_afterimages[i].erase(std::remove_if(s_afterimages[i].begin(), s_afterimages[i].end(), [](const CEAfterimage& a) { return a.life <= 0; }), s_afterimages[i].end());
-        const Fighter& f = *fighters[i];
-        if ((f.GetState() == FSTATE_SPECIAL || f.GetState() == FSTATE_JUMP || (f.GetState() == FSTATE_ATTACK && f.GetCurrentAttack().isHeavy)) && (f.GetStateFrame() % 3 == 0)) {
+        if ((st == FSTATE_SPECIAL || st == FSTATE_JUMP || (st == FSTATE_ATTACK && f.GetCurrentAttack().isHeavy)) && (f.GetStateFrame() % 3 == 0)) {
             CEAfterimage ghost{};
             ghost.pos = f.GetPosition();
             ghost.facingRight = f.IsFacingRight();
-            ghost.state = f.GetState();
+            ghost.state = st;
             ghost.frame = f.GetStateFrame();
             ghost.life = 9;
             s_afterimages[i].push_back(ghost);
         }
     }
 
-    // Check Super Flash Trigger
     if (p1.PopSuperFlashTrigger()) {
         s_superFlashTimer = 24;
         s_superFlashPlayer = 0;
@@ -1543,19 +1545,19 @@ inline void UpdateAndTrackFighters(Fighter& p1, Fighter& p2) {
         PushBanner(1, "SUPER COMBO!", p2.GetName().c_str(), Color{ 255, 215, 40, 255 });
     }
 
-    // Check 2-in-1 Cancel & Reversal Callouts
     if (p1.PopCancelCallout()) PushBanner(0, "2-IN-1 CANCEL!", "SPECIAL BUFFER", Color{ 90, 230, 255, 255 });
     if (p2.PopCancelCallout()) PushBanner(1, "2-IN-1 CANCEL!", "SPECIAL BUFFER", Color{ 90, 230, 255, 255 });
     if (p1.PopReversalCallout()) {
         PushBanner(0, "REVERSAL!", "TOTAL VETO", Color{ 255, 110, 50, 255 });
-        SpawnImpactJuice(p1.GetPosition(), true, true, "VETO!");
+        SpawnImpactJuice(Vector2{ p1.GetPosition().x, p1.GetPosition().y - 44.0f }, true, true, "VETO!");
     }
     if (p2.PopReversalCallout()) {
         PushBanner(1, "REVERSAL!", "TOTAL VETO", Color{ 255, 110, 50, 255 });
-        SpawnImpactJuice(p2.GetPosition(), true, true, "VETO!");
+        SpawnImpactJuice(Vector2{ p2.GetPosition().x, p2.GetPosition().y - 44.0f }, true, true, "VETO!");
     }
 
-    // Check Combo & First Strike Callouts
+    static const char* s_batmanLightWords[6] = { "POW!", "BAM!", "BIFF!", "SOCK!", "WHAM!", "ZAP!" };
+    static const char* s_batmanHeavyWords[4] = { "KAPOW!", "SMACK!", "WHAM!", "BAM!" };
     int c1 = p1.GetComboCount();
     int c2 = p2.GetComboCount();
     if (c1 > s_prevP1Hits && c1 >= 1) {
@@ -1569,7 +1571,10 @@ inline void UpdateAndTrackFighters(Fighter& p1, Fighter& p2) {
             PushBanner(0, buf, p1.GetCurrentAttack().name.c_str(), Color{ 255, 190, 40, 255 });
         }
         bool isSpec = (p1.GetState() == FSTATE_SPECIAL);
-        SpawnImpactJuice(Vector2{ p2.GetPosition().x, p2.GetPosition().y - 36.0f }, p1.GetCurrentAttack().isHeavy, isSpec, isSpec ? "VETO!" : (p1.GetCurrentAttack().isHeavy ? "SMACK!" : nullptr));
+        const char* word1 = isSpec ? "VETO!" : (p1.GetCurrentAttack().isHeavy ? s_batmanHeavyWords[(c1 + rand()) % 4] : s_batmanLightWords[(c1 + rand()) % 6]);
+        float hitX = p2.GetPosition().x + (p1.GetPosition().x < p2.GetPosition().x ? 12.0f : -12.0f);
+        float hitY = p2.GetPosition().y - 44.0f;
+        SpawnImpactJuice(Vector2{ hitX, hitY }, p1.GetCurrentAttack().isHeavy, isSpec, word1);
     }
     if (c2 > s_prevP2Hits && c2 >= 1) {
         if (!s_firstStrikeAwarded) {
@@ -1582,12 +1587,14 @@ inline void UpdateAndTrackFighters(Fighter& p1, Fighter& p2) {
             PushBanner(1, buf, p2.GetCurrentAttack().name.c_str(), Color{ 255, 120, 60, 255 });
         }
         bool isSpec = (p2.GetState() == FSTATE_SPECIAL);
-        SpawnImpactJuice(Vector2{ p1.GetPosition().x, p1.GetPosition().y - 36.0f }, p2.GetCurrentAttack().isHeavy, isSpec, isSpec ? "REDACTED!" : (p2.GetCurrentAttack().isHeavy ? "OBJECTION!" : nullptr));
+        const char* word2 = isSpec ? "REDACTED!" : (p2.GetCurrentAttack().isHeavy ? "OBJECTION!" : s_batmanLightWords[(c2 + rand()) % 6]);
+        float hitX = p1.GetPosition().x + (p2.GetPosition().x < p1.GetPosition().x ? 12.0f : -12.0f);
+        float hitY = p1.GetPosition().y - 44.0f;
+        SpawnImpactJuice(Vector2{ hitX, hitY }, p2.GetCurrentAttack().isHeavy, isSpec, word2);
     }
     s_prevP1Hits = c1;
     s_prevP2Hits = c2;
 
-    // Advance Particles, Stamps, and Banners
     for (auto& p : s_particles) {
         if (!p.alive) continue;
         p.pos.x += p.vel.x;
@@ -1601,7 +1608,7 @@ inline void UpdateAndTrackFighters(Fighter& p1, Fighter& p2) {
 
     for (auto& st : s_stamps) {
         if (!st.alive) continue;
-        st.pos.y -= 0.35f;
+        st.pos.y -= 0.14f;
         st.frame++;
         if (st.frame >= st.maxFrames) st.alive = false;
     }
@@ -1614,7 +1621,7 @@ inline void UpdateAndTrackFighters(Fighter& p1, Fighter& p2) {
 }
 
 inline void DrawFighterWorldOverlays(const Fighter& f) {
-    // 1. Karl Rove ("The Pundit"): Real-Time "DECISION 2028" Whiteboard Map Markup Animation!
+
     if (f.GetCharacterId() == CHAR_THE_PUNDIT && f.GetState() == FSTATE_SPECIAL && f.GetSpecialIndex() == 1) {
         int fr = f.GetStateFrame();
         float dir = f.IsFacingRight() ? 1.0f : -1.0f;
@@ -1623,57 +1630,38 @@ inline void DrawFighterWorldOverlays(const Fighter& f) {
         int wbX = wbCenterX - wbW / 2;
         int wbY = (int)(f.GetPosition().y - 80.0f);
 
-        // Top Header Banner "DECISION 2028" aligned to the top of Karl's Whiteboard (always un-mirrored!)
         DrawRectangle(wbX - 1, wbY - 1, wbW + 2, 13, Color{ 220, 30, 40, 255 });
         DrawRectangle(wbX, wbY, wbW, 11, Color{ 16, 38, 105, 255 });
         VisualsEngine::DrawPixelText("DECISION 2028", wbX + 3, wbY + 1, 10, Color{ 255, 235, 80, 255 });
 
-        // Progressive Real-Time Map Highlighting & Markup on the Whiteboard
         int mapX = wbCenterX - 28;
         int mapY = wbY + 14;
         if (fr >= 2) {
-            // West & Midwest Blue/Red State Highlights
+
             DrawRectangleLines(mapX + 2, mapY + 2, 12, 14, Color{ 35, 115, 255, 255 });
             DrawRectangleLines(mapX + 15, mapY + 2, 14, 11, Color{ 255, 45, 55, 255 });
         }
         if (fr >= 5) {
-            // Swing States & Trajectory Arrows
+
             DrawRectangleLines(mapX + 18, mapY + 14, 14, 10, Color{ 255, 45, 55, 255 });
             DrawLine(mapX + 12, mapY + 10, mapX + 46, mapY + 6, Color{ 255, 230, 60, 255 });
             DrawLine(mapX + 20, mapY + 18, mapX + 48, mapY + 20, Color{ 40, 220, 255, 255 });
         }
         if (fr >= 7) {
-            // Circled "270!" Electoral Victory Badge on Bottom Corner of Board
+
             int badgeX = wbCenterX + (f.IsFacingRight() ? 8 : -32);
             int badgeY = wbY + 25;
             DrawRectangle(badgeX - 2, badgeY - 1, 28, 12, Color{ 255, 250, 240, 245 });
             DrawRectangleLines(badgeX - 2, badgeY - 1, 28, 12, Color{ 225, 30, 40, 255 });
             VisualsEngine::DrawPixelText("270!", badgeX, badgeY, 10, Color{ 220, 20, 30, 255 });
         }
-        // Moving Dry-Erase Marker Tip Scribbling Live on the Map
+
         int penX = mapX + 8 + ((fr * 7) % 40);
         int penY = mapY + 5 + ((fr * 5) % 18);
         DrawCircle(penX, penY, 2.5f, (fr % 2 == 0) ? Color{ 255, 45, 55, 255 } : Color{ 45, 130, 255, 255 });
     }
 
-    // 2. Bold CPS-1 Motion-Blur Smear Slash Arcs during Active Melee Attack Frames
-    if ((f.GetState() == FSTATE_ATTACK || f.GetState() == FSTATE_SPECIAL) && f.GetCurrentAttack().boxW > 0.0f) {
-        int su = f.GetCurrentAttack().startupFrames;
-        int ac = f.GetCurrentAttack().activeFrames;
-        int fr = f.GetStateFrame();
-        if (fr >= su && fr < su + ac) {
-            float dir = f.IsFacingRight() ? 1.0f : -1.0f;
-            Vector2 pStart{ f.GetPosition().x + dir * 10.0f, f.GetPosition().y - 36.0f };
-            Vector2 pEnd{ f.GetPosition().x + dir * (f.GetCurrentAttack().reachX + 10.0f), f.GetPosition().y + f.GetCurrentAttack().reachY };
-            Color smearOuter = (f.GetState() == FSTATE_SPECIAL) ? Color{ 255, 70, 40, 230 } : (f.GetCurrentAttack().isHeavy ? Color{ 255, 195, 40, 230 } : Color{ 120, 230, 255, 210 });
-            DrawLineEx(Vector2{ pStart.x, pStart.y - 6.0f }, Vector2{ pEnd.x, pEnd.y - 2.0f }, 5.5f, smearOuter);
-            DrawLineEx(pStart, pEnd, 3.0f, WHITE);
-            DrawCircleLines((int)pEnd.x, (int)pEnd.y, f.GetCurrentAttack().isHeavy ? 14.0f : 9.0f, smearOuter);
-        }
-    }
-
-    // 3. Dynamic Hitstun / Knockdown Dizzy Stars (5 Large Orbiting Golden Stars when bonked on the head!)
-    if (f.GetState() == FSTATE_HITSTUN || f.GetState() == FSTATE_KNOCKDOWN_AIR || f.GetState() == FSTATE_KNOCKDOWN_GROUND) {
+    if (f.GetState() == FSTATE_HITSTUN && f.GetHealth() > 0) {
         float t = (float)GetTime() * 10.5f;
         int numStars = 5;
         float orbitRx = 18.0f;
@@ -1705,12 +1693,12 @@ inline void DrawWorldParticlesAndDebug(const Fighter& p1, const Fighter& p2) {
 
     for (const auto& st : s_stamps) {
         if (!st.alive) continue;
-        int tw = MeasureText(st.text.c_str(), 10);
-        int bx = (int)st.pos.x - tw / 2 - 4;
-        int by = (int)st.pos.y - 6;
-        DrawRectangle(bx, by, tw + 8, 13, Color{ 15, 10, 15, 230 });
-        DrawRectangleLines(bx, by, tw + 8, 13, st.color);
-        VisualsEngine::DrawPixelText(st.text.c_str(), bx + 4, by + 2, 10, st.color);
+        float popScale = (st.frame < 4) ? (0.72f + st.frame * 0.05f) : 0.88f;
+        bool isCrimson = (st.color.r > 220 && st.color.g < 100);
+        Color outerCol = isCrimson ? Color{ 245, 38, 32, 255 } : Color{ 255, 115, 20, 255 };
+        Color innerCol = isCrimson ? Color{ 255, 230, 45, 255 } : Color{ 255, 245, 70, 255 };
+        Color txtCol   = isCrimson ? Color{ 255, 255, 255, 255 } : Color{ 220, 22, 28, 255 };
+        DrawBatmanActionBurst(st.text.c_str(), (int)st.pos.x, (int)st.pos.y, 7, outerCol, innerCol, txtCol, popScale);
     }
 
     if (s_debugHitboxes) {
@@ -1738,26 +1726,47 @@ inline void DrawWorldParticlesAndDebug(const Fighter& p1, const Fighter& p2) {
 }
 
 inline void DrawScreenHUDAndSuperFlash(const Fighter& p1, const Fighter& p2, const InputManager& in1) {
-    // NO bottom meter bar! Clean arcade playfield at the bottom!
 
-    // 1. Top Championship Edition Badge under Round Timer
     int ceTw = MeasureText("CHAMPIONSHIP EDITION", 6);
     VisualsEngine::DrawPixelText("CHAMPIONSHIP EDITION", (SCREEN_WIDTH - ceTw) / 2, 35, 6, Color{ 255, 215, 60, 220 });
 
-    // 2. Sliding Combo & Callout Banners
     for (const auto& b : s_banners) {
-        float slide = std::min(1.0f, (float)(b.maxTimer - b.timer) / 6.0f);
-        int bw = 122;
-        int bh = 22;
-        int bx = (b.playerIndex == 0) ? (int)(-bw + slide * (bw + 8)) : (int)(SCREEN_WIDTH - slide * (bw + 8));
-        int by = 48 + b.playerIndex * 26;
-        DrawRectangle(bx, by, bw, bh, Color{ 14, 16, 28, 235 });
-        DrawRectangleLines(bx, by, bw, bh, b.color);
-        VisualsEngine::DrawPixelText(b.text.c_str(), bx + 5, by + 3, 8, b.color);
-        VisualsEngine::DrawPixelText(b.subtext.c_str(), bx + 5, by + 12, 6, WHITE);
+        float slide = std::min(1.0f, (float)(b.maxTimer - b.timer) / 5.0f);
+        int bw = 132;
+        int bx = (b.playerIndex == 0) ? (int)(-bw + slide * (bw + 10)) : (int)(SCREEN_WIDTH - slide * (bw + 6));
+        int by = 46 + b.playerIndex * 27;
+
+        Color topCol = Color{ 255, 245, 95, 255 };
+        Color botCol = b.color;
+        Color slashCol = (b.playerIndex == 0) ? Color{ 255, 195, 35, 245 } : Color{ 255, 95, 45, 245 };
+
+        int slashY = by + 12;
+        int slashW = MeasureText(b.text.c_str(), 9) + 14;
+        DrawLineEx(Vector2{ (float)bx - 2.0f, (float)slashY + 2.0f }, Vector2{ (float)(bx + slashW), (float)slashY - 1.0f }, 4.0f, Color{ 10, 12, 22, 230 });
+        DrawLineEx(Vector2{ (float)bx - 2.0f, (float)slashY + 1.0f }, Vector2{ (float)(bx + slashW), (float)slashY - 2.0f }, 2.2f, slashCol);
+        for (int k = 0; k < 3; k++) {
+            float tx = (float)(bx + slashW - 14 + k * 5);
+            DrawLineEx(Vector2{ tx, (float)slashY + 3.0f }, Vector2{ tx + 3.0f, (float)slashY - 3.0f }, 1.6f, WHITE);
+        }
+
+        if (b.text.size() >= 2 && b.text[0] >= '0' && b.text[0] <= '9') {
+            size_t sp = b.text.find(' ');
+            if (sp != std::string::npos) {
+                std::string numStr = b.text.substr(0, sp);
+                std::string restStr = b.text.substr(sp + 1);
+                int nw = MeasureText(numStr.c_str(), 14);
+                DrawArcade3DText(numStr.c_str(), bx, by - 4, 14, Color{ 255, 255, 140, 255 }, Color{ 255, 110, 25, 255 });
+                DrawArcade3DText(restStr.c_str(), bx + nw + 4, by + 1, 9, topCol, botCol);
+            } else {
+                DrawArcade3DText(b.text.c_str(), bx, by, 9, topCol, botCol);
+            }
+        } else {
+            DrawArcade3DText(b.text.c_str(), bx, by, 9, topCol, botCol);
+        }
+
+        DrawArcade3DText(b.subtext.c_str(), bx + 4, by + 14, 6, Color{ 165, 240, 255, 255 }, Color{ 55, 155, 235, 255 });
     }
 
-    // 3. Dramatic Super-Flash Cut-In Banner
     if (s_superFlashTimer > 0) {
         DrawRectangle(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT, Color{ 5, 8, 22, 195 });
         int bandY = SCREEN_HEIGHT / 2 - 24;
@@ -1773,7 +1782,6 @@ inline void DrawScreenHUDAndSuperFlash(const Fighter& p1, const Fighter& p2, con
         VisualsEngine::DrawPixelText(s_superFlashMove.c_str(), 28, bandY + 24, 14, WHITE);
     }
 
-    // 4. F1 Live Frame-Advantage & Input Buffer Telemetry Panel
     if (s_debugHitboxes) {
         DrawRectangle(6, SCREEN_HEIGHT - 42, SCREEN_WIDTH - 12, 36, Color{ 8, 10, 16, 225 });
         DrawRectangleLines(6, SCREEN_HEIGHT - 42, SCREEN_WIDTH - 12, 36, Color{ 80, 240, 120, 220 });
@@ -1801,15 +1809,41 @@ inline void DrawScreenHUDAndSuperFlash(const Fighter& p1, const Fighter& p2, con
     }
 }
 
-} // namespace ChampionshipEdition
+}
 
-// --- AssetManager.cpp ---
+class AIController {
+public:
+    AIController();
+    void Reset();
+    void Update(InputManager& input, const Fighter& cpu, const Fighter& opponent, float dt);
+
+    void SetDifficulty(AIDifficulty diff) { m_difficulty = diff; }
+    AIDifficulty GetDifficulty() const { return m_difficulty; }
+
+private:
+    void MakeDecision(InputManager& input, const Fighter& cpu, const Fighter& opponent, float dist, bool oppAirborne, bool oppAttacking);
+    void TriggerSpecial(InputManager& input, CharacterId charId, int role);
+
+    AIDifficulty m_difficulty = AI_DIFF_EASY;
+    int m_actionCooldown = 30;
+    int m_movementTimer = 0;
+    int m_moveDir = 0;
+
+    bool m_isBlocking = false;
+    int m_blockDuration = 0;
+
+    int m_footsiesPhase = 0;
+    int m_footsiesTimer = 0;
+
+    RawInputState m_simInput{};
+};
 #include <unordered_map>
 #include <vector>
 #include <string>
 #include <cstring>
 #include <algorithm>
 #include <cstdint>
+#include <cstdio>
 
 #ifdef _WIN32
 
@@ -1898,20 +1932,6 @@ void Init() {
         }
 
         if (!foundPath.empty()) {
-#ifndef _WIN32
-            int fd = open(foundPath.c_str(), O_RDONLY);
-            if (fd >= 0) {
-                struct stat st;
-                if (fstat(fd, &st) == 0 && st.st_size >= 16) {
-                    void* mapped = mmap(nullptr, st.st_size, PROT_READ, MAP_SHARED, fd, 0);
-                    if (mapped != MAP_FAILED) {
-                        s_pakData = (const uint8_t*)mapped;
-                        s_pakSize = (uint32_t)st.st_size;
-                    }
-                }
-                close(fd);
-            }
-#else
             FILE* f = fopen(foundPath.c_str(), "rb");
             if (f) {
                 fseek(f, 0, SEEK_END);
@@ -1927,7 +1947,6 @@ void Init() {
                 }
                 fclose(f);
             }
-#endif
         }
     }
 
@@ -2020,8 +2039,6 @@ Image LoadImage(const char* path) {
 }
 
 }
-
-// --- InputManager.cpp ---
 #include <cmath>
 
 InputManager::InputManager() {
@@ -2116,8 +2133,11 @@ RawInputState InputManager::PollRawInputs(int playerIndex) {
         if (IsKeyDown(KEY_KP_ENTER)) state.start = true;
     }
 
-    int pad = GetGamepadSlotForPlayer(playerIndex);
-    if (pad >= 0 && IsGamepadAvailable(pad)) {
+    int startPad = (playerIndex == 0) ? 0 : GetGamepadSlotForPlayer(playerIndex);
+    int endPad = (playerIndex == 0) ? 3 : startPad;
+    for (int pad = startPad; pad >= 0 && pad <= endPad; ++pad) {
+        if (!IsGamepadAvailable(pad)) continue;
+
         constexpr float STICK_UP_THRESHOLD = -0.35f;
         constexpr float STICK_DOWN_THRESHOLD = 0.35f;
         constexpr float STICK_HORIZ_THRESHOLD = 0.30f;
@@ -2298,7 +2318,6 @@ SpecialMotionType InputManager::CheckSpecialMotion(int& outButtonUsed) {
 
     outButtonUsed = curr.buttonsPressed;
 
-    // Championship Edition: Check 236236 (Double QCF + Attack) for Turbo Super Combo
     if (curr.buttonsPressed & (BTN_LP | BTN_HP | BTN_LK | BTN_HK)) {
         int sStage = 0;
         for (int i = 26; i >= 0; i--) {
@@ -2522,8 +2541,6 @@ bool InputManager::IsSecretMenuComboPressed() const {
 
     return false;
 }
-
-// --- AudioEngine.cpp ---
 #include <vector>
 #include <cmath>
 #include <cstdlib>
@@ -2534,7 +2551,7 @@ static constexpr int SAMPLE_RATE = 22050;
 
 std::atomic<int> AudioEngine::s_currentTrack{ -1 };
 std::atomic<size_t> AudioEngine::s_trackPlayhead{ 0 };
-static std::atomic<bool> s_ceCriticalTempo{ false };
+inline std::atomic<bool> s_ceCriticalTempo{ false };
 void AudioEngine::SetCriticalTempo(bool critical) { s_ceCriticalTempo.store(critical, std::memory_order_relaxed); }
 std::vector<int16_t>* AudioEngine::s_trackDataPtr = nullptr;
 
@@ -2625,7 +2642,7 @@ void AudioEngine::SynthesizeAll() {
     }
 
     {
-        // Championship Edition CPS-1 Crisp FM + Transient Snap Light Hit
+
         int count = (int)(SAMPLE_RATE * 0.18f);
         std::vector<int16_t> pcm(count);
         float phase = 0.0f, fmPhase = 0.0f;
@@ -2644,7 +2661,7 @@ void AudioEngine::SynthesizeAll() {
     }
 
     {
-        // Championship Edition CPS-1 Heavy Bone-Crushing Impact + Sub Drop + Metallic Ring
+
         int count = (int)(SAMPLE_RATE * 0.34f);
         std::vector<int16_t> pcm(count);
         float phase = 0.0f, ringPhase = 0.0f;
@@ -2665,7 +2682,7 @@ void AudioEngine::SynthesizeAll() {
     }
 
     {
-        // Championship Edition CPS-1 Metallic Anvil Guard Clang
+
         int count = (int)(SAMPLE_RATE * 0.18f);
         std::vector<int16_t> pcm(count);
         float p1 = 0.0f, p2 = 0.0f, p3 = 0.0f;
@@ -3010,10 +3027,7 @@ void AudioEngine::SynthesizeAll() {
         pcm.insert(pcm.end(), (int)(SAMPLE_RATE * 0.020f), 0);
         pcm.insert(pcm.end(), v2.begin(), v2.end());
         m_sounds[SFX_VOICE_BOO_YAA] = BuildWaveformSound(SAMPLE_RATE, (int)pcm.size(), pcm.data());
-    }
-
-    {
-        m_sounds[SFX_ROUND_WIN] = m_sounds[SFX_VOICE_BOO_YAA];
+        m_sounds[SFX_ROUND_WIN] = BuildWaveformSound(SAMPLE_RATE, (int)pcm.size(), pcm.data());
     }
 
     {
@@ -3481,14 +3495,11 @@ struct FMVoiceState {
 };
 
 void AudioEngine::SynthesizeBgmTracks() {
-    // Championship Edition Warm & Heavy CPS-1 Remaster of the Original Tracks:
-    // - 32 steps over 86,400 samples (slower, heavier arcade groove, zero "deedle-dee" arpeggios)
-    // - Pitched down ~2-3 semitones (0.86x) with a warm lower-octave unison & power-fifth pad
-    // - Deep sub-bass reinforcement + smooth low-pass warmth filter
+
     constexpr int LOOP_SAMPLES = 86400;
     constexpr int STEPS = 32;
     constexpr int SAMPLES_PER_STEP = LOOP_SAMPLES / STEPS;
-    constexpr float PITCH_DOWN = 0.86f; // Down ~2.5 semitones for a darker, weightier arcade tone
+    constexpr float PITCH_DOWN = 0.86f;
 
     for (int t = 0; t < 6; t++) {
         m_bgmTracks[t].resize(LOOP_SAMPLES);
@@ -3544,7 +3555,6 @@ void AudioEngine::SynthesizeBgmTracks() {
                 float bassEnv = expf(-stepT * 4.2f);
                 float leadEnv = sinf(stepT * PI_F * 0.92f) * expf(-stepT * 1.4f);
 
-                // Heavy Arcade Drums (Deep Punch Kick, Warm Low Snare, Subtle Hats)
                 float drum = 0.0f;
                 if ((step % 4) == 0 || (step % 16 == 11)) {
                     float kFreq = 115.0f * expf(-stepT * 18.0f) + 36.0f;
@@ -3560,11 +3570,9 @@ void AudioEngine::SynthesizeBgmTracks() {
                     drum += hatNoise * expf(-stepT * 34.0f) * 0.08f;
                 }
 
-                // Deep FM Bass + Sub-Octave Warm Reinforcement
                 float bass = bassVoice.Process(bassFreq, 2.0f, 1.6f, bassEnv) * 0.44f
                            + subBassVoice.Process(bassFreq * 0.5f, 1.0f, 0.4f, bassEnv) * 0.28f;
 
-                // Warm Mid-Range Lead + Lower-Octave Brass Body (no high-pitched squeaks)
                 float lead = 0.0f;
                 if (leadFreq > 40.0f) {
                     float mainLead = leadVoice.Process(leadFreq, 2.0f, 1.1f, leadEnv) * 0.22f;
@@ -3572,7 +3580,6 @@ void AudioEngine::SynthesizeBgmTracks() {
                     lead = mainLead + warmOctave;
                 }
 
-                // Analog-style smoothing filter on melodic voices for rich, non-fatiguing CPS-1 warmth
                 float synthRaw = bass + lead;
                 lpfState += (synthRaw - lpfState) * 0.38f;
 
@@ -3652,6 +3659,7 @@ void AudioEngine::PlaySfx(SfxId id, float pitch, float volume) {
 }
 
 void AudioEngine::SetBgmTrack(int trackId) {
+    SetCriticalTempo(false);
     if (s_currentTrack.load(std::memory_order_relaxed) != trackId) {
         s_trackPlayhead.store(0, std::memory_order_relaxed);
         s_currentTrack.store(trackId, std::memory_order_release);
@@ -3659,6 +3667,7 @@ void AudioEngine::SetBgmTrack(int trackId) {
 }
 
 void AudioEngine::StopBgm() {
+    SetCriticalTempo(false);
     s_currentTrack.store(-1, std::memory_order_release);
     s_trackPlayhead.store(0, std::memory_order_relaxed);
 }
@@ -3666,8 +3675,6 @@ void AudioEngine::StopBgm() {
 void AudioEngine::Update() {
 
 }
-
-// --- Fighter.cpp ---
 #include <cmath>
 #include <cstdlib>
 
@@ -3840,6 +3847,8 @@ void Fighter::ResetRound(float startX, bool faceRight, bool wasKnockedOut) {
     m_multiHitsRemaining = 0;
     m_comboCount = 0;
     m_comboResetTimer = 0;
+    m_tauntTimer = 0;
+    m_activeTaunt = "";
     m_health = 100;
     m_refillCount = 0;
     m_isHoldingBack = false;
@@ -3866,13 +3875,13 @@ void Fighter::SpawnProjectile(int type, float vx, float vy, int damage) {
         p.pos.y = GROUND_Y - 32.0f;
         p.pos.x = m_pos.x + (m_facingRight ? -30.0f : 30.0f);
     } else if (type == 9) {
-        // Karl Rove's "DECISION 2028" Whiteboard Map State & "270!" Projectile
+
         p.pos.x = m_pos.x + (m_facingRight ? 34.0f : -34.0f);
         p.pos.y = m_pos.y - 40.0f;
         p.width = 26.0f;
         p.height = 20.0f;
     } else if (type == 10) {
-        // A New Hope's High-Arcing Basketball Jump Shot!
+
         p.pos.x = m_pos.x + (m_facingRight ? 16.0f : -16.0f);
         p.pos.y = m_pos.y - 74.0f;
         p.width = 22.0f;
@@ -4223,7 +4232,7 @@ void Fighter::ExecuteSpecial(SpecialMotionType motion, int buttonUsed, const Fig
             m_vel = Vector2{ m_facingRight ? 2.2f : -2.2f, -6.5f };
             AudioEngine::Instance().PlaySfx(SFX_GAVEL_SLAM, 1.15f);
         } else {
-            // Signature Special: Pulls out "DECISION 2028" Whiteboard, draws map in real time, & shoots map states!
+
             m_specialIndex = 1;
             m_currentAttack = AttackData{ "DECISION 2028 MAP", 10, 20, 16, 18, ATTACK_PROJECTILE, 12, 24, 14, 4.2f, true, true, 0.0f, 0.0f, 0.0f, 0.0f };
             SpawnProjectile(9, isHeavy ? 4.8f : 3.8f, -0.25f, 10);
@@ -4239,13 +4248,13 @@ void Fighter::ExecuteSpecial(SpecialMotionType motion, int buttonUsed, const Fig
             m_vel = Vector2{ m_facingRight ? 2.6f : -2.6f, -7.2f };
             AudioEngine::Instance().PlaySfx(SFX_UPPERCUT, 1.1f);
         } else {
-            // Signature Special: Elevates & shoots a high-arcing basketball that hits the player in the head, making them see stars!
+
             m_specialIndex = 1;
             m_currentAttack = AttackData{ "HOPE JUMP SHOT", 8, 14, 16, 18, ATTACK_PROJECTILE, 12, 48, 14, 3.8f, false, true, 0.0f, 0.0f, 0.0f, 0.0f };
             float startX = m_pos.x + (m_facingRight ? 16.0f : -16.0f);
             float startY = m_pos.y - 74.0f;
             float targetX = opponent.GetPosition().x;
-            float targetY = opponent.GetPosition().y - 52.0f; // Directly onto opponent's head!
+            float targetY = opponent.GetPosition().y - 52.0f;
             float dx = std::abs(targetX - startX);
             float flightFrames = std::clamp(dx / 4.2f, 22.0f, 36.0f);
             float vx = std::clamp(dx / flightFrames, 2.2f, 6.2f);
@@ -4257,6 +4266,11 @@ void Fighter::ExecuteSpecial(SpecialMotionType motion, int buttonUsed, const Fig
             AudioEngine::Instance().PlaySfx(SFX_FIREBALL_LAUNCH, 0.95f);
         }
         break;
+    }
+
+    if (m_tauntTimer <= 0) {
+        m_activeTaunt = GetTauntQuote();
+        m_tauntTimer = 60;
     }
 
     m_currentAttack.isSpecial = true;
@@ -4384,20 +4398,7 @@ void Fighter::TriggerTaunt() {
 }
 
 bool Fighter::HasSpeechTaunt() const {
-    switch (m_charId) {
-    case CHAR_HIGH_BENCH:
-    case CHAR_COASTAL_GOV:
-    case CHAR_POPULIST:
-    case CHAR_WAR_PIG:
-    case CHAR_BILLARY:
-    case CHAR_SLEEPY_JOE:
-    case CHAR_MTG:
-    case CHAR_THE_PUNDIT:
-    case CHAR_A_NEW_HOPE:
-        return true;
-    default:
-        return false;
-    }
+    return true;
 }
 
 const char* Fighter::GetTauntQuote() const {
@@ -4412,6 +4413,14 @@ const char* Fighter::GetTauntQuote() const {
     case CHAR_COASTAL_GOV:      return "TOO EASY!";
     case CHAR_POPULIST:         return "SMILE! :)";
     case CHAR_WAR_PIG:          return "BRING IT!";
+    case CHAR_COMMANDER:        return "YOU'RE VETOED!";
+    case CHAR_REDCAP:           return "HOLD THE LINE!";
+    case CHAR_TECH_VISIONARY:   return "TO THE MOON!";
+    case CHAR_FILIBUSTER:       return "I YIELD NOTHING!";
+    case CHAR_MASCOT:           return "SCREEEECH!";
+    case CHAR_SUCKRATERY_RKF:   return "BRAIN WORM POWER!";
+    case CHAR_SOCIALIST:        return "TAX THE BILLIONAIRES!";
+    case CHAR_PALM_BEACH_PETE:  return "WELCOME TO MY ISLAND!";
     case CHAR_BILLARY:          return m_facingRight ? "OH YEAH!" : "DELETED!";
     case CHAR_THE_PUNDIT:       return (rand() % 2 == 0) ? "DECISION 2028: 270!" : "CHECK THE WHITEBOARD!";
     case CHAR_A_NEW_HOPE:       return "How's that for hope and change?";
@@ -4574,6 +4583,9 @@ void Fighter::ApplyHit(int damage, AttackType type, int hitstop, int hitstun, fl
     if (m_health <= 0) {
         m_state = FSTATE_KNOCKDOWN_AIR;
         m_stateFrame = 0;
+        m_tauntTimer = 0;
+        m_activeTaunt = "";
+        m_cosmeticPuffs.clear();
         m_vel = Vector2{ m_facingRight ? -3.0f : 3.0f, -7.0f };
         return;
     }
@@ -4629,7 +4641,7 @@ void Fighter::UpdatePhysics(const InputManager& input, const Fighter& opponent) 
                 p.vel.y = -p.vel.y * 0.65f;
             }
         } else if (p.type == 10) {
-            // Parabolic gravity so the basketball arcs up and drops down onto the opponent's head!
+
             p.vel.y += 0.24f;
             if (p.pos.y >= p.bounceY) {
                 p.pos.y = p.bounceY;
@@ -4862,7 +4874,7 @@ void Fighter::UpdatePhysics(const InputManager& input, const Fighter& opponent) 
             m_hitConnected = false;
             m_multiHitsRemaining--;
         }
-        // Karl Rove ("The Pundit"): Real-time whiteboard map drawing shoots additional electoral states off the board!
+
         if (m_charId == CHAR_THE_PUNDIT && m_specialIndex == 1 && (m_stateFrame == 12 || m_stateFrame == 20)) {
             SpawnProjectile(9, (m_stateFrame == 12) ? 4.4f : 5.3f, (m_stateFrame == 12) ? 0.22f : 0.0f, 10);
             AudioEngine::Instance().PlaySfx(SFX_FIREBALL_LAUNCH, 1.15f);
@@ -5024,8 +5036,6 @@ bool Fighter::GetActiveHitbox(Rectangle& outBox, AttackData& outData) const {
     }
     return false;
 }
-
-// --- Collision.cpp ---
 #include <algorithm>
 #include <cmath>
 
@@ -5218,8 +5228,6 @@ void CollisionSystem::ResolveCombat(Fighter& p1, Fighter& p2,
 
     TestProjectileClash(p1, p2, sparks);
 }
-
-// --- Stages.cpp ---
 #include <cmath>
 #include <cstdio>
 #include <cstring>
@@ -5882,8 +5890,6 @@ void StageManager::DrawForeground(float camX, float time) {
         }
     }
 }
-
-// --- Visuals.cpp ---
 #include <cmath>
 #include <cstdio>
 #include <cstring>
@@ -6387,332 +6393,38 @@ void VisualsEngine::DrawFighterSprite(const Fighter& f) {
             dstRec.y = posY - 45.0f * baseScale;
         }
 
-        // Championship Edition: 1) CPS-1 Afterimage Shadow Trails on Specials/Jumps/Heavies
-        int pIdx = (f.GetPlayerIndex() == 0) ? 0 : 1;
-        for (const auto& gh : ChampionshipEdition::s_afterimages[pIdx]) {
-            float ghDx = gh.pos.x - posX;
-            float ghDy = gh.pos.y - posY;
-            Rectangle ghDst = dstRec;
-            ghDst.x += ghDx;
-            ghDst.y += ghDy;
-            unsigned char ga = (unsigned char)std::clamp(gh.life * 18, 20, 145);
-            Color ghCol = (state == FSTATE_SPECIAL) ? Color{ 70, 210, 255, ga } : Color{ 255, 210, 70, ga };
-            DrawTexturePro(tex, srcRec, ghDst, origin, rotation, ghCol);
-        }
-
-        // Championship Edition: 2) Dark CPS-1 Outer Silhouette & Specular Rim Bevel Pass
-        Rectangle rimDark = dstRec;
-        rimDark.x += (fr ? -1.5f : 1.5f);
-        rimDark.y += 1.5f;
-        DrawTexturePro(tex, srcRec, rimDark, origin, rotation, Color{ 10, 12, 22, 195 });
-
-        Rectangle rimLight = dstRec;
-        rimLight.x += (fr ? 1.0f : -1.0f);
-        rimLight.y -= 1.0f;
-        Color bevelTint = (state == FSTATE_SPECIAL) ? Color{ 255, 230, 90, 160 } : Color{ 220, 240, 255, 110 };
-        DrawTexturePro(tex, srcRec, rimLight, origin, rotation, bevelTint);
-
-        // Championship Edition: 3) Main Character Pass
+        bool isDownOrKo = (f.GetHealth() <= 0 || state == FSTATE_KNOCKDOWN_AIR || state == FSTATE_KNOCKDOWN_GROUND || state == FSTATE_DEFEAT || state == FSTATE_WAKEUP);
         DrawTexturePro(tex, srcRec, dstRec, origin, rotation, tint);
 
-        if (state == FSTATE_ATTACK) {
-            int startup = f.GetCurrentAttack().startupFrames;
-            int active = f.GetCurrentAttack().activeFrames;
-            if (frame >= startup && frame < startup + active) {
-                AttackMoveType mtype = f.GetCurrentAttack().moveType;
-                float reachX = f.GetCurrentAttack().reachX;
-                float reachY = f.GetCurrentAttack().reachY;
-                float fxX = posX + dir * reachX;
-                float fxY = posY + reachY;
-
-                if (mtype == MOVE_LIGHT_PUNCH) {
-
-                    DrawLineEx(Vector2{ posX + dir * 18.0f, fxY - 2.0f }, Vector2{ fxX + dir * 8.0f, fxY - 2.0f }, 2.0f, Color{ 255, 255, 230, 220 });
-                    DrawLineEx(Vector2{ posX + dir * 14.0f, fxY + 4.0f }, Vector2{ fxX + dir * 4.0f, fxY + 4.0f }, 1.5f, Color{ 255, 220, 100, 180 });
-                    DrawCircle((int)(fxX + dir * 6.0f), (int)fxY, 3, Color{ 255, 255, 255, 240 });
-                } else if (mtype == MOVE_HEAVY_PUNCH) {
-
-                    DrawCircleLines((int)fxX, (int)fxY, 14.0f, Color{ 255, 120, 30, 200 });
-                    DrawCircle((int)fxX, (int)fxY, 5, Color{ 255, 240, 180, 255 });
-                    DrawLineEx(Vector2{ posX + dir * 12.0f, fxY - 10.0f }, Vector2{ fxX + dir * 12.0f, fxY + 8.0f }, 3.5f, Color{ 255, 180, 40, 240 });
-                } else if (mtype == MOVE_LIGHT_KICK) {
-
-                    DrawLineEx(Vector2{ posX + dir * 16.0f, fxY }, Vector2{ fxX + dir * 6.0f, fxY }, 2.0f, Color{ 230, 245, 255, 220 });
-                    DrawCircle((int)(fxX + dir * 4.0f), (int)fxY, 2, Color{ 255, 255, 255, 240 });
-                } else if (mtype == MOVE_HEAVY_KICK) {
-
-                    Vector2 p1{ posX + dir * 16.0f, fxY - 14.0f };
-                    Vector2 p2{ fxX + dir * 14.0f, fxY };
-                    Vector2 p3{ posX + dir * 20.0f, fxY + 16.0f };
-                    DrawLineEx(p1, p2, 3.5f, Color{ 255, 230, 80, 240 });
-                    DrawLineEx(p2, p3, 3.0f, Color{ 255, 160, 40, 220 });
-                    DrawCircle((int)p2.x, (int)p2.y, 4, Color{ 255, 255, 255, 255 });
-                }
-            }
-        }
-
-        if (state == FSTATE_WALK_FWD || state == FSTATE_WALK_BACK) {
-            float walkCycle = sinf(frame * 0.35f);
-            float legStride = walkCycle * 6.5f;
-            float dirSign = (state == FSTATE_WALK_FWD) ? 1.0f : -1.0f;
-            int footY = (int)(GROUND_Y - 2.0f);
-
-            int shoe1X = (int)(posX - (fr ? 7.0f : -7.0f) - legStride * dirSign);
-            int shoe2X = (int)(posX + (fr ? 5.0f : -5.0f) + legStride * dirSign);
-            DrawRectangle(shoe1X, footY, 9, 3, Color{ 22, 22, 28, 255 });
-            DrawRectangle(shoe2X, footY, 9, 3, Color{ 36, 38, 48, 255 });
-
-            if (fabsf(walkCycle) > 0.85f && (frame % 5 == 0)) {
-                DrawCircle((int)(posX - (fr ? 10.0f : -10.0f) - legStride * dirSign), footY + 1, 2, Color{ 200, 205, 215, 120 });
-            }
-        }
-
-        if (state == FSTATE_IDLE) {
-            int quirkTimer = frame % 200;
-            if (quirkTimer >= 100 && quirkTimer <= 170) {
-                float quirkPulse = sinf((quirkTimer - 100) * 0.09f);
-                switch (charId) {
-                case CHAR_COMMANDER: {
-                    float tieX = posX + (fr ? 4.0f : -4.0f) + sinf(frame * 0.25f) * 4.0f;
-                    float tieY = pos.y - 25.0f;
-                    DrawLineEx(Vector2{ posX + (fr ? 2.0f : -2.0f), pos.y - 42.0f }, Vector2{ tieX, tieY + 8.0f }, 2.5f, Color{ 230, 20, 20, 255 });
-                    DrawCircle((int)tieX, (int)(tieY + 8.0f), 2, Color{ 255, 215, 0, 220 });
-                    break;
-                }
-                case CHAR_HIGH_BENCH: {
-                    int gx = (int)(posX + (fr ? 16.0f : -16.0f));
-                    int gy = (int)(pos.y - 45.0f - quirkPulse * 5.0f);
-                    DrawRectangle(gx - 2, gy - 2, 8, 4, Color{ 220, 180, 50, 255 });
-                    DrawLine(gx + 2, gy, gx + 2, gy + 10, Color{ 140, 100, 30, 255 });
-                    break;
-                }
-                case CHAR_REDCAP: {
-                    int px = (int)(posX + (fr ? 14.0f : -14.0f));
-                    int py = (int)(pos.y - 40.0f);
-                    DrawCircle(px, py, 2 + (int)(quirkPulse * 2.0f), Color{ 240, 240, 245, 180 });
-                    break;
-                }
-                case CHAR_COASTAL_GOV: {
-                    int glintX = (int)(posX + (fr ? 6.0f : -6.0f));
-                    int glintY = (int)(pos.y - 58.0f);
-                    DrawLine(glintX - 4, glintY, glintX + 4, glintY, Color{ 255, 255, 255, 240 });
-                    DrawLine(glintX, glintY - 4, glintX, glintY + 4, Color{ 255, 255, 255, 240 });
-                    break;
-                }
-                case CHAR_TECH_VISIONARY: {
-                    int dx = (int)(posX - (fr ? 18.0f : -18.0f));
-                    int dy = (int)(pos.y - 68.0f + sinf(frame * 0.2f) * 3.0f);
-                    DrawRectangle(dx - 4, dy - 2, 8, 4, Color{ 40, 45, 55, 255 });
-                    DrawCircle(dx, dy - 1, 2, (frame % 10 < 5) ? Color{ 0, 255, 255, 255 } : Color{ 0, 120, 200, 255 });
-                    DrawLine(dx - 5, dy - 3, dx + 5, dy - 3, Color{ 180, 200, 220, 220 });
-                    break;
-                }
-                case CHAR_FILIBUSTER: {
-                    int fx = (int)(posX + (fr ? 12.0f : -12.0f));
-                    int fy = (int)(pos.y - 36.0f);
-                    DrawRectangle(fx - 4, fy - 6, 8, 12, Color{ 160, 40, 30, 240 });
-                    DrawPixelText("RULE 22", fx - 10, fy - 14, 6, Color{ 255, 220, 80, 220 });
-                    break;
-                }
-                case CHAR_MASCOT: {
-                    int mx = (int)(posX + (fr ? 14.0f : -14.0f));
-                    int my = (int)(pos.y - 52.0f);
-                    DrawCircle(mx, my, 3, Color{ 255, 220, 40, 230 });
-                    break;
-                }
-                case CHAR_POPULIST: {
-                    int sx = (int)(posX + (fr ? 14.0f : -14.0f));
-                    int sy = (int)(pos.y - 48.0f);
-                    DrawRectangle(sx - 2, sy - 4, 4, 8, Color{ 30, 30, 35, 255 });
-                    if (frame % 20 < 4) {
-                        DrawCircle(sx, sy - 3, 5, Color{ 255, 255, 240, 240 });
-                    }
-                    break;
-                }
-                case CHAR_SUCKRATERY_RKF: {
-                    int wx = (int)(posX + (fr ? 5.0f : -5.0f));
-                    int wy = (int)(pos.y - 62.0f - sinf(frame * 0.3f) * 4.0f);
-                    DrawCircle(wx, wy, 3, Color{ 255, 120, 180, 255 });
-                    DrawCircle(wx + (fr ? 2 : -2), wy - 1, 1, Color{ 255, 255, 255, 255 });
-                    DrawLine(wx, wy, (int)(posX + (fr ? 3.0f : -3.0f)), (int)(pos.y - 56.0f), Color{ 230, 80, 150, 255 });
-                    break;
-                }
-                case CHAR_WAR_PIG: {
-                    int vx = (int)(posX + (fr ? -4.0f : 4.0f));
-                    int vy = (int)(pos.y - 50.0f);
-                    DrawCircle(vx, vy, 3, Color{ 255, 60, 40, (unsigned char)(quirkPulse * 220) });
-                    break;
-                }
-                case CHAR_SOCIALIST: {
-                    int ax = (int)(posX + (fr ? 16.0f : -16.0f));
-                    int ay = (int)(pos.y - 40.0f - quirkPulse * 12.0f);
-                    DrawCircle(ax, ay, 3, Color{ 230, 40, 40, 255 });
-                    DrawLine(ax, ay - 3, ax + 1, ay - 5, Color{ 60, 160, 50, 255 });
-                    break;
-                }
-                case CHAR_BILLARY: {
-                    int ex = (int)(posX + (fr ? 12.0f : -12.0f));
-                    int ey = (int)(pos.y - 50.0f);
-                    DrawRectangle(ex - 4, ey - 3, 8, 6, Color{ 240, 240, 245, 230 });
-                    DrawLine(ex - 4, ey - 3, ex, ey, Color{ 100, 140, 220, 240 });
-                    DrawLine(ex + 4, ey - 3, ex, ey, Color{ 100, 140, 220, 240 });
-                    break;
-                }
-                case CHAR_PALM_BEACH_PETE: {
-                    int rx = (int)(posX + (fr ? 12.0f : -12.0f));
-                    int ry = (int)(pos.y - 34.0f);
-                    DrawCircle(rx, ry, 2, Color{ 255, 215, 0, 255 });
-                    DrawLine(rx - 3, ry, rx + 3, ry, Color{ 255, 255, 255, 230 });
-                    break;
-                }
-                case CHAR_SLEEPY_JOE: {
-                    int jx = (int)(posX + (fr ? 6.0f : -6.0f));
-                    int jy = (int)(pos.y - 58.0f);
-                    DrawCircle(jx, jy, 2, Color{ 255, 30, 30, 240 });
-                    DrawPixelText("z", jx + (fr ? 10 : -14), jy - 8, 6, Color{ 200, 220, 255, 200 });
-                    break;
-                }
-                case CHAR_MTG: {
-                    int mx = (int)(posX + (fr ? 2.0f : -2.0f));
-                    int my = (int)(pos.y - 66.0f);
-                    DrawPixelText("✦", mx + (int)(sinf(frame * 0.4f) * 6.0f), my - 4, 7, Color{ 255, 220, 40, 240 });
-                    break;
-                }
-                default:
-                    break;
-                }
-            }
-        }
-
-        if (f.GetTauntTimer() > 0 && f.HasSpeechTaunt() && !f.GetActiveTaunt().empty()) {
+        if (!isDownOrKo && f.GetTauntTimer() > 0 && !f.GetActiveTaunt().empty()) {
             const char* quote = f.GetActiveTaunt().c_str();
-            int qw = MeasureText(quote, 10);
-            int bubbleW = qw + 10;
-            int bubbleH = 13;
-
-            float headTopY = (f.GetCharacterId() == CHAR_WAR_PIG) ? (pos.y - 88.0f) : (pos.y - 70.0f);
-            int bubbleY = (int)(headTopY - bubbleH - 4.0f);
-            if (bubbleY < 12) bubbleY = 12;
-
-            int bubbleX = (int)pos.x - bubbleW / 2;
-            bubbleX = std::clamp(bubbleX, (int)STAGE_MIN_X + 6, (int)STAGE_MAX_X - 6 - bubbleW);
-
-            DrawRectangle(bubbleX + 1, bubbleY + 1, bubbleW, bubbleH, Color{ 0, 0, 0, 70 });
-
-            DrawRectangle(bubbleX, bubbleY, bubbleW, bubbleH, Color{ 255, 255, 235, 250 });
-            DrawRectangleLines(bubbleX, bubbleY, bubbleW, bubbleH, Color{ 20, 25, 35, 255 });
-
-            int tailX = std::clamp((int)pos.x, bubbleX + 8, bubbleX + bubbleW - 8);
-            DrawTriangle(Vector2{ (float)tailX, (float)headTopY - 1.0f },
-                         Vector2{ (float)tailX - 3.0f, (float)bubbleY + bubbleH },
-                         Vector2{ (float)tailX + 3.0f, (float)bubbleY + bubbleH },
-                         Color{ 255, 255, 235, 250 });
-            DrawLine(tailX - 3, bubbleY + bubbleH, tailX, (int)headTopY - 1, Color{ 20, 25, 35, 255 });
-            DrawLine(tailX + 3, bubbleY + bubbleH, tailX, (int)headTopY - 1, Color{ 20, 25, 35, 255 });
-
-            int textX = bubbleX + (bubbleW - qw) / 2;
-            DrawPixelText(quote, textX, bubbleY + 2, 8, Color{ 15, 20, 30, 255 });
-        } else if ((state == FSTATE_TAUNT || f.GetTauntTimer() > 0) && !f.HasSpeechTaunt()) {
-            int tickFrame = (state == FSTATE_TAUNT) ? frame : std::min(44, 90 - f.GetTauntTimer());
-
-            switch (f.GetCharacterId()) {
-            case CHAR_COMMANDER: {
-                float tootProg = std::clamp((float)tickFrame / 45.0f, 0.0f, 1.0f);
-                float tieWag = sinf(tickFrame * 0.45f) * 8.0f;
-                DrawLineEx(Vector2{ pos.x + dir * 2, pos.y - 40 }, Vector2{ pos.x + dir * 6 + tieWag, pos.y - 18 }, 4.0f, Color{ 220, 25, 25, 255 });
-                float acc = sinf(tickFrame * 0.5f) * 6.0f;
-                DrawCircle((int)(pos.x + dir * (12 + acc)), (int)(pos.y - 36), 3, Color{ 255, 220, 60, 255 });
-                DrawCircle((int)(pos.x - dir * (8 - acc)), (int)(pos.y - 36), 3, Color{ 255, 220, 60, 255 });
-                for (int p = 0; p < 4; p++) {
-                    float puffDist = 14.0f + p * 6.0f + tickFrame * 0.5f;
-                    float puffY = pos.y - 24.0f - p * 3.0f - sinf(tickFrame * 0.2f + p) * 3.0f;
-                    unsigned char alpha = (unsigned char)(std::clamp(1.0f - tootProg, 0.0f, 1.0f) * 190.0f);
-                    DrawCircle((int)(pos.x - dir * puffDist), (int)puffY, 4 + p * 2, Color{ 220, 225, 60, alpha });
-                    DrawCircle((int)(pos.x - dir * puffDist), (int)puffY, 2 + p, Color{ 245, 245, 120, alpha });
-                }
-                break;
-            }
-            case CHAR_SUCKRATERY_RKF: {
-                float wormReach = sinf((tickFrame / 45.0f) * 3.14159f) * 24.0f;
-                int wx = (int)(pos.x + dir * (10 + wormReach));
-                int wy = (int)(pos.y - 62 - sinf(tickFrame * 0.4f) * 4.0f);
-                DrawCircle(wx, wy, 4, Color{ 235, 110, 160, 255 });
-                DrawCircle(wx + (int)(dir * 2), wy - 1, 1, WHITE);
-                DrawLineEx(Vector2{ pos.x + dir * 6, pos.y - 62 }, Vector2{ (float)wx, (float)wy }, 3.0f, Color{ 210, 90, 140, 255 });
-                DrawCircle((int)(pos.x + dir * (8 + wormReach * 0.6f)), wy + 1, 3, Color{ 245, 130, 175, 255 });
-                if (tickFrame >= 15 && tickFrame <= 30) {
-                    DrawCircle(wx + (int)(dir * 4), wy + (tickFrame - 15) * 2, 2, Color{ 100, 240, 80, 220 });
-                }
-                break;
-            }
-            case CHAR_SOCIALIST: {
-                float arc = sinf((tickFrame / 45.0f) * 3.14159f) * 32.0f;
-                float appleX = pos.x + dir * 14.0f;
-                float appleY = pos.y - 50.0f - arc;
-                DrawCircle((int)appleX, (int)appleY, 4, Color{ 220, 30, 30, 255 });
-                DrawRectangle((int)appleX - 1, (int)appleY - 5, 2, 3, Color{ 80, 40, 15, 255 });
-                DrawCircle((int)appleX + 1, (int)appleY - 4, 1, Color{ 80, 180, 40, 255 });
-                if (tickFrame >= 32) {
-                    DrawPixelText("✦", (int)pos.x + (int)(dir * 8), (int)pos.y - 62, 8, Color{ 255, 240, 100, 255 });
-                }
-                break;
-            }
-            case CHAR_TECH_VISIONARY: {
-                float ang = (tickFrame / 45.0f) * 6.283f * 2.0f;
-                float rad = 18.0f;
-                float dx = pos.x + cosf(ang) * rad;
-                float dy = pos.y - 74.0f + sinf(ang) * (rad * 0.6f);
-                DrawRectangle((int)dx - 6, (int)dy - 2, 12, 4, Color{ 35, 45, 60, 255 });
-                DrawCircle((int)dx, (int)dy, 2, Color{ 0, 240, 255, 255 });
-                DrawPixelText("·", (int)dx - 4, (int)dy - 3, 6, Color{ 0, 220, 255, 180 });
-                break;
-            }
-            case CHAR_REDCAP: {
-                if (tickFrame <= 25) {
-                    float spitX = pos.x + dir * (6.0f + tickFrame * 1.0f);
-                    float spitY = pos.y - 48.0f + (tickFrame * tickFrame) * 0.05f;
-                    DrawCircle((int)spitX, (int)spitY, 2, Color{ 240, 240, 220, 240 });
-                }
-                if (tickFrame >= 18 && tickFrame <= 36) {
-                    DrawPixelText("✦", (int)pos.x + (int)(dir * 12), (int)pos.y - 40, 8, Color{ 255, 160, 30, 255 });
-                }
-                break;
-            }
-            case CHAR_FILIBUSTER: {
-                float scrollLen = std::min(32.0f, tickFrame * 1.2f);
-                int sx = (int)(pos.x + dir * 8);
-                int sy = (int)(pos.y - 44);
-                DrawRectangle(sx, sy, 10, (int)scrollLen, Color{ 245, 240, 215, 245 });
-                DrawRectangleLines(sx, sy, 10, (int)scrollLen, Color{ 140, 110, 60, 255 });
-                for (int l = 2; l < scrollLen - 2; l += 4) {
-                    DrawLine(sx + 2, sy + l, sx + 8, sy + l, Color{ 100, 80, 50, 200 });
-                }
-                break;
-            }
-            case CHAR_MASCOT: {
-                float wingFlap = sinf(tickFrame * 0.6f) * 8.0f;
-                DrawTriangle(Vector2{ pos.x - 14, pos.y - 48 }, Vector2{ pos.x - 22, pos.y - 48 - wingFlap }, Vector2{ pos.x - 6, pos.y - 38 }, Color{ 180, 140, 40, 255 });
-                DrawTriangle(Vector2{ pos.x + 14, pos.y - 48 }, Vector2{ pos.x + 22, pos.y - 48 - wingFlap }, Vector2{ pos.x + 6, pos.y - 38 }, Color{ 180, 140, 40, 255 });
-                DrawPixelText("★", (int)pos.x + (int)(sinf(tickFrame * 0.3f) * 16.0f), (int)pos.y - 74, 8, Color{ 255, 220, 50, 240 });
-                break;
-            }
-            case CHAR_PALM_BEACH_PETE: {
-                int wx = (int)(pos.x + dir * 10);
-                int wy = (int)(pos.y - 42);
-                DrawCircle(wx, wy, 4, Color{ 255, 215, 0, 255 });
-                DrawCircle(wx, wy, 2, Color{ 255, 250, 210, 255 });
-                if ((tickFrame / 6) % 2 == 0) {
-                    DrawPixelText("✦", wx - 3, wy - 8, 8, Color{ 255, 235, 120, 255 });
-                }
-                break;
-            }
-            default:
-                break;
-            }
+            float headTopY = (f.GetCharacterId() == CHAR_WAR_PIG) ? (pos.y - 84.0f) : (pos.y - 66.0f);
+            int bubbleCenterX = (int)(pos.x + (f.IsFacingRight() ? -8.0f : 8.0f));
+            ChampionshipEdition::DrawComicThoughtBubble(
+                quote,
+                bubbleCenterX,
+                (int)(headTopY - 3.0f),
+                (int)pos.x,
+                (int)(headTopY + 3.0f),
+                6,
+                Color{ 15, 22, 38, 255 }
+            );
+        } else if (!isDownOrKo && f.GetCharacterId() == CHAR_SLEEPY_JOE && state == FSTATE_SPECIAL && f.GetSpecialIndex() == 1) {
+            ChampionshipEdition::DrawComicThoughtBubble(
+                "Zzz... ICE CREAM...",
+                (int)pos.x,
+                (int)(pos.y - 46.0f),
+                (int)pos.x,
+                (int)(pos.y - 38.0f),
+                6,
+                Color{ 20, 40, 95, 255 }
+            );
         }
 
-        DrawCosmeticPuffs(f);
-        ChampionshipEdition::DrawFighterWorldOverlays(f);
+        if (!isDownOrKo) {
+            DrawCosmeticPuffs(f);
+            ChampionshipEdition::DrawFighterWorldOverlays(f);
+        }
         return;
     }
     ChampionshipEdition::DrawArticulated12PartRig(f);
@@ -6980,8 +6692,6 @@ void VisualsEngine::DrawProjectiles(const Fighter& f) {
                 Rectangle srcRec = { 0.0f, 0.0f, (float)s_sprSleepyJoeSS.width, (float)s_sprSleepyJoeSS.height };
                 if (!p.facingRight) srcRec.width = -srcRec.width;
                 Rectangle dstRec = { p.pos.x - 22.0f, p.pos.y - 28.0f, 44.0f, 54.0f };
-                Rectangle trailDst = { p.pos.x - (p.facingRight ? 32.0f : 12.0f), p.pos.y - 28.0f, 44.0f, 54.0f };
-                DrawTexturePro(s_sprSleepyJoeSS, srcRec, trailDst, Vector2{ 0.0f, 0.0f }, 0.0f, Color{ 30, 30, 45, 120 });
                 DrawTexturePro(s_sprSleepyJoeSS, srcRec, dstRec, Vector2{ 0.0f, 0.0f }, 0.0f, WHITE);
             } else {
                 DrawRectangle((int)p.pos.x - 12, (int)p.pos.y - 24, 24, 48, Color{ 15, 20, 25, 255 });
@@ -7002,7 +6712,7 @@ void VisualsEngine::DrawProjectiles(const Fighter& f) {
 
             DrawCircle((int)(p.pos.x + dir * 12), (int)p.pos.y - 2, 2, WHITE);
         } else if (p.type == 9) {
-            // Karl Rove's "DECISION 2028" Whiteboard Electoral Map State & "270!" Projectile
+
             float dir = p.facingRight ? 1.0f : -1.0f;
             int mode = ((p.lifetime / 5) % 3);
             bool isRedState = (mode != 1);
@@ -7028,21 +6738,18 @@ void VisualsEngine::DrawProjectiles(const Fighter& f) {
             DrawCircle((int)(px - dir * 20.0f), py - 4, 2.0f, Color{ 230, 45, 55, 220 });
             DrawCircle((int)(px - dir * 25.0f), py + 3, 2.0f, Color{ 45, 130, 255, 220 });
         } else if (p.type == 10) {
-            // Barack Obama ("A New Hope"): High-Arcing Chicago Streetball Basketball!
+
             int px = (int)p.pos.x;
             int py = (int)p.pos.y;
             float spin = (float)p.lifetime * 0.35f;
 
-            // Golden Hope & Change Arc Trail
             DrawCircle((int)(p.pos.x - p.vel.x * 2.2f), (int)(p.pos.y - p.vel.y * 2.2f), 6.0f, Color{ 255, 215, 60, 120 });
             DrawCircle((int)(p.pos.x - p.vel.x * 4.0f), (int)(p.pos.y - p.vel.y * 4.0f), 3.5f, Color{ 100, 220, 255, 100 });
 
-            // Basketball Outer Outline, Deep Orange Base, and Specular Highlight
             DrawCircle(px, py, 10.5f, Color{ 20, 12, 8, 255 });
             DrawCircle(px, py, 9.0f, Color{ 235, 105, 25, 255 });
             DrawCircle(px - 3, py - 3, 4.0f, Color{ 255, 155, 65, 230 });
 
-            // Rotating Black Basketball Seams
             int sx = (int)(cosf(spin) * 7.5f);
             int sy = (int)(sinf(spin) * 7.5f);
             DrawLine(px - 8, py, px + 8, py, Color{ 25, 18, 14, 240 });
@@ -7129,7 +6836,6 @@ void VisualsEngine::DrawBattleHUD(const Fighter& p1, const Fighter& p2, int roun
     Color p2BarTop = (p2Hp < 30.0f && ((int)(GetTime() * 14.0f) % 2 == 0)) ? Color{ 255, 120, 40, 255 } : Color{ 255, 235, 65, 255 };
     DrawRectangleGradientV(SCREEN_WIDTH - 22 - BAR_WIDTH, TOP_Y + 2, p2HealthW, BAR_HEIGHT, p2BarTop, Color{ 210, 155, 15, 255 });
 
-    // Championship Edition Live HUD Portrait Busts (bruised/sweating when HP < 30%)
     if (s_loaded) {
         int c1Id = (int)p1.GetCharacterId();
         int c2Id = (int)p2.GetCharacterId();
@@ -7181,7 +6887,6 @@ void VisualsEngine::DrawCinematicIntro(float timer, bool logoDropped, const Shad
         Rectangle dstRec = { 0.0f, 0.0f, (float)SCREEN_WIDTH, (float)SCREEN_HEIGHT };
         DrawTexturePro(s_titleSplash, srcRec, dstRec, Vector2{ 0.0f, 0.0f }, 0.0f, WHITE);
 
-        // Championship Edition Metallic Arcade Ribbon & Plasma Sparks
         float pulse = 0.5f + 0.5f * sinf(timer * 6.0f);
         int banW = 248;
         int banH = 22;
@@ -7610,8 +7315,13 @@ void VisualsEngine::DrawStageAndCharSelect(int selectedStage, int p1Char, int p2
             headerCol = Color{ 255, 215, 0, 255 };
         }
     } else if (defeatedOriginalCount < 9) {
-        headerTitle = "CHOOSE NEXT OPPONENT";
-        headerCol = Color{ 255, 120, 80, 255 };
+        if (ChampionshipEdition::s_opponentLocked) {
+            headerTitle = "SELECT BATTLE VENUE (D-PAD: PIN | ATTACK: FIGHT!)";
+            headerCol = Color{ 80, 235, 255, 255 };
+        } else {
+            headerTitle = "CHOOSE NEXT OPPONENT";
+            headerCol = Color{ 255, 120, 80, 255 };
+        }
     } else if (!defeatedFighters[CHAR_SUCKRATERY_RKF]) {
         headerTitle = "*** BOSS ENCOUNTER: SUCKRATERY RKF ***";
         headerCol = Color{ 255, 60, 60, 255 };
@@ -7650,11 +7360,20 @@ void VisualsEngine::DrawStageAndCharSelect(int selectedStage, int p1Char, int p2
         "CHICAGO WRIGLEY FIELD"
     };
 
-    char venueBanner[64];
-    snprintf(venueBanner, sizeof(venueBanner), "[STAGE: %s]", pinNamesAll[selectedStage < STAGE_COUNT ? selectedStage : 0]);
+    char venueBanner[80];
+    if (ChampionshipEdition::s_opponentLocked && !warPigBeaten && defeatedOriginalCount < 9) {
+        snprintf(venueBanner, sizeof(venueBanner), "< STAGE: %s >", pinNamesAll[selectedStage < STAGE_COUNT ? selectedStage : 0]);
+    } else {
+        snprintf(venueBanner, sizeof(venueBanner), "[STAGE: %s]", pinNamesAll[selectedStage < STAGE_COUNT ? selectedStage : 0]);
+    }
     int vbw = MeasureText(venueBanner, 8);
-    DrawRectangle((SCREEN_WIDTH - vbw) / 2 - 4, 132, vbw + 8, 12, Color{ 10, 14, 22, 230 });
-    DrawPixelText(venueBanner, (SCREEN_WIDTH - vbw) / 2, 134, 8, Color{ 0, 220, 255, 230 });
+    DrawRectangle((SCREEN_WIDTH - vbw) / 2 - 4, 132, vbw + 8, 12, Color{ 10, 14, 22, 235 });
+    if (ChampionshipEdition::s_opponentLocked && !warPigBeaten && defeatedOriginalCount < 9) {
+        DrawRectangleLines((SCREEN_WIDTH - vbw) / 2 - 4, 132, vbw + 8, 12, Color{ 255, 225, 60, 255 });
+        DrawPixelText(venueBanner, (SCREEN_WIDTH - vbw) / 2, 134, 8, Color{ 255, 235, 80, 255 });
+    } else {
+        DrawPixelText(venueBanner, (SCREEN_WIDTH - vbw) / 2, 134, 8, Color{ 0, 220, 255, 230 });
+    }
 
     const char* rosterNames[CHARACTER_COUNT] = {
         "POTUS", "HIGH BENCH", "REDCAP", "GOVERNATOR",
@@ -8504,48 +8223,253 @@ void VisualsEngine::DrawVictorySplash(int winnerChar, int loserChar, float timer
     snprintf(speakerBuf, sizeof(speakerBuf), "[ %s ]", rosterNames[winnerChar]);
     DrawPixelText(speakerBuf, boxX + 10, boxY + 6, 8, Color{ 255, 220, 50, 255 });
 
-    const char* line1[CHARACTER_COUNT] = {
-        "\"Nobody wins bigger than me, believe me!",
-        "\"By a 9-0 unanimous verdict, you have",
-        "\"You can't filibuster a clothesline, brother!",
-        "\"Your approval ratings just fell off a cliff!",
-        "\"According to my calculations and calculator,",
-        "\"Point of order! I've held this floor 35 years,",
-        "\"*SCREEECH!* Freedom has spoken, and it just",
-        "\"Hold that pose! This knockout is going straight",
-        "\"Look, folks... not a joke, this is a big deal!",
-        "\"THE SPACE LASERS PREDICTED THIS KNOCKOUT!",
-        "\"My brain worm calculated every move you had!",
-        "\"Maximum military aggression! You just took on",
-        "\"Free groceries, subway rides, and knockouts!",
-        "\"I did not have combat relations with that boxer!",
-        "\"Another refreshing sip of pure Adrenochrome...",
-        "\"Look at the DECISION 2028 whiteboard math:",
-        "\"Uhh, let me be clear: nothing but net!"
+    static float s_lastSplashTimer = 999.0f;
+    static int s_quoteVariant = 0;
+    static int s_loserVariant = 0;
+    if (timer < s_lastSplashTimer) {
+        s_quoteVariant = (s_quoteVariant + 1 + (std::rand() % 3)) % 4;
+        s_loserVariant = (s_loserVariant + 1 + (std::rand() % 3)) % 4;
+    }
+    s_lastSplashTimer = timer;
+
+    const char* winLine1[CHARACTER_COUNT][4] = {
+        {
+            "\"Nobody wins bigger than me, believe me!",
+            "\"People are saying that was the most tremendous",
+            "\"You're fired! Total Veto! Even the fake news",
+            "\"We built a wall of punches and made you"
+        },
+        {
+            "\"By a 9-0 unanimous verdict, you have",
+            "\"Certiorari denied! The Supreme Court finds",
+            "\"Order in the court! My gavel has spoken,",
+            "\"Your constitutional appeal just got"
+        },
+        {
+            "\"You can't filibuster a clothesline, brother!",
+            "\"Outta my way, swamp rat! That haymaker came",
+            "\"USA! USA! You just got flattened by",
+            "\"No teleprompter can save your jaw from"
+        },
+        {
+            "\"Your approval ratings just fell off a cliff!",
+            "\"Look at this hair—not a single strand moved",
+            "\"Consider your campaign suspended, pal!",
+            "\"Executive hair gel and California kicks:"
+        },
+        {
+            "\"According to my calculations and calculator,",
+            "\"First principles physics dictated my fist",
+            "\"Your combat firmware just crashed with a",
+            "\"I'm disrupting your consciousness and sending"
+        },
+        {
+            "\"Point of order! I've held this floor 35 years,",
+            "\"Pursuant to Senate Rule XXII, your jaw is",
+            "\"I yield zero time and zero mercy to",
+            "\"We will now read the entire 4,000-page"
+        },
+        {
+            "\"*SCREEECH!* Freedom has spoken, and it just",
+            "\"*CAW-CAW!* Mess with the eagle and you get",
+            "\"360 degrees of pure American talon fury!",
+            "\"No taxation without feathered devastation!"
+        },
+        {
+            "\"Hold that pose! This knockout is going straight",
+            "\"Chat, clip that! Don't forget to smash like",
+            "\"You just got ratio'd in 4K at 60 frames",
+            "\"Breaking news on my livestream: you just"
+        },
+        {
+            "\"Look, folks... not a joke, this is a big deal!",
+            "\"Listen here, Jack: no malarkey in my ring!",
+            "\"Dark Brandon sends his regards, pal!",
+            "\"C'mon man! Even Corn Pop lasted longer"
+        },
+        {
+            "\"THE SPACE LASERS PREDICTED THIS KNOCKOUT!",
+            "\"I'M FILING ARTICLES OF IMPEACHMENT ON YOUR",
+            "\"MARJORIE TAYLOR GREEN MACHINE JUST RAN",
+            "\"DECORUM IS DEAD AND SO IS YOUR HEALTH BAR!"
+        },
+        {
+            "\"My brain worm calculated every move you had!",
+            "\"Nothing a falcon, a roadkill bear cub, and",
+            "\"The worm in my head whispered the secret",
+            "\"Skip the seed oils and accept your Total"
+        },
+        {
+            "\"Maximum military aggression! You just took on",
+            "\"DEFCON 1! Shock and awe just flattened",
+            "\"Another $800 billion defense budget well",
+            "\"Full-spectrum Pentagon dominance! Your weak"
+        },
+        {
+            "\"Free groceries, subway rides, and knockouts!",
+            "\"We are seizing the means of your defeat,",
+            "\"Rent-stabilized knuckle sandwiches for",
+            "\"From Queens to Manhattan, the people's"
+        },
+        {
+            "\"I did not have combat relations with that boxer!",
+            "\"It depends on what the meaning of 'KO' is!",
+            "\"What difference, at this point, does it make?!",
+            "\"We came, we saw, we acid-washed your"
+        },
+        {
+            "\"Another refreshing sip of pure Adrenochrome...",
+            "\"Welcome to Temple Island, where the flight",
+            "\"Money, leverage, and island vintage elixir:",
+            "\"You were never on the VIP list, kid—"
+        },
+        {
+            "\"Look at the DECISION 2028 whiteboard math:",
+            "\"Karl's algorithm never misses! The suburban",
+            "\"Wait for the late precincts in Cuyahoga",
+            "\"I drew a red-and-blue arrow right across"
+        },
+        {
+            "\"Uhh, let me be clear: nothing but net!",
+            "\"Yes we can! That crossover and jump shot",
+            "\"Don't boo—vote! Or better yet, work on your",
+            "\"From the South Side of Chicago to the White"
+        }
     };
 
-    const char* line2[CHARACTER_COUNT] = {
-        "That was the greatest knockout in history!\"",
-        "been sentenced to the canvas. Case closed!\"",
-        "Take that sob story back to the nosebleeds!\"",
-        "Better hire a crisis PR firm, pal!\"",
-        "your win probability was exactly 0.00%!\"",
-        "and I'm not yielding today, youngster!\"",
-        "dropkicked your agenda into next week!\"",
-        "to my viral livestream highlight reel!\"",
-        "Now if you'll excuse me, it's naptime... Zzz...\"",
-        "WWG1WGA! YOU CAN'T HANDLE THE RAW TRUTH!\"",
-        "Drink some raw tonic and accept your defeat!\"",
-        "the Pentagon's highest caliber firepower!\"",
-        "Spread the joy and feel the progressive burn!\"",
-        "Your loss was wiped from my private server!\"",
-        "The island elite always triumph in paradise!\"",
-        "Ohio, Florida, and 270 electoral votes say VETO!\"",
-        "How's that for hope and change, Chicago?!\""
+    const char* winLine2[CHARACTER_COUNT][4] = {
+        {
+            "That was the greatest knockout in history!\"",
+            "knockout they've ever seen. Bigly!\"",
+            "has to admit you got completely schlonged!\"",
+            "pay for the whole thing on the canvas!\""
+        },
+        {
+            "been sentenced to the canvas. Case closed!\"",
+            "your defense completely unconstitutional!\"",
+            "and there are zero dissents on your KO!\"",
+            "overturned with extreme prejudice!\""
+        },
+        {
+            "Take that sob story back to the nosebleeds!\"",
+            "straight from the heartland, pal!\"",
+            "working-class overtime fury!\"",
+            "a red-blooded American haymaker!\""
+        },
+        {
+            "Better hire a crisis PR firm, pal!\"",
+            "while I swept you out of office!\"",
+            "The focus groups loved that roundhouse!\"",
+            "two things you just couldn't veto!\""
+        },
+        {
+            "your win probability was exactly 0.00%!\"",
+            "accelerating directly into your face!\"",
+            "fatal blue-screen error!\"",
+            "your teeth into low Earth orbit!\""
+        },
+        {
+            "and I'm not yielding today, youngster!\"",
+            "officially adjourned until next Tuesday!\"",
+            "amateurs in this chamber!\"",
+            "omnibus bill over your unconscious body!\""
+        },
+        {
+            "dropkicked your agenda into next week!\"",
+            "the talons, pal! E Pluribus Unum!\"",
+            "Consider your campaign endangered!\"",
+            "Taste the wings of liberty!\""
+        },
+        {
+            "to my viral livestream highlight reel!\"",
+            "and subscribe to my knockout channel!\"",
+            "per second! Hashtag VETOED!\"",
+            "got ratio'd into the shadow realm!\""
+        },
+        {
+            "Now if you'll excuse me, it's naptime... Zzz...\"",
+            "One scoop of chocolate chip, two scoops of KO!\"",
+            "Secret Service, clear the runway!\"",
+            "than you did in that round, kiddo!\""
+        },
+        {
+            "WWG1WGA! YOU CAN'T HANDLE THE RAW TRUTH!\"",
+            "GLASS JAW RIGHT NOW!\"",
+            "OVER YOUR WHOLE CAMPAIGN!\"",
+            "POINT OF PERSONAL PRIVILEGE: YOU LOST!\""
+        },
+        {
+            "Drink some raw tonic and accept your defeat!\"",
+            "raw unpasteurized milk can't cure!\"",
+            "to countering every punch you threw!\"",
+            "Veto prescription!\""
+        },
+        {
+            "the Pentagon's highest caliber firepower!\"",
+            "your entire diplomatic strategy!\"",
+            "spent on pure titanium knuckles!\"",
+            "peace treaty has been terminated!\""
+        },
+        {
+            "Spread the joy and feel the progressive burn!\"",
+            "one organic apple at a time!\"",
+            "everyone in the five boroughs!\"",
+            "coalition just vetoed your career!\""
+        },
+        {
+            "Your loss was wiped from my private server!\"",
+            "And right now, it means you're flat out!\"",
+            "33,000 punches and you missed 'em all!\"",
+            "entire health bar with BleachBit!\""
+        },
+        {
+            "The island elite always triumph in paradise!\"",
+            "logs are sealed and the knockouts are final!\"",
+            "you never stood a chance against the cabal!\"",
+            "security, toss this tourist in the ocean!\""
+        },
+        {
+            "Ohio, Florida, and 270 electoral votes say VETO!\"",
+            "precincts swung 100% in favor of your KO!\"",
+            "County—yep, you're mathematically eliminated!\"",
+            "your chin! That's the ballgame, folks!\""
+        },
+        {
+            "How's that for hope and change, Chicago?!\"",
+            "just sent your ankles to Wrigleyville!\"",
+            "perimeter defense before stepping on my court!\"",
+            "House lawn, that's what I call a mandate!\""
+        }
     };
 
-    DrawPixelText(line1[winnerChar], boxX + 10, boxY + 20, 8, Color{ 240, 245, 255, 255 });
-    DrawPixelText(line2[winnerChar], boxX + 10, boxY + 34, 8, Color{ 240, 245, 255, 255 });
+    const char* loseQuip[CHARACTER_COUNT][4] = {
+        { "RIGGED! STOP THE COUNT!", "I DEMAND A RECOUNT!", "FAKE NEWS REFEREE!", "MY TIE WAS IN MY EYES!" },
+        { "I RESPECTFULLY DISSENT...", "UNCONSTITUTIONAL PUNCH!", "WHERE IS MY BAILIFF?!", "MISTRIAL! MISTRIAL!" },
+        { "MUH TRUCKER HAT...", "THEY TOOK MY TEETH!", "CALL UNION LOCAL 404...", "REF WAS PAID OFF!" },
+        { "NOT THE HAIR! ANYTHING BUT THE HAIR!", "CALL MY PRESS SECRETARY...", "POLL NUMBERS CRASHING...", "MY VENEERS!" },
+        { "404: CONSCIOUSNESS NOT FOUND...", "REBOOTING NEURAL LINK...", "BLAME THE ALGORITHM...", "MY STOCK JUST TANKED!" },
+        { "I STILL... DO NOT... YIELD...", "SOMEBODY GET MY READING GLASSES...", "STRIKE THAT FROM THE RECORD...", "OUT OF ORDER..." },
+        { "*SAD EAGLE WHIMPER*", "MY FEATHERS ARE RUFFLED...", "CLIPPED IN MID-AIR...", "ENDANGERED SPECIES ABUSE!" },
+        { "DON'T POST THIS CLIP...", "STREAM SNIPED! LAGGING!", "UNSUBSCRIBED FROM CONSCIOUSNESS...", "CHAT, IS THIS REAL?!" },
+        { "WHERE'S MY ICE CREAM...?", "WAKE ME UP IN 2028... ZZZ...", "COME ON, MAN...", "CORN POP HITS SOFTER..." },
+        { "JEWISH SPACE LASERS BLINDED ME!", "THIS IS A DEEP STATE SETUP!", "MY NOSE BAND-AID FELL OFF!", "POINT OF ORDER! OUCH!" },
+        { "THE WORM NEEDS A NAP...", "NEED MORE RAW MILK...", "MY FALCON FLEW AWAY...", "BRAIN FOG CRITICAL..." },
+        { "NEED MORE T-REFILLS...", "RETREAT TO THE BUNKER...", "DEFENSE BUDGET DEPLETED...", "MEDIC! MEDIC!" },
+        { "SEIZE SOME ICE PACKS...", "MY ORGANIC GROCERIES SPILLED!", "SUBWAY DELAYED MY BLOCK...", "TAX THE WINNER!" },
+        { "WIPE THIS MATCH WITH A CLOTH...", "BILL! DO SOMETHING! / HILLARY! HELP!", "MY LAPTOP SCREEN CRACKED!", "VAST RIGHT-WING HAYMAKER!" },
+        { "SPILLED MY ADRENOCHROME...", "GET THE SUBMARINE READY...", "DELETE THE FLIGHT LOGS...", "MY AVIATORS ARE SHATTERED!" },
+        { "WAIT! CHECK FLORIDA AGAIN!", "MY WHITEBOARD MARKER DRIED UP!", "THE EXIT POLLS WERE WRONG!", "KARL'S GLASSES ARE BROKEN!" },
+        { "CLANGED OFF THE BACK RIM...", "UHH... LET ME ICE MY JAW...", "FOUL! THAT WAS A CHARGING FOUL!", "MICHELLE, GET THE ICE PACK..." }
+    };
+
+    int wVar = s_quoteVariant & 3;
+    int lVar = s_loserVariant & 3;
+    DrawPixelText(winLine1[winnerChar][wVar], boxX + 10, boxY + 18, 8, Color{ 240, 245, 255, 255 });
+    DrawPixelText(winLine2[winnerChar][wVar], boxX + 10, boxY + 30, 8, Color{ 240, 245, 255, 255 });
+
+    char loserLine[128];
+    snprintf(loserLine, sizeof(loserLine), "[%s]: \"%s\"", rosterNames[loserChar], loseQuip[loserChar][lVar]);
+    DrawPixelText(loserLine, boxX + 10, boxY + 42, 7, Color{ 255, 155, 155, 240 });
 
     if (((int)(timer * 3.0f) % 2) == 0) {
         int cw = MeasureText("PRESS ANY BUTTON TO ADVANCE", 8);
@@ -8747,8 +8671,6 @@ void VisualsEngine::DrawPauseOverlay(float timer) {
         DrawPixelText(hint, (SCREEN_WIDTH - hw) / 2, boxY + 29, 7, Color{ 200, 235, 255, 240 });
     }
 }
-
-// --- AIController.cpp ---
 #include <cmath>
 #include <cstdlib>
 #include <algorithm>
@@ -9053,8 +8975,6 @@ void AIController::Update(InputManager& input, const Fighter& cpu, const Fighter
 
     input.UpdateSimulated(m_simInput, facingRight);
 }
-
-// --- main.cpp ---
 #include "rlgl.h"
 #include <memory>
 #include <vector>
@@ -9190,18 +9110,19 @@ int main(int argc, char* argv[]) {
     bool bonusStagePlayed = false;
     bool playerLocked = false;
     bool choosingOpponent = false;
+    bool opponentLocked = false;
 
     static const StageId homeStages[PLAYABLE_CHARACTER_COUNT] = {
         STAGE_WHITE_HOUSE_MMA,
         STAGE_CONGRESSIONAL_FLOOR,
         STAGE_DEMOLISHED_EAST_WING,
         STAGE_REFLECTING_POOL,
-        STAGE_REFLECTING_POOL,
+        STAGE_SMITHSONIAN_AERO,
         STAGE_CONGRESSIONAL_FLOOR,
-        STAGE_WHITE_HOUSE_MMA,
-        STAGE_DEMOLISHED_EAST_WING,
-        STAGE_REFLECTING_POOL,
-        STAGE_CONGRESSIONAL_FLOOR
+        STAGE_LINCOLN_MEMORIAL,
+        STAGE_LINCOLN_MEMORIAL,
+        STAGE_TOMB_UNKNOWN,
+        STAGE_DEMOLISHED_EAST_WING
     };
 
     auto CountDefeatedOriginals = [&]() -> int {
@@ -9214,7 +9135,6 @@ int main(int argc, char* argv[]) {
         return count;
     };
 
-    static StageId s_lastRandomStage = STAGE_COUNT;
     auto GetStageForOpponent = [&](CharacterId opp) -> StageId {
         if (opp == CHAR_SUCKRATERY_RKF) return STAGE_PRESS_BRIEFING;
         if (opp == CHAR_THE_PUNDIT) return STAGE_ENN_NEWS_STUDIO;
@@ -9223,27 +9143,9 @@ int main(int argc, char* argv[]) {
         if (opp == CHAR_A_NEW_HOPE) return STAGE_CHICAGO_WRIGLEY;
         if (opp == CHAR_BILLARY) return STAGE_COMET_PING_PONG;
         if (opp == CHAR_PALM_BEACH_PETE) return STAGE_FLORIDA_KEYS;
-        static const StageId randomStagePool[10] = {
-            STAGE_LINCOLN_MEMORIAL,
-            STAGE_SMITHSONIAN_AERO,
-            STAGE_TOMB_UNKNOWN,
-            STAGE_LINCOLN_MEMORIAL,
-            STAGE_SMITHSONIAN_AERO,
-            STAGE_TOMB_UNKNOWN,
-            STAGE_DEMOLISHED_EAST_WING,
-            STAGE_REFLECTING_POOL,
-            STAGE_CONGRESSIONAL_FLOOR,
-            STAGE_WHITE_HOUSE_MMA
-        };
-        StageId picked = randomStagePool[std::rand() % 10];
-        for (int tries = 0; tries < 6 && picked == s_lastRandomStage; tries++) {
-            picked = randomStagePool[std::rand() % 10];
-        }
-        s_lastRandomStage = picked;
-        return picked;
+        if ((int)opp >= 0 && (int)opp < PLAYABLE_CHARACTER_COUNT) return homeStages[(int)opp];
+        return STAGE_DEMOLISHED_EAST_WING;
     };
-    currentStage = GetStageForOpponent(p2CharId);
-    stageMgr.SetStage(currentStage);
 
     auto PickNextAvailableOpponent = [&](int startIdx) -> CharacterId {
         int origDefeated = CountDefeatedOriginals();
@@ -9336,22 +9238,6 @@ int main(int argc, char* argv[]) {
                         killRequested = true;
                         break;
                     }
-
-                    const char* padName = GetGamepadName(pad);
-                    if (padName) {
-                        std::string nameLower = padName;
-                        for (char& c : nameLower) c = (char)tolower((unsigned char)c);
-                        if (nameLower.find("anbernic") != std::string::npos ||
-                            nameLower.find("retrogame") != std::string::npos ||
-                            nameLower.find("opensim") != std::string::npos ||
-                            nameLower.find("go-advance") != std::string::npos) {
-                            if (IsGamepadButtonPressed(pad, 8) || IsGamepadButtonDown(pad, 8) ||
-                                IsGamepadButtonPressed(pad, 10) || IsGamepadButtonDown(pad, 10)) {
-                                killRequested = true;
-                                break;
-                            }
-                        }
-                    }
                 }
             }
 
@@ -9426,10 +9312,12 @@ int main(int argc, char* argv[]) {
                     continuesRemaining = 2;
                     ChampionshipEdition::s_continuesRemaining = 2;
                     playerLocked = false;
+                    opponentLocked = false;
+                    ChampionshipEdition::s_opponentLocked = false;
                     choosingOpponent = false;
                     p1CharId = CHAR_COMMANDER;
                     p2CharId = PickNextAvailableOpponent(1);
-                    currentStage = GetStageForOpponent(p1CharId);
+                    currentStage = homeStages[(int)p1CharId];
                     stageMgr.SetStage(currentStage);
                     stateTimer = 0.0f;
                 }
@@ -9439,10 +9327,13 @@ int main(int argc, char* argv[]) {
 
         case STATE_SELECT_MAP: {
             inputP1.Update(0, true);
+            ChampionshipEdition::s_opponentLocked = opponentLocked;
 
             int origDefeated = CountDefeatedOriginals();
 
             if (defeatedFighters[CHAR_WAR_PIG]) {
+                opponentLocked = true;
+                ChampionshipEdition::s_opponentLocked = true;
                 if (!defeatedFighters[CHAR_SOCIALIST]) {
                     p2CharId = CHAR_SOCIALIST;
                     currentStage = STAGE_WTC_PLAZA;
@@ -9456,7 +9347,6 @@ int main(int argc, char* argv[]) {
                     p2CharId = CHAR_PALM_BEACH_PETE;
                     currentStage = STAGE_FLORIDA_KEYS;
                 } else {
-
                     if (p1CharId == CHAR_COMMANDER && !isSecretMode) {
                         gameState = STATE_CTHULHU_ENDING;
                         stateTimer = 0.0f;
@@ -9472,6 +9362,8 @@ int main(int argc, char* argv[]) {
                 }
                 stageMgr.SetStage(currentStage);
             } else if (origDefeated >= 9) {
+                opponentLocked = true;
+                ChampionshipEdition::s_opponentLocked = true;
                 if (!defeatedFighters[CHAR_SUCKRATERY_RKF]) {
                     p2CharId = CHAR_SUCKRATERY_RKF;
                     currentStage = STAGE_PRESS_BRIEFING;
@@ -9482,14 +9374,12 @@ int main(int argc, char* argv[]) {
                     p2CharId = CHAR_WAR_PIG;
                     currentStage = STAGE_PENTAGON_ALTAR;
                 } else {
-
                     gameState = STATE_MATCH_OVER;
                     stateTimer = 0.0f;
                     break;
                 }
                 stageMgr.SetStage(currentStage);
             } else if (!playerLocked) {
-
                 int p1Col = (int)p1CharId % 5;
                 int p1Row = (int)p1CharId / 5;
                 bool p1Changed = false;
@@ -9510,13 +9400,13 @@ int main(int argc, char* argv[]) {
 
                 if (p1Changed) {
                     p1CharId = (CharacterId)(p1Row * 5 + p1Col);
-
-                    currentStage = GetStageForOpponent(p1CharId);
+                    currentStage = homeStages[(int)p1CharId];
                     stageMgr.SetStage(currentStage);
                     AudioEngine::Instance().PlaySfx(SFX_SELECT_CURSOR);
                 }
             } else {
-
+                opponentLocked = false;
+                ChampionshipEdition::s_opponentLocked = false;
                 bool p2Changed = false;
 
                 if (IsKeyPressed(KEY_RIGHT) || IsKeyPressed(KEY_D) || inputP1.IsRightPressed()) {
@@ -9558,6 +9448,27 @@ int main(int argc, char* argv[]) {
                     currentStage = GetStageForOpponent(p2CharId);
                     stageMgr.SetStage(currentStage);
                     AudioEngine::Instance().PlaySfx(SFX_SELECT_CURSOR);
+                } else if (inputP1.IsButtonPressed(BTN_TAUNT) || inputP1.IsButtonPressed(BTN_SPECIAL)) {
+                    static const StageId normalStages[7] = {
+                        STAGE_DEMOLISHED_EAST_WING,
+                        STAGE_REFLECTING_POOL,
+                        STAGE_CONGRESSIONAL_FLOOR,
+                        STAGE_WHITE_HOUSE_MMA,
+                        STAGE_LINCOLN_MEMORIAL,
+                        STAGE_SMITHSONIAN_AERO,
+                        STAGE_TOMB_UNKNOWN
+                    };
+                    int curIdx = 0;
+                    for (int k = 0; k < 7; k++) {
+                        if (normalStages[k] == currentStage) {
+                            curIdx = k;
+                            break;
+                        }
+                    }
+                    curIdx = inputP1.IsButtonPressed(BTN_SPECIAL) ? ((curIdx + 1) % 7) : ((curIdx + 6) % 7);
+                    currentStage = normalStages[curIdx];
+                    stageMgr.SetStage(currentStage);
+                    AudioEngine::Instance().PlaySfx(SFX_SELECT_CURSOR);
                 }
             }
 
@@ -9582,14 +9493,27 @@ int main(int argc, char* argv[]) {
             }
 
             bool canConfirm = (stateTimer >= 0.25f);
+            bool padConfirm = false;
+            for (int pad = 0; pad < 4; pad++) {
+                if (!IsGamepadAvailable(pad)) continue;
+                if (IsGamepadButtonPressed(pad, GAMEPAD_BUTTON_MIDDLE_RIGHT) ||
+                    IsGamepadButtonPressed(pad, GAMEPAD_BUTTON_RIGHT_FACE_DOWN) ||
+                    IsGamepadButtonPressed(pad, GAMEPAD_BUTTON_RIGHT_FACE_RIGHT) ||
+                    IsGamepadButtonPressed(pad, GAMEPAD_BUTTON_RIGHT_FACE_LEFT) ||
+                    IsGamepadButtonPressed(pad, GAMEPAD_BUTTON_RIGHT_FACE_UP)) {
+                    padConfirm = true;
+                    break;
+                }
+            }
 
-            if (canConfirm && (inputP1.IsButtonPressed(BTN_START) || inputP1.IsButtonPressed(BTN_LP) ||
+            if (canConfirm && (padConfirm || inputP1.IsButtonPressed(BTN_START) || inputP1.IsButtonPressed(BTN_LP) ||
                 inputP1.IsButtonPressed(BTN_HP) || inputP1.IsButtonPressed(BTN_LK) ||
                 inputP1.IsButtonPressed(BTN_HK) || IsKeyPressed(KEY_ENTER) || IsKeyPressed(KEY_SPACE))) {
 
                 if (!playerLocked) {
-
                     playerLocked = true;
+                    opponentLocked = false;
+                    ChampionshipEdition::s_opponentLocked = false;
                     choosingOpponent = true;
                     p2CharId = PickNextAvailableOpponent((int)p1CharId + 1);
                     currentStage = GetStageForOpponent(p2CharId);
@@ -9597,11 +9521,14 @@ int main(int argc, char* argv[]) {
                     AudioEngine::Instance().PlaySfx(SFX_SELECT_CONFIRM);
                     stateTimer = 0.0f;
                 } else {
-
                     AudioEngine::Instance().PlaySfx(SFX_SELECT_CONFIRM);
 
-                    currentStage = GetStageForOpponent(p2CharId);
+                    if (defeatedFighters[CHAR_WAR_PIG] || origDefeated >= 9) {
+                        currentStage = GetStageForOpponent(p2CharId);
+                    }
                     stageMgr.SetStage(currentStage);
+                    opponentLocked = false;
+                    ChampionshipEdition::s_opponentLocked = false;
 
                     cpuAI.SetDifficulty((p2CharId == CHAR_WAR_PIG || p2CharId == CHAR_PALM_BEACH_PETE) ? AI_DIFF_HARD : AI_DIFF_NORMAL);
                     cpuAI.Reset();
@@ -9860,13 +9787,15 @@ int main(int argc, char* argv[]) {
                 matchEndTimer += dt;
                 p1->UpdatePhysics(inputP1, *p2);
                 p2->UpdatePhysics(inputP2, *p1);
+                ChampionshipEdition::UpdateAndTrackFighters(*p1, *p2);
 
                 if (matchEndTimer >= 1.5f) {
 
-                    int roundsNeeded = (p2CharId == CHAR_WAR_PIG || p2CharId == CHAR_PALM_BEACH_PETE) ? 1 : 2;
-                    if (p1->GetRoundsWon() >= roundsNeeded || p2->GetRoundsWon() >= roundsNeeded) {
+                    int p1RoundsNeeded = (p2CharId == CHAR_WAR_PIG || p2CharId == CHAR_PALM_BEACH_PETE) ? 1 : 2;
+                    int p2RoundsNeeded = 2;
+                    if (p1->GetRoundsWon() >= p1RoundsNeeded || p2->GetRoundsWon() >= p2RoundsNeeded) {
                         stateTimer = 0.0f;
-                        if (p1->GetRoundsWon() >= roundsNeeded) {
+                        if (p1->GetRoundsWon() >= p1RoundsNeeded) {
                             if (!isSecretMode) {
                                 matchesWon++;
                                 defeatedFighters[(int)p2CharId] = true;
@@ -9926,10 +9855,28 @@ int main(int argc, char* argv[]) {
 
         case STATE_VICTORY_SPLASH: {
             inputP1.Update(0, true);
-            if (stateTimer >= 6.0f || IsKeyPressed(KEY_ENTER) || IsKeyPressed(KEY_SPACE) ||
-                inputP1.IsButtonPressed(BTN_START) || inputP1.IsButtonPressed(BTN_LP) ||
-                inputP1.IsButtonPressed(BTN_HP) || inputP1.IsButtonPressed(BTN_LK) ||
-                inputP1.IsButtonPressed(BTN_HK)) {
+            bool padConfirm = false;
+            for (int pad = 0; pad < 4; pad++) {
+                if (!IsGamepadAvailable(pad)) continue;
+                if (IsGamepadButtonPressed(pad, GAMEPAD_BUTTON_MIDDLE_RIGHT) ||
+                    IsGamepadButtonPressed(pad, GAMEPAD_BUTTON_RIGHT_FACE_DOWN) ||
+                    IsGamepadButtonPressed(pad, GAMEPAD_BUTTON_RIGHT_FACE_RIGHT) ||
+                    IsGamepadButtonPressed(pad, GAMEPAD_BUTTON_RIGHT_FACE_LEFT) ||
+                    IsGamepadButtonPressed(pad, GAMEPAD_BUTTON_RIGHT_FACE_UP) ||
+                    IsGamepadButtonPressed(pad, GAMEPAD_BUTTON_LEFT_TRIGGER_1) ||
+                    IsGamepadButtonPressed(pad, GAMEPAD_BUTTON_RIGHT_TRIGGER_1)) {
+                    padConfirm = true;
+                    break;
+                }
+            }
+            bool wantAdvance = (stateTimer >= 6.0f) ||
+                (stateTimer >= 0.40f && (padConfirm ||
+                 IsKeyPressed(KEY_ENTER) || IsKeyPressed(KEY_SPACE) ||
+                 inputP1.IsButtonPressed(BTN_START) || inputP1.IsButtonPressed(BTN_LP) ||
+                 inputP1.IsButtonPressed(BTN_HP) || inputP1.IsButtonPressed(BTN_LK) ||
+                 inputP1.IsButtonPressed(BTN_HK) || inputP1.IsButtonPressed(BTN_SPECIAL) ||
+                 inputP1.IsButtonPressed(BTN_TAUNT)));
+            if (wantAdvance) {
 
                 if (isSecretMode) {
                     gameState = STATE_SECRET_SELECT;
@@ -9965,6 +9912,8 @@ int main(int argc, char* argv[]) {
                         AudioEngine::Instance().PlaySfx(SFX_JESUS_FANFARE);
                     }
                 } else {
+                    opponentLocked = false;
+                    ChampionshipEdition::s_opponentLocked = false;
                     p2CharId = PickNextAvailableOpponent((int)p2CharId + 1);
                     currentStage = GetStageForOpponent(p2CharId);
                     stageMgr.SetStage(currentStage);
@@ -10061,6 +10010,8 @@ int main(int argc, char* argv[]) {
                 p1->UpdatePhysics(inputP1, carDummy);
 
                 if (bonusPostTimer >= 2.0f) {
+                    opponentLocked = false;
+                    ChampionshipEdition::s_opponentLocked = false;
                     p2CharId = PickNextAvailableOpponent((int)p2CharId + 1);
                     currentStage = GetStageForOpponent(p2CharId);
                     stageMgr.SetStage(currentStage);
@@ -10102,7 +10053,6 @@ int main(int argc, char* argv[]) {
             }
 
             if (continuesRemaining > 0) {
-                // Player has Continues left (up to 2 continues after being Veto'd)
                 if (actionPressed && stateTimer >= 0.35f) {
                     continuesRemaining--;
                     ChampionshipEdition::s_continuesRemaining = continuesRemaining;
@@ -10120,12 +10070,13 @@ int main(int argc, char* argv[]) {
                     break;
                 }
                 if (stateTimer >= 10.0f) {
-                    // Countdown expired -> Start Over
                     continuesRemaining = 2;
                     ChampionshipEdition::s_continuesRemaining = 2;
                     matchesWon = 0;
                     bonusStagePlayed = false;
                     playerLocked = false;
+                    opponentLocked = false;
+                    ChampionshipEdition::s_opponentLocked = false;
                     choosingOpponent = false;
                     for (int i = 0; i < CHARACTER_COUNT; i++) defeatedFighters[i] = false;
 
@@ -10138,13 +10089,14 @@ int main(int argc, char* argv[]) {
                     AudioEngine::Instance().SetBgmTrack(0);
                 }
             } else {
-                // 3rd time Veto'd (0 continues left) -> Must Start Over!
                 if (stateTimer >= 5.0f || (actionPressed && stateTimer >= 0.35f)) {
                     continuesRemaining = 2;
                     ChampionshipEdition::s_continuesRemaining = 2;
                     matchesWon = 0;
                     bonusStagePlayed = false;
                     playerLocked = false;
+                    opponentLocked = false;
+                    ChampionshipEdition::s_opponentLocked = false;
                     choosingOpponent = false;
                     for (int i = 0; i < CHARACTER_COUNT; i++) defeatedFighters[i] = false;
 
@@ -10173,7 +10125,7 @@ int main(int argc, char* argv[]) {
 
                 p1CharId = CHAR_COMMANDER;
                 p2CharId = PickNextAvailableOpponent(1);
-                currentStage = GetStageForOpponent(p2CharId);
+                currentStage = homeStages[(int)p2CharId];
                 stageMgr.SetStage(currentStage);
                 gameState = STATE_SPLASH;
                 stateTimer = 0.0f;
@@ -10207,12 +10159,14 @@ int main(int argc, char* argv[]) {
                     matchesWon = 0;
                     bonusStagePlayed = false;
                     playerLocked = false;
+                    opponentLocked = false;
+                    ChampionshipEdition::s_opponentLocked = false;
                     choosingOpponent = false;
                     for (int i = 0; i < CHARACTER_COUNT; i++) defeatedFighters[i] = false;
 
                     p1CharId = CHAR_COMMANDER;
                     p2CharId = PickNextAvailableOpponent(1);
-                    currentStage = GetStageForOpponent(p2CharId);
+                    currentStage = homeStages[(int)p2CharId];
                     stageMgr.SetStage(currentStage);
                     gameState = STATE_SPLASH;
                     stateTimer = 0.0f;
@@ -10251,7 +10205,8 @@ int main(int argc, char* argv[]) {
             break;
         }
         case STATE_VICTORY_SPLASH: {
-            int winnerChar = (p1 && p2 && p2->GetRoundsWon() > p1->GetRoundsWon()) ? (int)p2CharId : (int)p1CharId;
+            int p1RoundsToWin = (p2CharId == CHAR_WAR_PIG || p2CharId == CHAR_PALM_BEACH_PETE) ? 1 : 2;
+            int winnerChar = (p1 && p1->GetRoundsWon() >= p1RoundsToWin) ? (int)p1CharId : (int)p2CharId;
             int loserChar = (winnerChar == (int)p1CharId) ? (int)p2CharId : (int)p1CharId;
             VisualsEngine::DrawVictorySplash(winnerChar, loserChar, stateTimer);
             break;
@@ -10331,7 +10286,7 @@ int main(int argc, char* argv[]) {
             VisualsEngine::DrawFighterSprite(*p2);
             rlPopMatrix();
 
-            int roundsToWin = (p2CharId == CHAR_WAR_PIG) ? 1 : 2;
+            int roundsToWin = (p2CharId == CHAR_WAR_PIG || p2CharId == CHAR_PALM_BEACH_PETE) ? 1 : 2;
             const Fighter& winner = (p1->GetRoundsWon() >= roundsToWin) ? *p1 : *p2;
             VisualsEngine::DrawMatchOver(winner, stateTimer);
             break;
@@ -10368,16 +10323,6 @@ int main(int argc, char* argv[]) {
             DrawTexturePro(screenTarget.texture, srcRec, dstRec, Vector2{ 0.0f, 0.0f }, 0.0f, WHITE);
         }
 
-        DrawText(ChampionshipEdition::s_debugHitboxes ? "[F1: BOXES ON] [F2: CRT] [F3: 12-PART RIG]" : "[F1: DEBUG BOXES] [F2: CRT] [F3: 12-PART RIG]", 10, 8, 12, Color{ 140, 220, 180, 220 });
-
-        char padStatus[96];
-        if (InputManager::IsGamepadActive()) {
-            snprintf(padStatus, sizeof(padStatus), "[PAD: %.26s]", InputManager::GetActiveControllerName(0));
-            DrawText(padStatus, 140, 8, 12, Color{ 80, 240, 140, 240 });
-        } else {
-            DrawText("[PAD: KEYBOARD (CONNECT GAMEPAD)]", 140, 8, 12, Color{ 180, 180, 195, 200 });
-        }
-
         rlDrawRenderBatchActive();
 
         EndDrawing();
@@ -10394,4 +10339,3 @@ int main(int argc, char* argv[]) {
 
     return 0;
 }
-
