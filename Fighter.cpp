@@ -593,6 +593,11 @@ void Fighter::ExecuteSpecial(SpecialMotionType motion, int buttonUsed, const Fig
         break;
     }
 
+    if (m_tauntTimer <= 0) {
+        m_activeTaunt = GetTauntQuote();
+        m_tauntTimer = 60;
+    }
+
     m_currentAttack.isSpecial = true;
     m_currentAttack.moveType = MOVE_SPECIAL;
 }
@@ -718,20 +723,7 @@ void Fighter::TriggerTaunt() {
 }
 
 bool Fighter::HasSpeechTaunt() const {
-    switch (m_charId) {
-    case CHAR_HIGH_BENCH:
-    case CHAR_COASTAL_GOV:
-    case CHAR_POPULIST:
-    case CHAR_WAR_PIG:
-    case CHAR_BILLARY:
-    case CHAR_SLEEPY_JOE:
-    case CHAR_MTG:
-    case CHAR_THE_PUNDIT:
-    case CHAR_A_NEW_HOPE:
-        return true;
-    default:
-        return false;
-    }
+    return true;
 }
 
 const char* Fighter::GetTauntQuote() const {
@@ -746,6 +738,14 @@ const char* Fighter::GetTauntQuote() const {
     case CHAR_COASTAL_GOV:      return "TOO EASY!";
     case CHAR_POPULIST:         return "SMILE! :)";
     case CHAR_WAR_PIG:          return "BRING IT!";
+    case CHAR_COMMANDER:        return "YOU'RE VETOED!";
+    case CHAR_REDCAP:           return "HOLD THE LINE!";
+    case CHAR_TECH_VISIONARY:   return "TO THE MOON!";
+    case CHAR_FILIBUSTER:       return "I YIELD NOTHING!";
+    case CHAR_MASCOT:           return "SCREEEECH!";
+    case CHAR_SUCKRATERY_RKF:   return "BRAIN WORM POWER!";
+    case CHAR_SOCIALIST:        return "TAX THE BILLIONAIRES!";
+    case CHAR_PALM_BEACH_PETE:  return "WELCOME TO MY ISLAND!";
     case CHAR_BILLARY:          return m_facingRight ? "OH YEAH!" : "DELETED!";
     case CHAR_THE_PUNDIT:       return (rand() % 2 == 0) ? "DECISION 2028: 270!" : "CHECK THE WHITEBOARD!";
     case CHAR_A_NEW_HOPE:       return "How's that for hope and change?";

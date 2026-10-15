@@ -485,10 +485,7 @@ void AudioEngine::SynthesizeAll() {
         pcm.insert(pcm.end(), (int)(SAMPLE_RATE * 0.020f), 0);
         pcm.insert(pcm.end(), v2.begin(), v2.end());
         m_sounds[SFX_VOICE_BOO_YAA] = BuildWaveformSound(SAMPLE_RATE, (int)pcm.size(), pcm.data());
-    }
-
-    {
-        m_sounds[SFX_ROUND_WIN] = m_sounds[SFX_VOICE_BOO_YAA];
+        m_sounds[SFX_ROUND_WIN] = BuildWaveformSound(SAMPLE_RATE, (int)pcm.size(), pcm.data());
     }
 
     {
@@ -1120,6 +1117,7 @@ void AudioEngine::PlaySfx(SfxId id, float pitch, float volume) {
 }
 
 void AudioEngine::SetBgmTrack(int trackId) {
+    SetCriticalTempo(false);
     if (s_currentTrack.load(std::memory_order_relaxed) != trackId) {
         s_trackPlayhead.store(0, std::memory_order_relaxed);
         s_currentTrack.store(trackId, std::memory_order_release);
@@ -1127,6 +1125,7 @@ void AudioEngine::SetBgmTrack(int trackId) {
 }
 
 void AudioEngine::StopBgm() {
+    SetCriticalTempo(false);
     s_currentTrack.store(-1, std::memory_order_release);
     s_trackPlayhead.store(0, std::memory_order_relaxed);
 }

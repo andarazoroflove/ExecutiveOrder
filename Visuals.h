@@ -1,5 +1,6 @@
 #pragma once
 #include "Common.h"
+#include "AssetManager.h"
 #include "Fighter.h"
 #include "Collision.h"
 #include "Stages.h"
@@ -246,14 +247,146 @@ inline void SpawnImpactJuice(Vector2 pos, bool heavy, bool isSpecial, const char
     }
     if (stampText != nullptr && stampText[0] != '\0') {
         CEStamp st{};
-        st.pos = Vector2{ pos.x, pos.y - 20.0f };
+        st.pos = pos;
         st.text = stampText;
         st.color = isSpecial ? Color{ 255, 55, 55, 255 } : Color{ 255, 220, 40, 255 };
         st.frame = 0;
-        st.maxFrames = 34;
+        st.maxFrames = 24;
         st.alive = true;
         s_stamps.push_back(st);
     }
+}
+
+inline void DrawComicThoughtBubble(const char* text, int centerX, int bottomY, int tailTargetX, int tailTargetY, int fontSize, Color textCol, Color cloudCol = Color{ 255, 255, 248, 238 }) {
+    if (!text || text[0] == '\0') return;
+    int tw = MeasureText(text, fontSize);
+    int padX = 5;
+    int padY = 3;
+    int halfW = tw / 2 + padX;
+    int halfH = fontSize / 2 + padY;
+
+    int cx = std::clamp(centerX, (int)STAGE_MIN_X + halfW, (int)STAGE_MAX_X - halfW);
+    int cy = std::clamp(bottomY - halfH, 16 + halfH, (int)GROUND_Y - 24);
+
+    int numTop = std::max(4, (tw + 10) / 8);
+    Color outlineCol{ 18, 22, 34, 245 };
+    Color shadowCol{ 0, 0, 0, 70 };
+
+    auto drawCloudPass = [&](int ox, int oy, float rGrow, Color col) {
+        DrawRectangle(cx - halfW + 3 + ox, cy - halfH + 2 + oy, (halfW - 3) * 2, (halfH - 2) * 2, col);
+        DrawCircle(cx - halfW + 3 + ox, cy + oy, (float)halfH - 0.5f + rGrow, col);
+        DrawCircle(cx + halfW - 3 + ox, cy + oy, (float)halfH - 0.5f + rGrow, col);
+        for (int i = 0; i < numTop; i++) {
+            float t = (numTop == 1) ? 0.5f : (float)i / (float)(numTop - 1);
+            float lx = (cx - halfW + 4) + t * ((halfW - 4) * 2.0f);
+            float arch = sinf(t * PI_F) * 1.6f;
+            float rTop = ((i % 2 == 0) ? (halfH * 0.68f) : (halfH * 0.78f)) + rGrow;
+            float rBot = ((i % 2 == 1) ? (halfH * 0.64f) : (halfH * 0.74f)) + rGrow;
+            DrawCircle((int)lx + ox, (int)(cy - halfH + 2 - arch) + oy, rTop, col);
+            DrawCircle((int)lx + ox, (int)(cy + halfH - 2 + arch * 0.6f) + oy, rBot, col);
+        }
+    };
+
+    drawCloudPass(1, 1, 1.1f, shadowCol);
+    drawCloudPass(0, 0, 1.2f, outlineCol);
+    drawCloudPass(0, 0, 0.0f, cloudCol);
+
+    for (int i = 0; i < numTop; i++) {
+        float t = (numTop == 1) ? 0.5f : (float)i / (float)(numTop - 1);
+        float lx = (cx - halfW + 4) + t * ((halfW - 4) * 2.0f);
+        float arch = sinf(t * PI_F) * 1.6f;
+        float rTop = (i % 2 == 0) ? (halfH * 0.48f) : (halfH * 0.56f);
+        DrawCircle((int)lx, (int)(cy - halfH + 2 - arch), rTop, WHITE);
+    }
+
+    float startX = (float)std::clamp(tailTargetX, cx - halfW + 6, cx + halfW - 6);
+    float startY = (float)(cy + halfH + 1);
+    float endX = (float)tailTargetX;
+    float endY = (float)std::max((int)startY + 4, tailTargetY);
+    float radii[3] = { 2.3f, 1.6f, 1.0f };
+    for (int p = 0; p < 3; p++) {
+        float u = (float)(p + 1) / 3.3f;
+        float px = startX + (endX - startX) * u + ((p == 1) ? 1.0f : 0.0f);
+        float py = startY + (endY - startY) * u;
+        DrawCircle((int)px + 1, (int)py + 1, radii[p] + 0.8f, shadowCol);
+        DrawCircle((int)px, (int)py, radii[p] + 1.0f, outlineCol);
+        DrawCircle((int)px, (int)py, radii[p], cloudCol);
+    }
+
+    VisualsEngine::DrawPixelText(text, cx - tw / 2, cy - fontSize / 2, fontSize, textCol);
+}
+
+inline void DrawBatmanActionBurst(const char* text, int centerX, int centerY, int fontSize, Color burstOuter, Color burstInner, Color textCol, float scale = 1.0f) {
+    if (!text || text[0] == '\0') return;
+    int tw = MeasureText(text, fontSize);
+    float rx = (tw * 0.50f + 7.5f) * scale;
+    float ry = (fontSize * 0.52f + 5.5f) * scale;
+
+    float cx = std::clamp((float)centerX, STAGE_MIN_X + rx, STAGE_MAX_X - rx);
+    float cy = std::clamp((float)centerY, ry + 18.0f, GROUND_Y - ry - 8.0f);
+
+    const int N = 16;
+    auto buildBurstPts = [&](float mult, Vector2 outPts[N]) {
+        for (int i = 0; i < N; i++) {
+            float ang = (float)i * (2.0f * PI_F / (float)N) - 0.14f;
+            bool isSpike = (i % 2 == 0);
+            float spikeBoost = isSpike ? (((i % 4 == 0) ? 1.24f : 1.12f)) : 0.68f;
+            outPts[i] = Vector2{
+                cx + cosf(ang) * rx * spikeBoost * mult,
+                cy + sinf(ang) * ry * spikeBoost * mult
+            };
+        }
+    };
+
+    auto fillStarburst = [&](float mult, Color col, float ox, float oy) {
+        Vector2 pts[N];
+        buildBurstPts(mult, pts);
+        Vector2 c{ cx + ox, cy + oy };
+        for (int i = 0; i < N; i++) {
+            Vector2 p1{ pts[i].x + ox, pts[i].y + oy };
+            Vector2 p2{ pts[(i + 1) % N].x + ox, pts[(i + 1) % N].y + oy };
+            DrawTriangle(c, p1, p2, col);
+            DrawTriangle(c, p2, p1, col);
+        }
+    };
+
+    fillStarburst(1.12f, Color{ 0, 0, 0, 95 }, 1.5f, 1.5f);
+    fillStarburst(1.13f, Color{ 12, 12, 18, 250 }, 0.0f, 0.0f);
+    fillStarburst(1.00f, burstOuter, 0.0f, 0.0f);
+    fillStarburst(0.74f, burstInner, 0.0f, 0.0f);
+
+    Vector2 outerPts[N];
+    buildBurstPts(1.01f, outerPts);
+    for (int i = 0; i < N; i++) {
+        DrawLineEx(outerPts[i], outerPts[(i + 1) % N], 1.2f, Color{ 12, 12, 18, 250 });
+    }
+
+    int tx = (int)(cx - tw * 0.5f);
+    int ty = (int)(cy - fontSize * 0.5f);
+    VisualsEngine::DrawPixelText(text, tx + 1, ty + 1, fontSize, Color{ 10, 10, 16, 255 });
+    for (int dy = -1; dy <= 1; dy++) {
+        for (int dx = -1; dx <= 1; dx++) {
+            if (dx != 0 || dy != 0) {
+                VisualsEngine::DrawPixelText(text, tx + dx, ty + dy, fontSize, Color{ 12, 12, 18, 255 });
+            }
+        }
+    }
+    VisualsEngine::DrawPixelText(text, tx, ty, fontSize, textCol);
+}
+
+inline void DrawArcade3DText(const char* text, int x, int y, int fontSize, Color topCol, Color botCol) {
+    if (!text || text[0] == '\0') return;
+    VisualsEngine::DrawPixelText(text, x + 2, y + 2, fontSize, Color{ 8, 10, 20, 245 });
+    VisualsEngine::DrawPixelText(text, x + 1, y + 2, fontSize, Color{ 8, 10, 20, 245 });
+    for (int dy = -1; dy <= 1; dy++) {
+        for (int dx = -1; dx <= 1; dx++) {
+            if (dx != 0 || dy != 0) {
+                VisualsEngine::DrawPixelText(text, x + dx, y + dy, fontSize, Color{ 14, 16, 28, 255 });
+            }
+        }
+    }
+    VisualsEngine::DrawPixelText(text, x, y + 1, fontSize, botCol);
+    VisualsEngine::DrawPixelText(text, x, y, fontSize, topCol);
 }
 
 inline void DrawLimb3Tone(Vector2 a, Vector2 b, float rA, float rB, Color baseCol) {
@@ -389,22 +522,6 @@ inline void DrawStageUpgrades(StageId stageId, float camX, float time) {
         }
     }
 
-    int gy = (int)GROUND_Y;
-    DrawLine(0, gy, SCREEN_WIDTH, gy, Color{ 255, 225, 110, 95 });
-    for (int r = 1; r <= 4; r++) {
-        int ry = gy + r * 6;
-        if (ry < SCREEN_HEIGHT) {
-            DrawLine(0, ry, SCREEN_WIDTH, ry, Color{ 255, 255, 255, (unsigned char)(18 + r * 6) });
-        }
-    }
-    float floorScroll = fmodf(-camX, 32.0f);
-    for (int i = -4; i < 18; i++) {
-        float topX = i * 32.0f + floorScroll;
-        float distFromCenter = (topX - SCREEN_WIDTH * 0.5f);
-        float botX = SCREEN_WIDTH * 0.5f + distFromCenter * 1.48f;
-        DrawLine((int)topX, gy, (int)botX, SCREEN_HEIGHT, Color{ 255, 255, 255, 32 });
-    }
-
     for (int p = 0; p < 16; p++) {
         float px = fmodf(p * 37.0f + time * (16.0f + (p % 4) * 4.0f) - camX * 0.6f + 1600.0f, (float)SCREEN_WIDTH);
         float py = fmodf(p * 23.0f + time * (18.0f + (p % 3) * 5.0f), GROUND_Y - 8.0f);
@@ -453,87 +570,118 @@ inline void DrawStageUpgrades(StageId stageId, float camX, float time) {
             DrawCircleLines(lincX, lincHandsY, 6.0f + (0.35f - clapWave) * 22.0f, Color{ 255, 235, 110, 225 });
             DrawLine(lincX - 8, lincHandsY - 5, lincX - 13, lincHandsY - 9, Color{ 255, 245, 160, 235 });
             DrawLine(lincX + 8, lincHandsY - 5, lincX + 13, lincHandsY - 9, Color{ 255, 245, 160, 235 });
-            const char* cheers[4] = { "CLAP! CLAP!", "BRAVO!", "FOUR SCORE!", "ENCORE!" };
-            const char* ch = cheers[((int)(time * 2.0f)) % 4];
-            int ctw = MeasureText(ch, 6);
-            DrawRectangle(lincX - ctw / 2 - 3, lincHeadY, ctw + 6, 9, Color{ 15, 20, 35, 225 });
-            DrawRectangleLines(lincX - ctw / 2 - 3, lincHeadY, ctw + 6, 9, Color{ 255, 220, 70, 240 });
-            VisualsEngine::DrawPixelText(ch, lincX - ctw / 2, lincHeadY + 2, 6, Color{ 255, 235, 90, 255 });
         }
     } else if (stageId == STAGE_SMITHSONIAN_AERO) {
-
-        int droneNoseX = (int)BgX(382.0f);
-        int droneNoseY = (int)BgY(148.0f);
-        int droneTailX = (int)BgX(198.0f);
-        int droneTailY = (int)BgY(122.0f);
-        float propSpan = sinf(time * 48.0f) * 8.0f;
-        DrawLine(droneTailX, droneTailY - (int)propSpan, droneTailX, droneTailY + (int)propSpan, Color{ 220, 235, 255, 210 });
         if (fmodf(time * 2.6f, 1.0f) < 0.45f) {
-            DrawCircle((int)BgX(255.0f), (int)BgY(138.0f), 2.2f, Color{ 255, 45, 45, 245 });
-            DrawCircle((int)BgX(395.0f), (int)BgY(125.0f), 2.2f, Color{ 45, 255, 90, 245 });
-        }
-        float scanX = droneNoseX + 25.0f + sinf(time * 2.2f) * 40.0f;
-        DrawLine(droneNoseX, droneNoseY, (int)scanX, (int)GROUND_Y - 8, Color{ 255, 45, 45, 70 });
-        DrawCircle((int)scanX, (int)GROUND_Y - 8, 2.5f, Color{ 255, 60, 60, 175 });
-
-        float p51Span = cosf(time * 44.0f) * 12.0f;
-        DrawLine((int)BgX(492.0f), (int)BgY(192.0f) - (int)p51Span, (int)BgX(492.0f), (int)BgY(192.0f) + (int)p51Span, Color{ 225, 235, 250, 195 });
-
-        int sallyX = (int)BgX(292.0f);
-        int sallyY = (int)BgY(320.0f);
-        int wrightX = (int)BgX(955.0f);
-        int wrightY = (int)BgY(295.0f);
-        if (fmodf(time, 3.6f) < 1.6f) {
-            int stw = MeasureText("GO SALLY!", 5);
-            DrawRectangle(sallyX - stw / 2 - 2, sallyY - 12, stw + 4, 8, Color{ 15, 35, 90, 225 });
-            DrawRectangleLines(sallyX - stw / 2 - 2, sallyY - 12, stw + 4, 8, Color{ 100, 210, 255, 230 });
-            VisualsEngine::DrawPixelText("GO SALLY!", sallyX - stw / 2, sallyY - 10, 5, Color{ 140, 235, 255, 255 });
-        } else if (fmodf(time, 3.6f) > 1.8f && fmodf(time, 3.6f) < 3.4f) {
-            int wtw = MeasureText("FIRST FLIGHT!", 5);
-            DrawRectangle(wrightX - wtw / 2 - 2, wrightY - 12, wtw + 4, 8, Color{ 50, 35, 18, 225 });
-            DrawRectangleLines(wrightX - wtw / 2 - 2, wrightY - 12, wtw + 4, 8, Color{ 255, 215, 90, 230 });
-            VisualsEngine::DrawPixelText("FIRST FLIGHT!", wrightX - wtw / 2, wrightY - 10, 5, Color{ 255, 225, 120, 255 });
+            DrawPixel((int)BgX(255.0f), (int)BgY(62.0f), Color{ 255, 45, 45, 225 });
+            DrawPixel((int)BgX(395.0f), (int)BgY(56.0f), Color{ 45, 255, 90, 225 });
         }
     } else if (stageId == STAGE_TOMB_UNKNOWN) {
 
-        float flameX = BgX(918.0f);
-        float flameY = BgY(298.0f);
-        float flicker1 = sinf(time * 17.0f) * 3.0f;
-        float flicker2 = cosf(time * 23.0f + 1.1f) * 2.5f;
-        DrawCircle((int)flameX, (int)flameY - 8, 22.0f + sinf(time * 9.0f) * 3.0f, Color{ 255, 145, 25, 55 });
+        float flameX = BgX(992.0f);
+        float flameY = BgY(188.0f);
+        float flicker1 = sinf(time * 17.0f) * 2.5f;
+        float flicker2 = cosf(time * 23.0f + 1.1f) * 2.0f;
+        DrawCircle((int)flameX, (int)flameY - 6, 16.0f + sinf(time * 9.0f) * 2.5f, Color{ 255, 145, 25, 55 });
         DrawTriangle(
-            Vector2{ flameX + flicker1, flameY - 22.0f - fabsf(flicker2) },
-            Vector2{ flameX - 9.0f, flameY + 2.0f },
-            Vector2{ flameX + 9.0f, flameY + 2.0f },
+            Vector2{ flameX + flicker1, flameY - 16.0f - fabsf(flicker2) },
+            Vector2{ flameX - 7.0f, flameY + 2.0f },
+            Vector2{ flameX + 7.0f, flameY + 2.0f },
             Color{ 255, 85, 15, 195 }
         );
         DrawTriangle(
-            Vector2{ flameX - flicker2 * 0.6f, flameY - 16.0f - fabsf(flicker1) * 0.5f },
-            Vector2{ flameX - 5.5f, flameY + 2.0f },
-            Vector2{ flameX + 5.5f, flameY + 2.0f },
+            Vector2{ flameX - flicker2 * 0.6f, flameY - 12.0f - fabsf(flicker1) * 0.5f },
+            Vector2{ flameX - 4.5f, flameY + 2.0f },
+            Vector2{ flameX + 4.5f, flameY + 2.0f },
             Color{ 255, 205, 45, 220 }
         );
-        DrawCircle((int)flameX, (int)flameY - 3, 4.0f, Color{ 255, 250, 215, 240 });
-        for (int e = 0; e < 6; e++) {
+        DrawCircle((int)flameX, (int)flameY - 2, 3.2f, Color{ 255, 250, 215, 240 });
+        for (int e = 0; e < 5; e++) {
             float eLife = fmodf(time * 1.8f + e * 0.17f, 1.0f);
-            float ex = flameX + sinf(time * 8.0f + e * 2.0f) * 6.0f;
-            float ey = flameY - 8.0f - eLife * 26.0f;
-            DrawCircle((int)ex, (int)ey, 1.2f, (e % 2 == 0) ? Color{ 255, 235, 95, 235 } : Color{ 255, 120, 30, 215 });
+            float ex = flameX + sinf(time * 8.0f + e * 2.0f) * 4.5f;
+            float ey = flameY - 6.0f - eLife * 18.0f;
+            DrawCircle((int)ex, (int)ey, 1.1f, (e % 2 == 0) ? Color{ 255, 235, 95, 235 } : Color{ 255, 120, 30, 215 });
         }
 
-        int bayonetX = (int)BgX(398.0f);
-        int bayonetY = (int)BgY(260.0f);
-        if (fmodf(time * 2.2f, 1.0f) < 0.35f) {
-            DrawCircle(bayonetX, bayonetY, 3.5f, WHITE);
-            DrawLine(bayonetX - 6, bayonetY, bayonetX + 6, bayonetY, Color{ 220, 240, 255, 230 });
-            DrawLine(bayonetX, bayonetY - 6, bayonetX, bayonetY + 6, Color{ 220, 240, 255, 230 });
+        static Texture2D s_sentinelTex = { 0 };
+        static bool s_sentinelTexChecked = false;
+        if (!s_sentinelTexChecked) {
+            s_sentinelTexChecked = true;
+            AssetManager::Init();
+            const char* paths[3] = {
+                "assets/spr_tomb_sentinel.png",
+                "../assets/spr_tomb_sentinel.png",
+                "spr_tomb_sentinel.png"
+            };
+            for (int p = 0; p < 3; p++) {
+                if (AssetManager::FileExists(paths[p])) {
+                    s_sentinelTex = AssetManager::LoadTexture(paths[p]);
+                    if (s_sentinelTex.id != 0) {
+                        SetTextureFilter(s_sentinelTex, TEXTURE_FILTER_POINT);
+                        break;
+                    }
+                }
+            }
         }
-        int heelX = (int)BgX(442.0f);
-        int heelY = (int)BgY(555.0f);
-        float stepWave = fmodf(time * 1.5f, 1.0f);
-        if (stepWave < 0.28f) {
-            DrawCircleLines(heelX, heelY, 4.0f + stepWave * 22.0f, Color{ 255, 225, 120, 190 });
-        }
+
+        auto drawMarchingSentinel = [&](float xA, float xB, float phaseOffset) {
+            float cyc = fmodf(time * 0.12f + phaseOffset, 1.0f);
+            float tPos = 0.0f;
+            bool facingRight = true;
+            bool isHalted = false;
+            float haltProg = 0.0f;
+
+            if (cyc < 0.40f) {
+                tPos = cyc / 0.40f;
+                facingRight = (xB >= xA);
+            } else if (cyc < 0.50f) {
+                tPos = 1.0f;
+                facingRight = (xB < xA);
+                isHalted = true;
+                haltProg = (cyc - 0.40f) / 0.10f;
+            } else if (cyc < 0.90f) {
+                tPos = 1.0f - (cyc - 0.50f) / 0.40f;
+                facingRight = (xA > xB);
+            } else {
+                tPos = 0.0f;
+                facingRight = (xB >= xA);
+                isHalted = true;
+                haltProg = (cyc - 0.90f) / 0.10f;
+            }
+
+            float texX = xA + (xB - xA) * tPos;
+            float sx = BgX(texX);
+            float sy = BgY(285.0f);
+            float dir = facingRight ? 1.0f : -1.0f;
+
+            static const int stepCycle[4] = { 0, 1, 2, 1 };
+            int frameIdx = isHalted ? 1 : stepCycle[((int)(time * 4.2f + phaseOffset * 8.0f)) & 3];
+            int bobPx = (!isHalted && frameIdx != 1) ? 1 : 0;
+
+            DrawEllipse((int)sx, (int)sy, 7.0f, 1.8f, Color{ 0, 0, 0, 135 });
+            if (isHalted && haltProg < 0.45f) {
+                DrawEllipseLines((int)sx, (int)sy, 4.0f + haltProg * 18.0f, 1.4f + haltProg * 5.0f, Color{ 255, 225, 110, 205 });
+            }
+
+            if (s_sentinelTex.id != 0) {
+                float cellW = (float)s_sentinelTex.width / 3.0f;
+                float cellH = (float)s_sentinelTex.height;
+                Rectangle srcRec{ frameIdx * cellW, 0.0f, facingRight ? cellW : -cellW, cellH };
+                Rectangle dstRec{ (float)((int)(sx - 17.0f)), (float)((int)(sy - 49.0f - bobPx)), 34.0f, 50.0f };
+                DrawTexturePro(s_sentinelTex, srcRec, dstRec, Vector2{ 0.0f, 0.0f }, 0.0f, WHITE);
+            }
+
+            if (fmodf(time * 2.2f + phaseOffset, 1.0f) < 0.28f) {
+                int bx = (int)(sx - dir * 13.0f);
+                int by = (int)(sy - 46.0f - bobPx);
+                DrawPixel(bx, by, WHITE);
+                DrawLine(bx - 3, by, bx + 3, by, Color{ 220, 240, 255, 230 });
+                DrawLine(bx, by - 3, bx, by + 3, Color{ 220, 240, 255, 230 });
+            }
+        };
+
+        drawMarchingSentinel(175.0f, 465.0f, 0.0f);
+        drawMarchingSentinel(815.0f, 525.0f, 0.45f);
     } else if (stageId == STAGE_ENN_NEWS_STUDIO) {
 
         if (fmodf(time * 2.4f, 1.0f) < 0.65f) {
@@ -551,33 +699,6 @@ inline void DrawStageUpgrades(StageId stageId, float camX, float time) {
         int deskY = (int)BgY(418.0f);
         float deskPulse = 0.5f + 0.5f * sinf(time * 6.0f);
         DrawCircle(deskX, deskY, 16.0f + deskPulse * 6.0f, Color{ 255, 40, 50, (unsigned char)(28 + deskPulse * 35) });
-
-        int cycle = ((int)(time * 0.9f)) % 3;
-        if (cycle == 0) {
-
-            int hx = (int)BgX(268.0f);
-            int hy = (int)BgY(218.0f);
-            int tw = MeasureText("HANNITY: BREAKING!", 5);
-            DrawRectangle(hx - tw / 2 - 2, hy, tw + 4, 8, Color{ 15, 25, 65, 230 });
-            DrawRectangleLines(hx - tw / 2 - 2, hy, tw + 4, 8, Color{ 255, 70, 70, 240 });
-            VisualsEngine::DrawPixelText("HANNITY: BREAKING!", hx - tw / 2, hy + 2, 5, Color{ 255, 225, 90, 255 });
-        } else if (cycle == 1) {
-
-            int cx = (int)BgX(352.0f);
-            int cy = (int)BgY(216.0f);
-            int tw = MeasureText("COOPER: ENN 360!", 5);
-            DrawRectangle(cx - tw / 2 - 2, cy, tw + 4, 8, Color{ 15, 35, 75, 230 });
-            DrawRectangleLines(cx - tw / 2 - 2, cy, tw + 4, 8, Color{ 90, 215, 255, 240 });
-            VisualsEngine::DrawPixelText("COOPER: ENN 360!", cx - tw / 2, cy + 2, 5, Color{ 150, 235, 255, 255 });
-        } else {
-
-            int ix = (int)BgX(795.0f);
-            int iy = (int)BgY(216.0f);
-            int tw = MeasureText("INGRAHAM: THE ANGLE!", 5);
-            DrawRectangle(ix - tw / 2 - 2, iy, tw + 4, 8, Color{ 65, 15, 35, 230 });
-            DrawRectangleLines(ix - tw / 2 - 2, iy, tw + 4, 8, Color{ 255, 195, 60, 240 });
-            VisualsEngine::DrawPixelText("INGRAHAM: THE ANGLE!", ix - tw / 2, iy + 2, 5, Color{ 255, 230, 110, 255 });
-        }
     } else if (stageId == STAGE_CHICAGO_WRIGLEY) {
 
         for (int b = 0; b < 8; b++) {
@@ -593,41 +714,6 @@ inline void DrawStageUpgrades(StageId stageId, float camX, float time) {
             float sy = BgY(355.0f) - phase * 16.0f;
             unsigned char sa = (unsigned char)std::clamp((int)((1.8f - phase) * 110.0f), 0, 180);
             DrawCircle((int)sx, (int)sy, 2.5f + phase * 1.5f, Color{ 245, 250, 255, sa });
-        }
-
-        int cycle = ((int)(time * 0.7f)) % 4;
-        if (cycle == 0) {
-
-            int mx = (int)BgX(408.0f);
-            int my = (int)BgY(302.0f);
-            int tw = MeasureText("MICHELLE: YES WE CAN!", 5);
-            DrawRectangle(mx - tw / 2 - 2, my, tw + 4, 9, Color{ 20, 45, 95, 235 });
-            DrawRectangleLines(mx - tw / 2 - 2, my, tw + 4, 9, Color{ 255, 220, 70, 245 });
-            VisualsEngine::DrawPixelText("MICHELLE: YES WE CAN!", mx - tw / 2, my + 1, 5, Color{ 255, 240, 110, 255 });
-        } else if (cycle == 1) {
-
-            int jx = (int)BgX(630.0f);
-            int jy = (int)BgY(302.0f);
-            int tw = MeasureText("JOHN CANDY: HEY CHICAGO!", 5);
-            DrawRectangle(jx - tw / 2 - 2, jy, tw + 4, 9, Color{ 65, 35, 18, 235 });
-            DrawRectangleLines(jx - tw / 2 - 2, jy, tw + 4, 9, Color{ 255, 210, 80, 245 });
-            VisualsEngine::DrawPixelText("JOHN CANDY: HEY CHICAGO!", jx - tw / 2, jy + 1, 5, Color{ 255, 235, 120, 255 });
-        } else if (cycle == 2) {
-
-            int ax = (int)BgX(515.0f);
-            int ay = (int)BgY(302.0f);
-            int tw = MeasureText("AYKROYD: ON A MISSION!", 5);
-            DrawRectangle(ax - tw / 2 - 2, ay, tw + 4, 9, Color{ 15, 20, 32, 235 });
-            DrawRectangleLines(ax - tw / 2 - 2, ay, tw + 4, 9, Color{ 110, 220, 255, 245 });
-            VisualsEngine::DrawPixelText("AYKROYD: ON A MISSION!", ax - tw / 2, ay + 1, 5, Color{ 165, 235, 255, 255 });
-        } else {
-
-            int dx = (int)BgX(750.0f);
-            int dy = (int)BgY(302.0f);
-            int tw = MeasureText("DITKA: DA BEARS!", 5);
-            DrawRectangle(dx - tw / 2 - 2, dy, tw + 4, 9, Color{ 18, 30, 62, 235 });
-            DrawRectangleLines(dx - tw / 2 - 2, dy, tw + 4, 9, Color{ 255, 135, 40, 245 });
-            VisualsEngine::DrawPixelText("DITKA: DA BEARS!", dx - tw / 2, dy + 1, 5, Color{ 255, 195, 80, 255 });
         }
     }
 }
@@ -695,13 +781,15 @@ inline void UpdateAndTrackFighters(Fighter& p1, Fighter& p2) {
     if (p2.PopCancelCallout()) PushBanner(1, "2-IN-1 CANCEL!", "SPECIAL BUFFER", Color{ 90, 230, 255, 255 });
     if (p1.PopReversalCallout()) {
         PushBanner(0, "REVERSAL!", "TOTAL VETO", Color{ 255, 110, 50, 255 });
-        SpawnImpactJuice(p1.GetPosition(), true, true, "VETO!");
+        SpawnImpactJuice(Vector2{ p1.GetPosition().x, p1.GetPosition().y - 44.0f }, true, true, "VETO!");
     }
     if (p2.PopReversalCallout()) {
         PushBanner(1, "REVERSAL!", "TOTAL VETO", Color{ 255, 110, 50, 255 });
-        SpawnImpactJuice(p2.GetPosition(), true, true, "VETO!");
+        SpawnImpactJuice(Vector2{ p2.GetPosition().x, p2.GetPosition().y - 44.0f }, true, true, "VETO!");
     }
 
+    static const char* s_batmanLightWords[6] = { "POW!", "BAM!", "BIFF!", "SOCK!", "WHAM!", "ZAP!" };
+    static const char* s_batmanHeavyWords[4] = { "KAPOW!", "SMACK!", "WHAM!", "BAM!" };
     int c1 = p1.GetComboCount();
     int c2 = p2.GetComboCount();
     if (c1 > s_prevP1Hits && c1 >= 1) {
@@ -715,7 +803,10 @@ inline void UpdateAndTrackFighters(Fighter& p1, Fighter& p2) {
             PushBanner(0, buf, p1.GetCurrentAttack().name.c_str(), Color{ 255, 190, 40, 255 });
         }
         bool isSpec = (p1.GetState() == FSTATE_SPECIAL);
-        SpawnImpactJuice(Vector2{ p2.GetPosition().x, p2.GetPosition().y - 36.0f }, p1.GetCurrentAttack().isHeavy, isSpec, isSpec ? "VETO!" : (p1.GetCurrentAttack().isHeavy ? "SMACK!" : nullptr));
+        const char* word1 = isSpec ? "VETO!" : (p1.GetCurrentAttack().isHeavy ? s_batmanHeavyWords[(c1 + rand()) % 4] : s_batmanLightWords[(c1 + rand()) % 6]);
+        float hitX = p2.GetPosition().x + (p1.GetPosition().x < p2.GetPosition().x ? 12.0f : -12.0f);
+        float hitY = p2.GetPosition().y - 44.0f;
+        SpawnImpactJuice(Vector2{ hitX, hitY }, p1.GetCurrentAttack().isHeavy, isSpec, word1);
     }
     if (c2 > s_prevP2Hits && c2 >= 1) {
         if (!s_firstStrikeAwarded) {
@@ -728,7 +819,10 @@ inline void UpdateAndTrackFighters(Fighter& p1, Fighter& p2) {
             PushBanner(1, buf, p2.GetCurrentAttack().name.c_str(), Color{ 255, 120, 60, 255 });
         }
         bool isSpec = (p2.GetState() == FSTATE_SPECIAL);
-        SpawnImpactJuice(Vector2{ p1.GetPosition().x, p1.GetPosition().y - 36.0f }, p2.GetCurrentAttack().isHeavy, isSpec, isSpec ? "REDACTED!" : (p2.GetCurrentAttack().isHeavy ? "OBJECTION!" : nullptr));
+        const char* word2 = isSpec ? "REDACTED!" : (p2.GetCurrentAttack().isHeavy ? "OBJECTION!" : s_batmanLightWords[(c2 + rand()) % 6]);
+        float hitX = p1.GetPosition().x + (p2.GetPosition().x < p1.GetPosition().x ? 12.0f : -12.0f);
+        float hitY = p1.GetPosition().y - 44.0f;
+        SpawnImpactJuice(Vector2{ hitX, hitY }, p2.GetCurrentAttack().isHeavy, isSpec, word2);
     }
     s_prevP1Hits = c1;
     s_prevP2Hits = c2;
@@ -746,7 +840,7 @@ inline void UpdateAndTrackFighters(Fighter& p1, Fighter& p2) {
 
     for (auto& st : s_stamps) {
         if (!st.alive) continue;
-        st.pos.y -= 0.35f;
+        st.pos.y -= 0.14f;
         st.frame++;
         if (st.frame >= st.maxFrames) st.alive = false;
     }
@@ -799,21 +893,6 @@ inline void DrawFighterWorldOverlays(const Fighter& f) {
         DrawCircle(penX, penY, 2.5f, (fr % 2 == 0) ? Color{ 255, 45, 55, 255 } : Color{ 45, 130, 255, 255 });
     }
 
-    if ((f.GetState() == FSTATE_ATTACK || f.GetState() == FSTATE_SPECIAL) && f.GetCurrentAttack().boxW > 0.0f) {
-        int su = f.GetCurrentAttack().startupFrames;
-        int ac = f.GetCurrentAttack().activeFrames;
-        int fr = f.GetStateFrame();
-        if (fr >= su && fr < su + ac) {
-            float dir = f.IsFacingRight() ? 1.0f : -1.0f;
-            Vector2 pStart{ f.GetPosition().x + dir * 10.0f, f.GetPosition().y - 36.0f };
-            Vector2 pEnd{ f.GetPosition().x + dir * (f.GetCurrentAttack().reachX + 10.0f), f.GetPosition().y + f.GetCurrentAttack().reachY };
-            Color smearOuter = (f.GetState() == FSTATE_SPECIAL) ? Color{ 255, 70, 40, 230 } : (f.GetCurrentAttack().isHeavy ? Color{ 255, 195, 40, 230 } : Color{ 120, 230, 255, 210 });
-            DrawLineEx(Vector2{ pStart.x, pStart.y - 6.0f }, Vector2{ pEnd.x, pEnd.y - 2.0f }, 5.5f, smearOuter);
-            DrawLineEx(pStart, pEnd, 3.0f, WHITE);
-            DrawCircleLines((int)pEnd.x, (int)pEnd.y, f.GetCurrentAttack().isHeavy ? 14.0f : 9.0f, smearOuter);
-        }
-    }
-
     if (f.GetState() == FSTATE_HITSTUN && f.GetHealth() > 0) {
         float t = (float)GetTime() * 10.5f;
         int numStars = 5;
@@ -846,12 +925,12 @@ inline void DrawWorldParticlesAndDebug(const Fighter& p1, const Fighter& p2) {
 
     for (const auto& st : s_stamps) {
         if (!st.alive) continue;
-        int tw = MeasureText(st.text.c_str(), 10);
-        int bx = (int)st.pos.x - tw / 2 - 4;
-        int by = (int)st.pos.y - 6;
-        DrawRectangle(bx, by, tw + 8, 13, Color{ 15, 10, 15, 230 });
-        DrawRectangleLines(bx, by, tw + 8, 13, st.color);
-        VisualsEngine::DrawPixelText(st.text.c_str(), bx + 4, by + 2, 10, st.color);
+        float popScale = (st.frame < 4) ? (0.72f + st.frame * 0.05f) : 0.88f;
+        bool isCrimson = (st.color.r > 220 && st.color.g < 100);
+        Color outerCol = isCrimson ? Color{ 245, 38, 32, 255 } : Color{ 255, 115, 20, 255 };
+        Color innerCol = isCrimson ? Color{ 255, 230, 45, 255 } : Color{ 255, 245, 70, 255 };
+        Color txtCol   = isCrimson ? Color{ 255, 255, 255, 255 } : Color{ 220, 22, 28, 255 };
+        DrawBatmanActionBurst(st.text.c_str(), (int)st.pos.x, (int)st.pos.y, 7, outerCol, innerCol, txtCol, popScale);
     }
 
     if (s_debugHitboxes) {
@@ -884,15 +963,40 @@ inline void DrawScreenHUDAndSuperFlash(const Fighter& p1, const Fighter& p2, con
     VisualsEngine::DrawPixelText("CHAMPIONSHIP EDITION", (SCREEN_WIDTH - ceTw) / 2, 35, 6, Color{ 255, 215, 60, 220 });
 
     for (const auto& b : s_banners) {
-        float slide = std::min(1.0f, (float)(b.maxTimer - b.timer) / 6.0f);
-        int bw = 122;
-        int bh = 22;
-        int bx = (b.playerIndex == 0) ? (int)(-bw + slide * (bw + 8)) : (int)(SCREEN_WIDTH - slide * (bw + 8));
-        int by = 48 + b.playerIndex * 26;
-        DrawRectangle(bx, by, bw, bh, Color{ 14, 16, 28, 235 });
-        DrawRectangleLines(bx, by, bw, bh, b.color);
-        VisualsEngine::DrawPixelText(b.text.c_str(), bx + 5, by + 3, 8, b.color);
-        VisualsEngine::DrawPixelText(b.subtext.c_str(), bx + 5, by + 12, 6, WHITE);
+        float slide = std::min(1.0f, (float)(b.maxTimer - b.timer) / 5.0f);
+        int bw = 132;
+        int bx = (b.playerIndex == 0) ? (int)(-bw + slide * (bw + 10)) : (int)(SCREEN_WIDTH - slide * (bw + 6));
+        int by = 46 + b.playerIndex * 27;
+
+        Color topCol = Color{ 255, 245, 95, 255 };
+        Color botCol = b.color;
+        Color slashCol = (b.playerIndex == 0) ? Color{ 255, 195, 35, 245 } : Color{ 255, 95, 45, 245 };
+
+        int slashY = by + 12;
+        int slashW = MeasureText(b.text.c_str(), 9) + 14;
+        DrawLineEx(Vector2{ (float)bx - 2.0f, (float)slashY + 2.0f }, Vector2{ (float)(bx + slashW), (float)slashY - 1.0f }, 4.0f, Color{ 10, 12, 22, 230 });
+        DrawLineEx(Vector2{ (float)bx - 2.0f, (float)slashY + 1.0f }, Vector2{ (float)(bx + slashW), (float)slashY - 2.0f }, 2.2f, slashCol);
+        for (int k = 0; k < 3; k++) {
+            float tx = (float)(bx + slashW - 14 + k * 5);
+            DrawLineEx(Vector2{ tx, (float)slashY + 3.0f }, Vector2{ tx + 3.0f, (float)slashY - 3.0f }, 1.6f, WHITE);
+        }
+
+        if (b.text.size() >= 2 && b.text[0] >= '0' && b.text[0] <= '9') {
+            size_t sp = b.text.find(' ');
+            if (sp != std::string::npos) {
+                std::string numStr = b.text.substr(0, sp);
+                std::string restStr = b.text.substr(sp + 1);
+                int nw = MeasureText(numStr.c_str(), 14);
+                DrawArcade3DText(numStr.c_str(), bx, by - 4, 14, Color{ 255, 255, 140, 255 }, Color{ 255, 110, 25, 255 });
+                DrawArcade3DText(restStr.c_str(), bx + nw + 4, by + 1, 9, topCol, botCol);
+            } else {
+                DrawArcade3DText(b.text.c_str(), bx, by, 9, topCol, botCol);
+            }
+        } else {
+            DrawArcade3DText(b.text.c_str(), bx, by, 9, topCol, botCol);
+        }
+
+        DrawArcade3DText(b.subtext.c_str(), bx + 4, by + 14, 6, Color{ 165, 240, 255, 255 }, Color{ 55, 155, 235, 255 });
     }
 
     if (s_superFlashTimer > 0) {

@@ -93,8 +93,11 @@ RawInputState InputManager::PollRawInputs(int playerIndex) {
         if (IsKeyDown(KEY_KP_ENTER)) state.start = true;
     }
 
-    int pad = GetGamepadSlotForPlayer(playerIndex);
-    if (pad >= 0 && IsGamepadAvailable(pad)) {
+    int startPad = (playerIndex == 0) ? 0 : GetGamepadSlotForPlayer(playerIndex);
+    int endPad = (playerIndex == 0) ? 3 : startPad;
+    for (int pad = startPad; pad >= 0 && pad <= endPad; ++pad) {
+        if (!IsGamepadAvailable(pad)) continue;
+
         constexpr float STICK_UP_THRESHOLD = -0.35f;
         constexpr float STICK_DOWN_THRESHOLD = 0.35f;
         constexpr float STICK_HORIZ_THRESHOLD = 0.30f;

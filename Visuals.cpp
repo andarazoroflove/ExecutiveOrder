@@ -504,331 +504,37 @@ void VisualsEngine::DrawFighterSprite(const Fighter& f) {
         }
 
         bool isDownOrKo = (f.GetHealth() <= 0 || state == FSTATE_KNOCKDOWN_AIR || state == FSTATE_KNOCKDOWN_GROUND || state == FSTATE_DEFEAT || state == FSTATE_WAKEUP);
-        if (!isDownOrKo) {
-            int pIdx = (f.GetPlayerIndex() == 0) ? 0 : 1;
-            for (const auto& gh : ChampionshipEdition::s_afterimages[pIdx]) {
-                float ghDx = gh.pos.x - posX;
-                float ghDy = gh.pos.y - posY;
-                Rectangle ghDst = dstRec;
-                ghDst.x += ghDx;
-                ghDst.y += ghDy;
-                unsigned char ga = (unsigned char)std::clamp(gh.life * 18, 20, 145);
-                Color ghCol = (state == FSTATE_SPECIAL) ? Color{ 70, 210, 255, ga } : Color{ 255, 210, 70, ga };
-                DrawTexturePro(tex, srcRec, ghDst, origin, rotation, ghCol);
-            }
-
-            Rectangle rimDark = dstRec;
-            rimDark.x += (fr ? -1.5f : 1.5f);
-            rimDark.y += 1.5f;
-            DrawTexturePro(tex, srcRec, rimDark, origin, rotation, Color{ 10, 12, 22, 195 });
-
-            Rectangle rimLight = dstRec;
-            rimLight.x += (fr ? 1.0f : -1.0f);
-            rimLight.y -= 1.0f;
-            Color bevelTint = (state == FSTATE_SPECIAL) ? Color{ 255, 230, 90, 160 } : Color{ 220, 240, 255, 110 };
-            DrawTexturePro(tex, srcRec, rimLight, origin, rotation, bevelTint);
-        }
-
         DrawTexturePro(tex, srcRec, dstRec, origin, rotation, tint);
 
-        if (state == FSTATE_ATTACK) {
-            int startup = f.GetCurrentAttack().startupFrames;
-            int active = f.GetCurrentAttack().activeFrames;
-            if (frame >= startup && frame < startup + active) {
-                AttackMoveType mtype = f.GetCurrentAttack().moveType;
-                float reachX = f.GetCurrentAttack().reachX;
-                float reachY = f.GetCurrentAttack().reachY;
-                float fxX = posX + dir * reachX;
-                float fxY = posY + reachY;
-
-                if (mtype == MOVE_LIGHT_PUNCH) {
-
-                    DrawLineEx(Vector2{ posX + dir * 18.0f, fxY - 2.0f }, Vector2{ fxX + dir * 8.0f, fxY - 2.0f }, 2.0f, Color{ 255, 255, 230, 220 });
-                    DrawLineEx(Vector2{ posX + dir * 14.0f, fxY + 4.0f }, Vector2{ fxX + dir * 4.0f, fxY + 4.0f }, 1.5f, Color{ 255, 220, 100, 180 });
-                    DrawCircle((int)(fxX + dir * 6.0f), (int)fxY, 3, Color{ 255, 255, 255, 240 });
-                } else if (mtype == MOVE_HEAVY_PUNCH) {
-
-                    DrawCircleLines((int)fxX, (int)fxY, 14.0f, Color{ 255, 120, 30, 200 });
-                    DrawCircle((int)fxX, (int)fxY, 5, Color{ 255, 240, 180, 255 });
-                    DrawLineEx(Vector2{ posX + dir * 12.0f, fxY - 10.0f }, Vector2{ fxX + dir * 12.0f, fxY + 8.0f }, 3.5f, Color{ 255, 180, 40, 240 });
-                } else if (mtype == MOVE_LIGHT_KICK) {
-
-                    DrawLineEx(Vector2{ posX + dir * 16.0f, fxY }, Vector2{ fxX + dir * 6.0f, fxY }, 2.0f, Color{ 230, 245, 255, 220 });
-                    DrawCircle((int)(fxX + dir * 4.0f), (int)fxY, 2, Color{ 255, 255, 255, 240 });
-                } else if (mtype == MOVE_HEAVY_KICK) {
-
-                    Vector2 p1{ posX + dir * 16.0f, fxY - 14.0f };
-                    Vector2 p2{ fxX + dir * 14.0f, fxY };
-                    Vector2 p3{ posX + dir * 20.0f, fxY + 16.0f };
-                    DrawLineEx(p1, p2, 3.5f, Color{ 255, 230, 80, 240 });
-                    DrawLineEx(p2, p3, 3.0f, Color{ 255, 160, 40, 220 });
-                    DrawCircle((int)p2.x, (int)p2.y, 4, Color{ 255, 255, 255, 255 });
-                }
-            }
-        }
-
-        if (state == FSTATE_WALK_FWD || state == FSTATE_WALK_BACK) {
-            float walkCycle = sinf(frame * 0.35f);
-            float legStride = walkCycle * 6.5f;
-            float dirSign = (state == FSTATE_WALK_FWD) ? 1.0f : -1.0f;
-            int footY = (int)(GROUND_Y - 2.0f);
-
-            int shoe1X = (int)(posX - (fr ? 7.0f : -7.0f) - legStride * dirSign);
-            int shoe2X = (int)(posX + (fr ? 5.0f : -5.0f) + legStride * dirSign);
-            DrawRectangle(shoe1X, footY, 9, 3, Color{ 22, 22, 28, 255 });
-            DrawRectangle(shoe2X, footY, 9, 3, Color{ 36, 38, 48, 255 });
-
-            if (fabsf(walkCycle) > 0.85f && (frame % 5 == 0)) {
-                DrawCircle((int)(posX - (fr ? 10.0f : -10.0f) - legStride * dirSign), footY + 1, 2, Color{ 200, 205, 215, 120 });
-            }
-        }
-
-        if (state == FSTATE_IDLE) {
-            int quirkTimer = frame % 200;
-            if (quirkTimer >= 100 && quirkTimer <= 170) {
-                float quirkPulse = sinf((quirkTimer - 100) * 0.09f);
-                switch (charId) {
-                case CHAR_COMMANDER: {
-                    float tieX = posX + (fr ? 4.0f : -4.0f) + sinf(frame * 0.25f) * 4.0f;
-                    float tieY = pos.y - 25.0f;
-                    DrawLineEx(Vector2{ posX + (fr ? 2.0f : -2.0f), pos.y - 42.0f }, Vector2{ tieX, tieY + 8.0f }, 2.5f, Color{ 230, 20, 20, 255 });
-                    DrawCircle((int)tieX, (int)(tieY + 8.0f), 2, Color{ 255, 215, 0, 220 });
-                    break;
-                }
-                case CHAR_HIGH_BENCH: {
-                    int gx = (int)(posX + (fr ? 16.0f : -16.0f));
-                    int gy = (int)(pos.y - 45.0f - quirkPulse * 5.0f);
-                    DrawRectangle(gx - 2, gy - 2, 8, 4, Color{ 220, 180, 50, 255 });
-                    DrawLine(gx + 2, gy, gx + 2, gy + 10, Color{ 140, 100, 30, 255 });
-                    break;
-                }
-                case CHAR_REDCAP: {
-                    int px = (int)(posX + (fr ? 14.0f : -14.0f));
-                    int py = (int)(pos.y - 40.0f);
-                    DrawCircle(px, py, 2 + (int)(quirkPulse * 2.0f), Color{ 240, 240, 245, 180 });
-                    break;
-                }
-                case CHAR_COASTAL_GOV: {
-                    int glintX = (int)(posX + (fr ? 6.0f : -6.0f));
-                    int glintY = (int)(pos.y - 58.0f);
-                    DrawLine(glintX - 4, glintY, glintX + 4, glintY, Color{ 255, 255, 255, 240 });
-                    DrawLine(glintX, glintY - 4, glintX, glintY + 4, Color{ 255, 255, 255, 240 });
-                    break;
-                }
-                case CHAR_TECH_VISIONARY: {
-                    int dx = (int)(posX - (fr ? 18.0f : -18.0f));
-                    int dy = (int)(pos.y - 68.0f + sinf(frame * 0.2f) * 3.0f);
-                    DrawRectangle(dx - 4, dy - 2, 8, 4, Color{ 40, 45, 55, 255 });
-                    DrawCircle(dx, dy - 1, 2, (frame % 10 < 5) ? Color{ 0, 255, 255, 255 } : Color{ 0, 120, 200, 255 });
-                    DrawLine(dx - 5, dy - 3, dx + 5, dy - 3, Color{ 180, 200, 220, 220 });
-                    break;
-                }
-                case CHAR_FILIBUSTER: {
-                    int fx = (int)(posX + (fr ? 12.0f : -12.0f));
-                    int fy = (int)(pos.y - 36.0f);
-                    DrawRectangle(fx - 4, fy - 6, 8, 12, Color{ 160, 40, 30, 240 });
-                    DrawPixelText("RULE 22", fx - 10, fy - 14, 6, Color{ 255, 220, 80, 220 });
-                    break;
-                }
-                case CHAR_MASCOT: {
-                    int mx = (int)(posX + (fr ? 14.0f : -14.0f));
-                    int my = (int)(pos.y - 52.0f);
-                    DrawCircle(mx, my, 3, Color{ 255, 220, 40, 230 });
-                    break;
-                }
-                case CHAR_POPULIST: {
-                    int sx = (int)(posX + (fr ? 14.0f : -14.0f));
-                    int sy = (int)(pos.y - 48.0f);
-                    DrawRectangle(sx - 2, sy - 4, 4, 8, Color{ 30, 30, 35, 255 });
-                    if (frame % 20 < 4) {
-                        DrawCircle(sx, sy - 3, 5, Color{ 255, 255, 240, 240 });
-                    }
-                    break;
-                }
-                case CHAR_SUCKRATERY_RKF: {
-                    int wx = (int)(posX + (fr ? 5.0f : -5.0f));
-                    int wy = (int)(pos.y - 62.0f - sinf(frame * 0.3f) * 4.0f);
-                    DrawCircle(wx, wy, 3, Color{ 255, 120, 180, 255 });
-                    DrawCircle(wx + (fr ? 2 : -2), wy - 1, 1, Color{ 255, 255, 255, 255 });
-                    DrawLine(wx, wy, (int)(posX + (fr ? 3.0f : -3.0f)), (int)(pos.y - 56.0f), Color{ 230, 80, 150, 255 });
-                    break;
-                }
-                case CHAR_WAR_PIG: {
-                    int vx = (int)(posX + (fr ? -4.0f : 4.0f));
-                    int vy = (int)(pos.y - 50.0f);
-                    DrawCircle(vx, vy, 3, Color{ 255, 60, 40, (unsigned char)(quirkPulse * 220) });
-                    break;
-                }
-                case CHAR_SOCIALIST: {
-                    int ax = (int)(posX + (fr ? 16.0f : -16.0f));
-                    int ay = (int)(pos.y - 40.0f - quirkPulse * 12.0f);
-                    DrawCircle(ax, ay, 3, Color{ 230, 40, 40, 255 });
-                    DrawLine(ax, ay - 3, ax + 1, ay - 5, Color{ 60, 160, 50, 255 });
-                    break;
-                }
-                case CHAR_BILLARY: {
-                    int ex = (int)(posX + (fr ? 12.0f : -12.0f));
-                    int ey = (int)(pos.y - 50.0f);
-                    DrawRectangle(ex - 4, ey - 3, 8, 6, Color{ 240, 240, 245, 230 });
-                    DrawLine(ex - 4, ey - 3, ex, ey, Color{ 100, 140, 220, 240 });
-                    DrawLine(ex + 4, ey - 3, ex, ey, Color{ 100, 140, 220, 240 });
-                    break;
-                }
-                case CHAR_PALM_BEACH_PETE: {
-                    int rx = (int)(posX + (fr ? 12.0f : -12.0f));
-                    int ry = (int)(pos.y - 34.0f);
-                    DrawCircle(rx, ry, 2, Color{ 255, 215, 0, 255 });
-                    DrawLine(rx - 3, ry, rx + 3, ry, Color{ 255, 255, 255, 230 });
-                    break;
-                }
-                case CHAR_SLEEPY_JOE: {
-                    int jx = (int)(posX + (fr ? 6.0f : -6.0f));
-                    int jy = (int)(pos.y - 58.0f);
-                    DrawCircle(jx, jy, 2, Color{ 255, 30, 30, 240 });
-                    DrawPixelText("z", jx + (fr ? 10 : -14), jy - 8, 6, Color{ 200, 220, 255, 200 });
-                    break;
-                }
-                case CHAR_MTG: {
-                    int mx = (int)(posX + (fr ? 2.0f : -2.0f));
-                    int my = (int)(pos.y - 66.0f);
-                    DrawPixelText("✦", mx + (int)(sinf(frame * 0.4f) * 6.0f), my - 4, 7, Color{ 255, 220, 40, 240 });
-                    break;
-                }
-                default:
-                    break;
-                }
-            }
-        }
-
-        bool isFaintedOrDown = (f.GetHealth() <= 0 || state == FSTATE_KNOCKDOWN_AIR || state == FSTATE_KNOCKDOWN_GROUND || state == FSTATE_DEFEAT || state == FSTATE_WAKEUP);
-        if (!isFaintedOrDown && f.GetTauntTimer() > 0 && f.HasSpeechTaunt() && !f.GetActiveTaunt().empty()) {
+        if (!isDownOrKo && f.GetTauntTimer() > 0 && !f.GetActiveTaunt().empty()) {
             const char* quote = f.GetActiveTaunt().c_str();
-            int qw = MeasureText(quote, 10);
-            int bubbleW = qw + 10;
-            int bubbleH = 13;
-
-            float headTopY = (f.GetCharacterId() == CHAR_WAR_PIG) ? (pos.y - 88.0f) : (pos.y - 70.0f);
-            int bubbleY = (int)(headTopY - bubbleH - 4.0f);
-            if (bubbleY < 12) bubbleY = 12;
-
-            int bubbleX = (int)pos.x - bubbleW / 2;
-            bubbleX = std::clamp(bubbleX, (int)STAGE_MIN_X + 6, (int)STAGE_MAX_X - 6 - bubbleW);
-
-            DrawRectangle(bubbleX + 1, bubbleY + 1, bubbleW, bubbleH, Color{ 0, 0, 0, 70 });
-
-            DrawRectangle(bubbleX, bubbleY, bubbleW, bubbleH, Color{ 255, 255, 235, 250 });
-            DrawRectangleLines(bubbleX, bubbleY, bubbleW, bubbleH, Color{ 20, 25, 35, 255 });
-
-            int tailX = std::clamp((int)pos.x, bubbleX + 8, bubbleX + bubbleW - 8);
-            DrawTriangle(Vector2{ (float)tailX, (float)headTopY - 1.0f },
-                         Vector2{ (float)tailX - 3.0f, (float)bubbleY + bubbleH },
-                         Vector2{ (float)tailX + 3.0f, (float)bubbleY + bubbleH },
-                         Color{ 255, 255, 235, 250 });
-            DrawLine(tailX - 3, bubbleY + bubbleH, tailX, (int)headTopY - 1, Color{ 20, 25, 35, 255 });
-            DrawLine(tailX + 3, bubbleY + bubbleH, tailX, (int)headTopY - 1, Color{ 20, 25, 35, 255 });
-
-            int textX = bubbleX + (bubbleW - qw) / 2;
-            DrawPixelText(quote, textX, bubbleY + 2, 8, Color{ 15, 20, 30, 255 });
-        } else if (!isFaintedOrDown && (state == FSTATE_TAUNT || f.GetTauntTimer() > 0) && !f.HasSpeechTaunt()) {
-            int tickFrame = (state == FSTATE_TAUNT) ? frame : std::min(44, 90 - f.GetTauntTimer());
-
-            switch (f.GetCharacterId()) {
-            case CHAR_COMMANDER: {
-                float tootProg = std::clamp((float)tickFrame / 45.0f, 0.0f, 1.0f);
-                float tieWag = sinf(tickFrame * 0.45f) * 8.0f;
-                DrawLineEx(Vector2{ pos.x + dir * 2, pos.y - 40 }, Vector2{ pos.x + dir * 6 + tieWag, pos.y - 18 }, 4.0f, Color{ 220, 25, 25, 255 });
-                float acc = sinf(tickFrame * 0.5f) * 6.0f;
-                DrawCircle((int)(pos.x + dir * (12 + acc)), (int)(pos.y - 36), 3, Color{ 255, 220, 60, 255 });
-                DrawCircle((int)(pos.x - dir * (8 - acc)), (int)(pos.y - 36), 3, Color{ 255, 220, 60, 255 });
-                for (int p = 0; p < 4; p++) {
-                    float puffDist = 14.0f + p * 6.0f + tickFrame * 0.5f;
-                    float puffY = pos.y - 24.0f - p * 3.0f - sinf(tickFrame * 0.2f + p) * 3.0f;
-                    unsigned char alpha = (unsigned char)(std::clamp(1.0f - tootProg, 0.0f, 1.0f) * 190.0f);
-                    DrawCircle((int)(pos.x - dir * puffDist), (int)puffY, 4 + p * 2, Color{ 220, 225, 60, alpha });
-                    DrawCircle((int)(pos.x - dir * puffDist), (int)puffY, 2 + p, Color{ 245, 245, 120, alpha });
-                }
-                break;
-            }
-            case CHAR_SUCKRATERY_RKF: {
-                float wormReach = sinf((tickFrame / 45.0f) * 3.14159f) * 24.0f;
-                int wx = (int)(pos.x + dir * (10 + wormReach));
-                int wy = (int)(pos.y - 62 - sinf(tickFrame * 0.4f) * 4.0f);
-                DrawCircle(wx, wy, 4, Color{ 235, 110, 160, 255 });
-                DrawCircle(wx + (int)(dir * 2), wy - 1, 1, WHITE);
-                DrawLineEx(Vector2{ pos.x + dir * 6, pos.y - 62 }, Vector2{ (float)wx, (float)wy }, 3.0f, Color{ 210, 90, 140, 255 });
-                DrawCircle((int)(pos.x + dir * (8 + wormReach * 0.6f)), wy + 1, 3, Color{ 245, 130, 175, 255 });
-                if (tickFrame >= 15 && tickFrame <= 30) {
-                    DrawCircle(wx + (int)(dir * 4), wy + (tickFrame - 15) * 2, 2, Color{ 100, 240, 80, 220 });
-                }
-                break;
-            }
-            case CHAR_SOCIALIST: {
-                float arc = sinf((tickFrame / 45.0f) * 3.14159f) * 32.0f;
-                float appleX = pos.x + dir * 14.0f;
-                float appleY = pos.y - 50.0f - arc;
-                DrawCircle((int)appleX, (int)appleY, 4, Color{ 220, 30, 30, 255 });
-                DrawRectangle((int)appleX - 1, (int)appleY - 5, 2, 3, Color{ 80, 40, 15, 255 });
-                DrawCircle((int)appleX + 1, (int)appleY - 4, 1, Color{ 80, 180, 40, 255 });
-                if (tickFrame >= 32) {
-                    DrawPixelText("✦", (int)pos.x + (int)(dir * 8), (int)pos.y - 62, 8, Color{ 255, 240, 100, 255 });
-                }
-                break;
-            }
-            case CHAR_TECH_VISIONARY: {
-                float ang = (tickFrame / 45.0f) * 6.283f * 2.0f;
-                float rad = 18.0f;
-                float dx = pos.x + cosf(ang) * rad;
-                float dy = pos.y - 74.0f + sinf(ang) * (rad * 0.6f);
-                DrawRectangle((int)dx - 6, (int)dy - 2, 12, 4, Color{ 35, 45, 60, 255 });
-                DrawCircle((int)dx, (int)dy, 2, Color{ 0, 240, 255, 255 });
-                DrawPixelText("·", (int)dx - 4, (int)dy - 3, 6, Color{ 0, 220, 255, 180 });
-                break;
-            }
-            case CHAR_REDCAP: {
-                if (tickFrame <= 25) {
-                    float spitX = pos.x + dir * (6.0f + tickFrame * 1.0f);
-                    float spitY = pos.y - 48.0f + (tickFrame * tickFrame) * 0.05f;
-                    DrawCircle((int)spitX, (int)spitY, 2, Color{ 240, 240, 220, 240 });
-                }
-                if (tickFrame >= 18 && tickFrame <= 36) {
-                    DrawPixelText("✦", (int)pos.x + (int)(dir * 12), (int)pos.y - 40, 8, Color{ 255, 160, 30, 255 });
-                }
-                break;
-            }
-            case CHAR_FILIBUSTER: {
-                float scrollLen = std::min(32.0f, tickFrame * 1.2f);
-                int sx = (int)(pos.x + dir * 8);
-                int sy = (int)(pos.y - 44);
-                DrawRectangle(sx, sy, 10, (int)scrollLen, Color{ 245, 240, 215, 245 });
-                DrawRectangleLines(sx, sy, 10, (int)scrollLen, Color{ 140, 110, 60, 255 });
-                for (int l = 2; l < scrollLen - 2; l += 4) {
-                    DrawLine(sx + 2, sy + l, sx + 8, sy + l, Color{ 100, 80, 50, 200 });
-                }
-                break;
-            }
-            case CHAR_MASCOT: {
-                float wingFlap = sinf(tickFrame * 0.6f) * 8.0f;
-                DrawTriangle(Vector2{ pos.x - 14, pos.y - 48 }, Vector2{ pos.x - 22, pos.y - 48 - wingFlap }, Vector2{ pos.x - 6, pos.y - 38 }, Color{ 180, 140, 40, 255 });
-                DrawTriangle(Vector2{ pos.x + 14, pos.y - 48 }, Vector2{ pos.x + 22, pos.y - 48 - wingFlap }, Vector2{ pos.x + 6, pos.y - 38 }, Color{ 180, 140, 40, 255 });
-                DrawPixelText("★", (int)pos.x + (int)(sinf(tickFrame * 0.3f) * 16.0f), (int)pos.y - 74, 8, Color{ 255, 220, 50, 240 });
-                break;
-            }
-            case CHAR_PALM_BEACH_PETE: {
-                int wx = (int)(pos.x + dir * 10);
-                int wy = (int)(pos.y - 42);
-                DrawCircle(wx, wy, 4, Color{ 255, 215, 0, 255 });
-                DrawCircle(wx, wy, 2, Color{ 255, 250, 210, 255 });
-                if ((tickFrame / 6) % 2 == 0) {
-                    DrawPixelText("✦", wx - 3, wy - 8, 8, Color{ 255, 235, 120, 255 });
-                }
-                break;
-            }
-            default:
-                break;
-            }
+            float headTopY = (f.GetCharacterId() == CHAR_WAR_PIG) ? (pos.y - 84.0f) : (pos.y - 66.0f);
+            int bubbleCenterX = (int)(pos.x + (f.IsFacingRight() ? -8.0f : 8.0f));
+            ChampionshipEdition::DrawComicThoughtBubble(
+                quote,
+                bubbleCenterX,
+                (int)(headTopY - 3.0f),
+                (int)pos.x,
+                (int)(headTopY + 3.0f),
+                6,
+                Color{ 15, 22, 38, 255 }
+            );
+        } else if (!isDownOrKo && f.GetCharacterId() == CHAR_SLEEPY_JOE && state == FSTATE_SPECIAL && f.GetSpecialIndex() == 1) {
+            ChampionshipEdition::DrawComicThoughtBubble(
+                "Zzz... ICE CREAM...",
+                (int)pos.x,
+                (int)(pos.y - 46.0f),
+                (int)pos.x,
+                (int)(pos.y - 38.0f),
+                6,
+                Color{ 20, 40, 95, 255 }
+            );
         }
 
-        if (!isDownOrKo) { DrawCosmeticPuffs(f); ChampionshipEdition::DrawFighterWorldOverlays(f); }
+        if (!isDownOrKo) {
+            DrawCosmeticPuffs(f);
+            ChampionshipEdition::DrawFighterWorldOverlays(f);
+        }
         return;
     }
     ChampionshipEdition::DrawArticulated12PartRig(f);
@@ -1096,8 +802,6 @@ void VisualsEngine::DrawProjectiles(const Fighter& f) {
                 Rectangle srcRec = { 0.0f, 0.0f, (float)s_sprSleepyJoeSS.width, (float)s_sprSleepyJoeSS.height };
                 if (!p.facingRight) srcRec.width = -srcRec.width;
                 Rectangle dstRec = { p.pos.x - 22.0f, p.pos.y - 28.0f, 44.0f, 54.0f };
-                Rectangle trailDst = { p.pos.x - (p.facingRight ? 32.0f : 12.0f), p.pos.y - 28.0f, 44.0f, 54.0f };
-                DrawTexturePro(s_sprSleepyJoeSS, srcRec, trailDst, Vector2{ 0.0f, 0.0f }, 0.0f, Color{ 30, 30, 45, 120 });
                 DrawTexturePro(s_sprSleepyJoeSS, srcRec, dstRec, Vector2{ 0.0f, 0.0f }, 0.0f, WHITE);
             } else {
                 DrawRectangle((int)p.pos.x - 12, (int)p.pos.y - 24, 24, 48, Color{ 15, 20, 25, 255 });

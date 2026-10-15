@@ -5,6 +5,7 @@
 #include <cstring>
 #include <algorithm>
 #include <cstdint>
+#include <cstdio>
 
 #ifdef _WIN32
 
@@ -93,20 +94,6 @@ void Init() {
         }
 
         if (!foundPath.empty()) {
-#ifndef _WIN32
-            int fd = open(foundPath.c_str(), O_RDONLY);
-            if (fd >= 0) {
-                struct stat st;
-                if (fstat(fd, &st) == 0 && st.st_size >= 16) {
-                    void* mapped = mmap(nullptr, st.st_size, PROT_READ, MAP_SHARED, fd, 0);
-                    if (mapped != MAP_FAILED) {
-                        s_pakData = (const uint8_t*)mapped;
-                        s_pakSize = (uint32_t)st.st_size;
-                    }
-                }
-                close(fd);
-            }
-#else
             FILE* f = fopen(foundPath.c_str(), "rb");
             if (f) {
                 fseek(f, 0, SEEK_END);
@@ -122,7 +109,6 @@ void Init() {
                 }
                 fclose(f);
             }
-#endif
         }
     }
 
