@@ -24,6 +24,21 @@ __declspec(dllimport) DWORD __stdcall SizeofResource(HMODULE hModule, HRSRC hRes
 
 #define WIN_MAKEINTRESOURCEA(i) ((const char*)((uintptr_t)((uint16_t)(i))))
 #define WIN_RT_RCDATA WIN_MAKEINTRESOURCEA(10)
+
+#ifdef EO_PAK_FILE
+__asm__(
+    ".section .eopak,\"dr\"\n"
+    ".p2align 4\n"
+    ".globl eo_pak_start\n"
+    "eo_pak_start:\n"
+    ".incbin \"" EO_PAK_FILE "\"\n"
+    ".globl eo_pak_end\n"
+    "eo_pak_end:\n"
+    ".text\n"
+);
+extern "C" const uint8_t eo_pak_start[];
+extern "C" const uint8_t eo_pak_end[];
+#endif
 #else
 #include <sys/mman.h>
 #include <sys/stat.h>
@@ -62,12 +77,28 @@ void Init() {
 
 #ifdef _WIN32
 
-    HRSRC hRes = FindResourceA(nullptr, WIN_MAKEINTRESOURCEA(100), WIN_RT_RCDATA);
-    if (hRes) {
-        HGLOBAL hGlobal = LoadResource(nullptr, hRes);
-        if (hGlobal) {
-            s_pakData = (const uint8_t*)LockResource(hGlobal);
-            s_pakSize = (uint32_t)SizeofResource(nullptr, hRes);
+#ifdef EO_PAK_FILE
+    // Preferred: pak embedded via .incbin into its own read-only PE section.
+    // Keeping it out of .rsrc keeps the resource section tiny so Explorer can
+    // extract the application icon reliably.
+    {
+        volatile uintptr_t pakBegin = (uintptr_t)eo_pak_start;
+        volatile uintptr_t pakEnd = (uintptr_t)eo_pak_end;
+        if (pakEnd > pakBegin) {
+            s_pakData = (const uint8_t*)pakBegin;
+            s_pakSize = (uint32_t)(pakEnd - pakBegin);
+        }
+    }
+#endif
+
+    if (!s_pakData || s_pakSize < 16) {
+        HRSRC hRes = FindResourceA(nullptr, WIN_MAKEINTRESOURCEA(100), WIN_RT_RCDATA);
+        if (hRes) {
+            HGLOBAL hGlobal = LoadResource(nullptr, hRes);
+            if (hGlobal) {
+                s_pakData = (const uint8_t*)LockResource(hGlobal);
+                s_pakSize = (uint32_t)SizeofResource(nullptr, hRes);
+            }
         }
     }
 #endif
