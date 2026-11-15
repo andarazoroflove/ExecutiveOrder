@@ -7,4 +7,5 @@ namespace AssetManager {
     bool FileExists(const char* path);
     Texture2D LoadTexture(const char* path);
     Image LoadImage(const char* path);
+    Sound LoadSound(const char* path);
 }

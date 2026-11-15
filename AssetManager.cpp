@@ -78,9 +78,7 @@ void Init() {
 #ifdef _WIN32
 
 #ifdef EO_PAK_FILE
-    // Preferred: pak embedded via .incbin into its own read-only PE section.
-    // Keeping it out of .rsrc keeps the resource section tiny so Explorer can
-    // extract the application icon reliably.
+
     {
         volatile uintptr_t pakBegin = (uintptr_t)eo_pak_start;
         volatile uintptr_t pakEnd = (uintptr_t)eo_pak_end;
@@ -105,15 +103,23 @@ void Init() {
 
     if (!s_pakData || s_pakSize < 16) {
         const char* candidatePaths[] = {
+            "turbo_assets.pak",
+            "assets/turbo_assets.pak",
+            "../assets/turbo_assets.pak",
+            "/roms/ports/ExecutiveVetoIITurbo/turbo_assets.pak",
+            "/roms2/ports/ExecutiveVetoIITurbo/turbo_assets.pak",
+            "/storage/roms/ports/ExecutiveVetoIITurbo/turbo_assets.pak",
+            "/media/roms/ports/ExecutiveVetoIITurbo/turbo_assets.pak",
             "assets.pak",
             "ExecutiveOrder/assets.pak",
-            "../assets.pak",
-            "/roms/ports/ExecutiveOrder/assets.pak",
-            "/roms2/ports/ExecutiveOrder/assets.pak"
+            "../assets.pak"
         };
         std::string foundPath;
+        std::string appDirTurboPak = std::string(GetApplicationDirectory()) + "turbo_assets.pak";
         std::string appDirPak = std::string(GetApplicationDirectory()) + "assets.pak";
-        if (::FileExists(appDirPak.c_str())) {
+        if (::FileExists(appDirTurboPak.c_str())) {
+            foundPath = appDirTurboPak;
+        } else if (::FileExists(appDirPak.c_str())) {
             foundPath = appDirPak;
         } else {
             for (const char* cp : candidatePaths) {
@@ -125,20 +131,37 @@ void Init() {
         }
 
         if (!foundPath.empty()) {
-            FILE* f = fopen(foundPath.c_str(), "rb");
-            if (f) {
-                fseek(f, 0, SEEK_END);
-                long sz = ftell(f);
-                fseek(f, 0, SEEK_SET);
-                if (sz >= 16) {
-                    static std::vector<uint8_t> fileBuf;
-                    fileBuf.resize(sz);
-                    if (fread(fileBuf.data(), 1, sz, f) == (size_t)sz) {
-                        s_pakData = fileBuf.data();
-                        s_pakSize = (uint32_t)sz;
+#ifndef _WIN32
+
+            int fd = open(foundPath.c_str(), O_RDONLY);
+            if (fd >= 0) {
+                struct stat st{};
+                if (fstat(fd, &st) == 0 && st.st_size >= 16) {
+                    void* mapped = mmap(nullptr, (size_t)st.st_size, PROT_READ, MAP_PRIVATE, fd, 0);
+                    if (mapped != MAP_FAILED && mapped != nullptr) {
+                        s_pakData = (const uint8_t*)mapped;
+                        s_pakSize = (uint32_t)st.st_size;
                     }
                 }
-                fclose(f);
+                close(fd);
+            }
+#endif
+            if (!s_pakData || s_pakSize < 16) {
+                FILE* f = fopen(foundPath.c_str(), "rb");
+                if (f) {
+                    fseek(f, 0, SEEK_END);
+                    long sz = ftell(f);
+                    fseek(f, 0, SEEK_SET);
+                    if (sz >= 16) {
+                        static std::vector<uint8_t> fileBuf;
+                        fileBuf.resize(sz);
+                        if (fread(fileBuf.data(), 1, sz, f) == (size_t)sz) {
+                            s_pakData = fileBuf.data();
+                            s_pakSize = (uint32_t)sz;
+                        }
+                    }
+                    fclose(f);
+                }
             }
         }
     }
@@ -229,6 +252,24 @@ Image LoadImage(const char* path) {
         return LoadImageFromMemory(ext, buf.data(), (int)buf.size());
     }
     return ::LoadImage(path);
+}
+
+Sound LoadSound(const char* path) {
+    std::vector<uint8_t> buf;
+    if (GetDecryptedData(path, buf)) {
+        const char* ext = GetFileExtension(path);
+        if (!ext || !ext[0]) ext = ".wav";
+        Wave wave = LoadWaveFromMemory(ext, buf.data(), (int)buf.size());
+        if (wave.frameCount > 0 && wave.data != nullptr) {
+            Sound snd = LoadSoundFromWave(wave);
+            UnloadWave(wave);
+            return snd;
+        }
+    }
+    if (::FileExists(path)) {
+        return ::LoadSound(path);
+    }
+    return Sound{};
 }
 
 }

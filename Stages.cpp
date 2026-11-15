@@ -104,10 +104,120 @@ StageManager::StageManager() {
         Color{ 195, 25, 35, 255 }, Color{ 145, 78, 55, 255 },
         Color{ 255, 215, 50, 255 }
     };
+
+    m_venues[STAGE_RYUGYONG_HOTEL] = VenueDetails{
+        "RYUGYONG UPPER FLOOR", "PYONGYANG, DPRK - 105TH FLOOR",
+        Color{ 26, 22, 58, 255 }, Color{ 68, 54, 112, 255 },
+        Color{ 92, 92, 98, 255 }, Color{ 118, 118, 122, 255 },
+        Color{ 80, 225, 95, 255 }
+    };
+
+    m_venues[STAGE_WESTERN_WALL] = VenueDetails{
+        "THE WESTERN WALL", "JERUSALEM - OLD CITY PLAZA",
+        Color{ 120, 155, 210, 255 }, Color{ 245, 205, 140, 255 },
+        Color{ 225, 190, 130, 255 }, Color{ 215, 185, 135, 255 },
+        Color{ 255, 230, 120, 255 }
+    };
+
+    m_venues[STAGE_SOVIET_FOUNDRY] = VenueDetails{
+        "SOVIET STEEL FOUNDRY", "SIBERIA, RUSSIA - BLAST PLANT",
+        Color{ 35, 18, 16, 255 }, Color{ 120, 48, 20, 255 },
+        Color{ 175, 40, 30, 255 }, Color{ 115, 112, 108, 255 },
+        Color{ 255, 185, 25, 255 }
+    };
+
+    m_venues[STAGE_PALACE_COURTYARD] = VenueDetails{
+        "PALACE COURTYARD", "PERSIAN GULF - ROYAL ARCHES",
+        Color{ 35, 135, 235, 255 }, Color{ 135, 205, 255, 255 },
+        Color{ 210, 165, 110, 255 }, Color{ 195, 155, 105, 255 },
+        Color{ 55, 210, 245, 255 }
+    };
+
+    m_venues[STAGE_PERFORMING_ARTS] = VenueDetails{
+        "PERFORMING ARTS CENTER", "WASHINGTON, D.C. - KENNEDY PLAZA",
+        Color{ 24, 38, 76, 255 }, Color{ 185, 120, 75, 255 },
+        Color{ 225, 220, 212, 255 }, Color{ 155, 150, 145, 255 },
+        Color{ 245, 195, 55, 255 }
+    };
+
+    m_venues[STAGE_THE_HOOD] = VenueDetails{
+        "THE HOOD", "WASHINGTON, D.C. - 3AM CARRYOUT",
+        Color{ 12, 16, 28, 255 }, Color{ 28, 34, 52, 255 },
+        Color{ 85, 42, 34, 255 }, Color{ 26, 30, 38, 255 },
+        Color{ 65, 255, 130, 255 }
+    };
+
+    m_venues[STAGE_PROGRESS_AVENUE] = VenueDetails{
+        "PROGRESS AVENUE", "DONGALD J. TRUMPF PROGRESSIVE CTR",
+        Color{ 55, 165, 245, 255 }, Color{ 135, 215, 255, 255 },
+        Color{ 205, 125, 90, 255 }, Color{ 185, 165, 145, 255 },
+        Color{ 255, 95, 210, 255 }
+    };
+
+    m_venues[STAGE_LINCOLN_BEDROOM] = VenueDetails{
+        "THE LINCOLN BEDROOM", "WHITE HOUSE - RESIDENCE SUITE",
+        Color{ 115, 22, 28, 255 }, Color{ 165, 42, 45, 255 },
+        Color{ 185, 138, 52, 255 }, Color{ 150, 24, 32, 255 },
+        Color{ 255, 210, 55, 255 }
+    };
+
+    m_venues[STAGE_WYOMING_RODEO] = VenueDetails{
+        "WYOMING", "JACKSON HOLE & OLD FAITHFUL RODEO",
+        Color{ 48, 165, 248, 255 }, Color{ 145, 215, 255, 255 },
+        Color{ 138, 92, 52, 255 }, Color{ 176, 108, 52, 255 },
+        Color{ 255, 165, 40, 255 }
+    };
+
+    m_venues[STAGE_TEHRAN_CASBAH] = VenueDetails{
+        "TEHRAN", "AZADI SQUARE - ROCK THE CASBAH",
+        Color{ 92, 48, 98, 255 }, Color{ 245, 135, 55, 255 },
+        Color{ 45, 175, 165, 255 }, Color{ 185, 152, 122, 255 },
+        Color{ 255, 85, 45, 255 }
+    };
 }
 
 StageManager::~StageManager() {
     Shutdown();
+}
+
+void StageManager::EnsureStageTextureLoaded(StageId id) {
+    if (id < 0 || id >= STAGE_COUNT) return;
+    if (m_stageTextures[id].id > 0) return;
+
+#if defined(GRAPHICS_API_OPENGL_ES2) || defined(__aarch64__)
+
+    for (int k = 0; k < STAGE_COUNT; k++) {
+        if (k != (int)id && m_stageTextures[k].id > 0) {
+            UnloadTexture(m_stageTextures[k]);
+            m_stageTextures[k] = { 0 };
+        }
+    }
+#endif
+
+    static const char* namedStages[STAGE_COUNT] = {
+        "stage_0.png", "stage_1.png", "stage_2.png", "stage_3.png", "stage_4.png", "stage_5.png",
+        "stage_wtc_plaza.png", "stage_comet_ping_pong.png", "stage_florida_keys.png",
+        "stage_lincoln_memorial.png", "stage_smithsonian_aero.png", "stage_tomb_unknown.png",
+        "stage_enn_news_studio.png", "stage_chicago_wrigley.png",
+        "stage_ryugyong_hotel.png", "stage_western_wall.png",
+        "stage_soviet_foundry.png", "stage_palace_courtyard.png",
+        "stage_performing_arts.png", "stage_the_hood.png",
+        "stage_progress_avenue.png", "stage_lincoln_bedroom.png",
+        "stage_wyoming_rodeo.png", "stage_tehran_casbah.png"
+    };
+
+    char path[160];
+    snprintf(path, sizeof(path), "%sstage_%d.png", m_baseDir.c_str(), (int)id);
+    if (AssetManager::FileExists(path)) {
+        m_stageTextures[id] = AssetManager::LoadTexture(path);
+        if (m_stageTextures[id].id > 0) SetTextureFilter(m_stageTextures[id], TEXTURE_FILTER_BILINEAR);
+    } else if (namedStages[id] != nullptr) {
+        snprintf(path, sizeof(path), "%s%s", m_baseDir.c_str(), namedStages[id]);
+        if (AssetManager::FileExists(path)) {
+            m_stageTextures[id] = AssetManager::LoadTexture(path);
+            if (m_stageTextures[id].id > 0) SetTextureFilter(m_stageTextures[id], TEXTURE_FILTER_BILINEAR);
+        }
+    }
 }
 
 void StageManager::Init() {
@@ -115,42 +225,28 @@ void StageManager::Init() {
 
     AssetManager::Init();
 
-    std::string baseDir = "assets/";
-    if (!AssetManager::HasEmbeddedAssets() && !DirectoryExists(baseDir.c_str())) {
+    m_baseDir = "assets/";
+    if (!AssetManager::HasEmbeddedAssets() && !DirectoryExists(m_baseDir.c_str())) {
         std::string appDirAssets = std::string(GetApplicationDirectory()) + "assets/";
         std::string parentAssets = "../assets/";
         std::string appParentAssets = std::string(GetApplicationDirectory()) + "../assets/";
         if (DirectoryExists(appDirAssets.c_str())) {
-            baseDir = appDirAssets;
+            m_baseDir = appDirAssets;
         } else if (DirectoryExists(parentAssets.c_str())) {
-            baseDir = parentAssets;
+            m_baseDir = parentAssets;
         } else if (DirectoryExists(appParentAssets.c_str())) {
-            baseDir = appParentAssets;
+            m_baseDir = appParentAssets;
         }
     }
 
-    const char* namedStages[STAGE_COUNT] = {
-        "stage_0.png", "stage_1.png", "stage_2.png", "stage_3.png", "stage_4.png", "stage_5.png",
-        "stage_wtc_plaza.png", "stage_comet_ping_pong.png", "stage_florida_keys.png",
-        "stage_lincoln_memorial.png", "stage_smithsonian_aero.png", "stage_tomb_unknown.png",
-        "stage_enn_news_studio.png", "stage_chicago_wrigley.png"
-    };
-
-    for (int i = 0; i < STAGE_COUNT; i++) {
-        char path[128];
-        snprintf(path, sizeof(path), "%sstage_%d.png", baseDir.c_str(), i);
-        if (AssetManager::FileExists(path)) {
-            m_stageTextures[i] = AssetManager::LoadTexture(path);
-            SetTextureFilter(m_stageTextures[i], TEXTURE_FILTER_POINT);
-        } else if (namedStages[i] != nullptr) {
-            snprintf(path, sizeof(path), "%s%s", baseDir.c_str(), namedStages[i]);
-            if (AssetManager::FileExists(path)) {
-                m_stageTextures[i] = AssetManager::LoadTexture(path);
-                SetTextureFilter(m_stageTextures[i], TEXTURE_FILTER_POINT);
-            }
-        }
-    }
     m_texturesLoaded = true;
+#if defined(GRAPHICS_API_OPENGL_ES2) || defined(__aarch64__)
+    EnsureStageTextureLoaded(m_stageId);
+#else
+    for (int i = 0; i < STAGE_COUNT; i++) {
+        EnsureStageTextureLoaded((StageId)i);
+    }
+#endif
 }
 
 void StageManager::Shutdown() {
@@ -167,25 +263,47 @@ void StageManager::Shutdown() {
 void StageManager::SetStage(StageId id) {
     if (id >= 0 && id < STAGE_COUNT) {
         m_stageId = id;
+#if defined(GRAPHICS_API_OPENGL_ES2) || defined(__aarch64__)
+        if (m_texturesLoaded) {
+            EnsureStageTextureLoaded(m_stageId);
+        }
+#endif
     }
 }
 
 void StageManager::DrawFarLayer(float camX, float time) {
+#if defined(GRAPHICS_API_OPENGL_ES2) || defined(__aarch64__)
+    if (m_texturesLoaded && m_stageTextures[m_stageId].id == 0) {
+        EnsureStageTextureLoaded(m_stageId);
+    }
+#endif
     if (m_texturesLoaded && m_stageTextures[m_stageId].id > 0) {
 
         float minCam = STAGE_MIN_X;
         float maxCam = STAGE_MAX_X - SCREEN_WIDTH;
         float t = std::clamp((camX - minCam) / (maxCam - minCam), 0.0f, 1.0f);
 
-        float srcH = 640.0f;
-        float srcW = srcH * ((float)SCREEN_WIDTH / (float)SCREEN_HEIGHT);
-        float maxScrollX = (float)m_stageTextures[m_stageId].width - srcW;
+        float texWf = (float)m_stageTextures[m_stageId].width;
+        float texHf = (float)m_stageTextures[m_stageId].height;
+        float srcH = std::min(640.0f, texHf);
+        float srcY = std::max(0.0f, texHf - srcH);
+        if (m_stageId >= STAGE_PERFORMING_ARTS && texHf >= 740.0f) {
+            srcH = 752.0f;
+            srcY = 8.0f;
+        } else if (m_stageId >= STAGE_RYUGYONG_HOTEL && texHf >= 740.0f) {
+            srcH = 700.0f;
+            srcY = 52.0f;
+        }
+        float srcW = std::min(texWf, srcH * ((float)SCREEN_WIDTH / (float)SCREEN_HEIGHT));
+        float maxScrollX = std::max(0.0f, texWf - srcW);
         float srcX = t * maxScrollX;
-        float srcY = (float)m_stageTextures[m_stageId].height - srcH;
 
         Rectangle srcRec = { srcX, srcY, srcW, srcH };
         Rectangle dstRec = { 0.0f, 0.0f, (float)SCREEN_WIDTH, (float)SCREEN_HEIGHT };
         DrawTexturePro(m_stageTextures[m_stageId], srcRec, dstRec, Vector2{ 0.0f, 0.0f }, 0.0f, WHITE);
+
+        auto MapBgX = [&](float tx) -> float { return (tx - srcX) * ((float)SCREEN_WIDTH / srcW); };
+        auto MapBgY = [&](float ty) -> float { return (ty - srcY) * ((float)SCREEN_HEIGHT / srcH); };
 
         switch (m_stageId) {
         case STAGE_DEMOLISHED_EAST_WING: {
@@ -196,56 +314,32 @@ void StageManager::DrawFarLayer(float camX, float time) {
             break;
         }
         case STAGE_REFLECTING_POOL: {
-
             float monTexX = 688.0f;
             float monScreenX = (monTexX - srcX) * ((float)SCREEN_WIDTH / srcW);
             if (fmodf(time, 1.2f) < 0.6f) {
-                DrawCircle((int)monScreenX, 10, 3, Color{ 255, 40, 40, 240 });
-                DrawCircle((int)monScreenX, 10, 6, Color{ 255, 60, 60, 90 });
+                DrawRectangle((int)monScreenX - 1, 9, 2, 2, Color{ 255, 45, 45, 240 });
             }
             break;
         }
-        case STAGE_CONGRESSIONAL_FLOOR: {
-
-            float chanScreenX = (float)(SCREEN_WIDTH / 2) + sinf(time * 1.5f) * 6.0f;
-            DrawLine((int)chanScreenX, 0, (int)chanScreenX, 20, Color{ 200, 160, 50, 255 });
-            DrawCircle((int)chanScreenX, 22, 8, Color{ 220, 180, 60, 255 });
-            DrawCircle((int)chanScreenX, 22, 4, Color{ 255, 240, 180, 255 });
+        case STAGE_CONGRESSIONAL_FLOOR:
+        case STAGE_WHITE_HOUSE_MMA:
             break;
-        }
-        case STAGE_WHITE_HOUSE_MMA: {
-
-            float heliTexX = 1140.0f;
-            float heliScreenX = (heliTexX - srcX) * ((float)SCREEN_WIDTH / srcW);
-            float heliScreenY = (280.0f - srcY) * ((float)SCREEN_HEIGHT / srcH);
-            float rotorSweep = sinf(time * 40.0f) * 36.0f;
-            DrawLine((int)heliScreenX - (int)rotorSweep, (int)heliScreenY, (int)heliScreenX + (int)rotorSweep, (int)heliScreenY, Color{ 160, 180, 160, 180 });
-            break;
-        }
         case STAGE_PRESS_BRIEFING: {
-
             float flashCycle = fmodf(time * 3.8f, 1.0f);
             if (flashCycle < 0.08f) {
                 float fx = 60.0f + fmodf(time * 123.4f, 260.0f);
                 float fy = 90.0f + fmodf(time * 56.7f, 50.0f);
-                DrawCircle((int)fx, (int)fy, 8, Color{ 255, 255, 255, 220 });
-                DrawCircle((int)fx, (int)fy, 18, Color{ 230, 240, 255, 100 });
+                VisualsEngine::DrawCenteredSprite(VisualsEngine::GetVfxSprite(0), fx, fy, 12.0f, 12.0f);
             }
             float flashCycle2 = fmodf(time * 2.3f + 0.5f, 1.0f);
             if (flashCycle2 < 0.06f) {
                 float fx2 = 120.0f + fmodf(time * 78.9f, 220.0f);
                 float fy2 = 110.0f + fmodf(time * 34.5f, 40.0f);
-                DrawCircle((int)fx2, (int)fy2, 6, Color{ 255, 255, 240, 200 });
-                DrawCircle((int)fx2, (int)fy2, 14, Color{ 255, 250, 210, 80 });
+                VisualsEngine::DrawCenteredSprite(VisualsEngine::GetVfxSprite(0), fx2, fy2, 10.0f, 10.0f, 22.0f);
             }
             break;
         }
         case STAGE_PENTAGON_ALTAR: {
-
-            float flamePulse = sinf(time * 8.0f) * 4.0f;
-            DrawCircle(40, 110, (int)(10 + flamePulse), Color{ 255, 100, 30, 110 });
-            DrawCircle(SCREEN_WIDTH - 40, 110, (int)(10 + flamePulse), Color{ 255, 100, 30, 110 });
-
             if (fmodf(time, 2.0f) < 1.0f) {
                 DrawTriangle(Vector2{ (float)SCREEN_WIDTH / 2.0f, 0.0f },
                              Vector2{ (float)SCREEN_WIDTH / 2.0f - 60.0f, (float)SCREEN_HEIGHT },
@@ -255,40 +349,127 @@ void StageManager::DrawFarLayer(float camX, float time) {
             break;
         }
         case STAGE_WTC_PLAZA: {
-
             if (fmodf(time * 1.8f, 1.0f) < 0.12f) {
-                float glintX = (float)(SCREEN_WIDTH / 2) + 20.0f;
-                DrawCircle((int)glintX, 15, 3, WHITE);
-                DrawCircle((int)glintX, 15, 6, Color{ 255, 240, 180, 120 });
-            }
-
-            if (fmodf(time * 2.5f + 0.3f, 1.0f) < 0.15f) {
-                DrawCircle(48, 55, 2, Color{ 255, 230, 80, 220 });
+                VisualsEngine::DrawCenteredSprite(VisualsEngine::GetVfxSprite(0), (float)(SCREEN_WIDTH / 2) + 20.0f, 15.0f, 8.0f, 8.0f);
             }
             break;
         }
         case STAGE_COMET_PING_PONG: {
-
             if (fmodf(time * 7.5f, 1.0f) < 0.05f) {
                 DrawRectangle(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT, Color{ 20, 20, 30, 40 });
             }
-
-            float pizzaPulse = 0.6f + 0.4f * sinf(time * 5.0f);
-            DrawCircle(SCREEN_WIDTH - 25, 25, 12, Color{ 255, 60, 40, (unsigned char)(60 * pizzaPulse) });
             break;
         }
         case STAGE_FLORIDA_KEYS: {
-
-            float spireGlint = sinf(time * 3.0f);
-            if (spireGlint > 0.8f) {
-                float sx = (float)(SCREEN_WIDTH / 2) + 5.0f;
-                DrawCircle((int)sx, 38, 4, Color{ 255, 245, 160, 220 });
-                DrawCircle((int)sx, 38, 8, Color{ 255, 215, 0, 90 });
-            }
-
             float waveTick = fmodf(time * 1.5f, 1.0f);
             float sparkX = 40.0f + waveTick * 180.0f;
             DrawRectangle((int)sparkX, (int)GROUND_Y - 4, 8, 1, Color{ 140, 240, 255, 180 });
+            break;
+        }
+        case STAGE_RYUGYONG_HOTEL: {
+            float jucheX = MapBgX(338.0f);
+            float jucheY = MapBgY(298.0f);
+            float flScale = 0.85f + 0.15f * sinf(time * 10.0f);
+            VisualsEngine::DrawCenteredSprite(VisualsEngine::GetVfxSprite(11), jucheX, jucheY - 2.0f, 10.0f * flScale, 12.0f * flScale);
+            break;
+        }
+        case STAGE_WESTERN_WALL:
+            break;
+        case STAGE_SOVIET_FOUNDRY:
+            break;
+        case STAGE_PALACE_COURTYARD: {
+
+            float ftnX = MapBgX(684.0f);
+            float ftnTopY = MapBgY(358.0f);
+            float ftnPoolY = MapBgY(522.0f);
+            for (int j = 0; j < 9; j++) {
+                float phase = fmodf(time * 2.6f + j * 0.13f, 1.0f);
+                float spread = (j - 4) * 3.8f;
+                float dropX = ftnX + spread * phase;
+                float dropY = ftnTopY + phase * phase * (ftnPoolY - ftnTopY);
+                DrawRectangle((int)dropX, (int)dropY, 2, 2, Color{ 195, 245, 255, 225 });
+            }
+            break;
+        }
+        case STAGE_PERFORMING_ARTS: {
+            for (int sp = 0; sp < 8; sp++) {
+                float ph = fmodf(time * 2.4f + sp * 0.17f, 1.0f);
+                float sx = MapBgX(520.0f + (sp % 4) * 115.0f + sinf(sp * 3.1f + time * 5.0f) * 14.0f);
+                float sy = MapBgY(78.0f + ph * ph * 165.0f);
+                DrawPixel((int)sx, (int)sy, (sp % 2 == 0) ? Color{ 255, 240, 130, 240 } : Color{ 255, 155, 45, 220 });
+            }
+            if (fmodf(time * 3.6f, 1.0f) < 0.08f) {
+                float fx = MapBgX((int(time * 5.0f) % 2 == 0) ? 512.0f : 935.0f);
+                float fy = MapBgY(485.0f);
+                VisualsEngine::DrawCenteredSprite(VisualsEngine::GetVfxSprite(0), fx, fy, 11.0f, 11.0f);
+            }
+            break;
+        }
+        case STAGE_THE_HOOD: {
+            float neonFlick = (fmodf(time * 9.0f, 1.0f) > 0.05f) ? 1.0f : 0.35f;
+            DrawRectangle((int)MapBgX(190.0f), (int)MapBgY(32.0f), (int)(600.0f * SCREEN_WIDTH / srcW), (int)(135.0f * SCREEN_HEIGHT / srcH),
+                          Color{ 255, 90, 35, (unsigned char)(18 * neonFlick) });
+            DrawRectangle((int)MapBgX(735.0f) + (int)(sinf(time * 7.0f) * 2.0f), (int)MapBgY(705.0f), 14, 2, Color{ 80, 255, 140, 150 });
+            for (int st = 0; st < 4; st++) {
+                float up = fmodf(time * 1.4f + st * 0.25f, 1.0f);
+                float bx = MapBgX((st < 2) ? 115.0f : 990.0f) + sinf(time * 4.0f + st) * 2.0f;
+                float by = MapBgY(430.0f - up * 38.0f);
+                DrawPixel((int)bx, (int)by, Color{ 230, 235, 245, (unsigned char)((1.0f - up) * 175) });
+            }
+            break;
+        }
+        case STAGE_PROGRESS_AVENUE: {
+            static const Color kPrideCols[6] = {
+                {235, 45, 55, 220}, {250, 145, 35, 220}, {250, 225, 45, 220},
+                {45, 195, 85, 220}, {55, 135, 250, 220}, {175, 65, 235, 220}
+            };
+            for (int c = 0; c < 14; c++) {
+                float cx = fmodf(c * 31.0f + time * (12.0f + (c % 3) * 4.0f), (float)SCREEN_WIDTH);
+                float cy = fmodf(c * 19.0f + time * 16.0f, (float)GROUND_Y - 18.0f);
+                DrawRectangle((int)cx + (int)(sinf(time * 5.0f + c) * 3.0f), (int)cy, 2, 2, kPrideCols[c % 6]);
+            }
+            break;
+        }
+        case STAGE_LINCOLN_BEDROOM: {
+            float tvX = MapBgX(1215.0f), tvY = MapBgY(385.0f);
+            float carShift = fmodf(time * 18.0f, 14.0f);
+            DrawRectangle((int)(tvX - 6.0f + carShift * 0.3f), (int)(tvY + 4.0f - carShift * 0.4f), 3, 2, Color{ 255, 240, 120, 210 });
+            float chX = MapBgX(790.0f), chY = MapBgY(82.0f);
+            if (fmodf(time * 3.2f, 1.0f) < 0.35f) {
+                DrawPixel((int)chX + ((int)(time * 9.0f) % 9 - 4) * 3, (int)chY, Color{ 255, 252, 210, 240 });
+            }
+            break;
+        }
+        case STAGE_WYOMING_RODEO: {
+            float geyX = MapBgX(1065.0f);
+            for (int m = 0; m < 10; m++) {
+                float ph = fmodf(time * 1.9f + m * 0.11f, 1.0f);
+                float mx = geyX + sinf(m * 2.3f + time * 3.0f) * (5.0f + ph * 14.0f);
+                float my = MapBgY(410.0f - ph * 340.0f);
+                DrawRectangle((int)mx, (int)my, 2, 2, Color{ 240, 252, 255, (unsigned char)((1.0f - ph) * 210) });
+            }
+            for (int h = 0; h < 2; h++) {
+                float hp = fmodf(time * 0.85f + h * 0.5f, 1.0f);
+                float hx = MapBgX(426.0f) + sinf(time * 4.0f + h * 3.0f) * 3.0f;
+                float hy = MapBgY(428.0f - hp * 55.0f);
+                Color hc{ 255, 75, 125, (unsigned char)((1.0f - hp) * 235) };
+                DrawRectangle((int)hx - 2, (int)hy, 2, 2, hc);
+                DrawRectangle((int)hx + 1, (int)hy, 2, 2, hc);
+                DrawRectangle((int)hx - 1, (int)hy + 1, 3, 2, hc);
+            }
+            break;
+        }
+        case STAGE_TEHRAN_CASBAH: {
+            float rigX = MapBgX(260.0f), rigY = MapBgY(215.0f);
+            Color spotCol = ((int)(time * 5.0f) % 2 == 0) ? Color{ 255, 220, 75, 36 } : Color{ 80, 235, 215, 36 };
+            DrawTriangle(Vector2{ rigX - 30.0f, rigY - 25.0f }, Vector2{ rigX - 55.0f, rigY + 85.0f }, Vector2{ rigX + 35.0f, rigY + 85.0f }, spotCol);
+
+            for (int bf = 0; bf < 2; bf++) {
+                float fx = MapBgX(bf == 0 ? 645.0f : 1190.0f);
+                float fy = MapBgY(342.0f);
+                float flScale = 0.9f + 0.15f * sinf(time * 18.0f + bf * 2.0f);
+                VisualsEngine::DrawCenteredSprite(VisualsEngine::GetVfxSprite(11), fx + 3.0f, fy - 3.0f, 9.0f * flScale, 11.0f * flScale);
+            }
             break;
         }
         default:
@@ -393,30 +574,14 @@ void StageManager::DrawMidLayer(float camX, float time) {
             }
             break;
         }
-        case STAGE_CONGRESSIONAL_FLOOR: {
-
-            float midOffset = -camX * 0.40f;
-            for (int i = 0; i < 10; i++) {
-                float npcX = i * 42.0f + fmodf(midOffset, 42.0f) + 10.0f;
-                bool standing = ((i + (int)(time * 2.5f)) % 3) == 0;
-                if (standing) {
-                    float armY = sinf(time * 14.0f + i) * 4.0f;
-                    DrawLine((int)npcX + 6, 85, (int)npcX + 10, 80 + (int)armY, Color{ 235, 190, 150, 200 });
-                    if (i % 2 == 0) {
-                        DrawRectangle((int)npcX + 9, 78 + (int)armY, 4, 3, Color{ 200, 150, 60, 255 });
-                    }
-                }
-            }
+        case STAGE_CONGRESSIONAL_FLOOR:
             break;
-        }
         case STAGE_WHITE_HOUSE_MMA: {
-
             float midOffset = -camX * 0.50f;
-            for (int i = 0; i < 12; i++) {
-                float crowdX = i * 35.0f + fmodf(midOffset, 35.0f);
-                if (fmodf(time * 9.0f + i * 1.9f, 2.0f) < 0.05f) {
-                    DrawCircle((int)crowdX, 120, 8, Color{ 255, 255, 255, 210 });
-                    DrawCircle((int)crowdX, 120, 16, Color{ 200, 230, 255, 80 });
+            for (int i = 0; i < 10; i++) {
+                float crowdX = i * 42.0f + fmodf(midOffset, 42.0f);
+                if (fmodf(time * 9.0f + i * 1.9f, 2.2f) < 0.05f) {
+                    VisualsEngine::DrawCenteredSprite(VisualsEngine::GetVfxSprite(0), crowdX, 118.0f, 10.0f, 10.0f, (float)(i * 20));
                 }
             }
             break;
@@ -652,14 +817,6 @@ void StageManager::DrawPlayfield(float camX, float time) {
 }
 
 void StageManager::DrawForeground(float camX, float time) {
-    if (m_stageId == STAGE_WHITE_HOUSE_MMA) {
-
-        float fenceOffset = -camX * 1.05f;
-        Color wireCol = Color{ 40, 45, 50, 40 };
-        for (int x = -20; x < SCREEN_WIDTH + 40; x += 18) {
-            float fx = (float)x + fmodf(fenceOffset, 18.0f);
-            DrawLine((int)fx, 125, (int)fx + 22, (int)GROUND_Y - 4, wireCol);
-            DrawLine((int)fx + 22, 125, (int)fx, (int)GROUND_Y - 4, wireCol);
-        }
-    }
+    (void)camX;
+    (void)time;
 }

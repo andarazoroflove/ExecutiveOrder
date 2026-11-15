@@ -34,8 +34,10 @@ private:
     void DrawReflectingPool(float camX, float time);
     void DrawCongressionalFloor(float camX, float time);
     void DrawMMARing(float camX, float time);
+    void EnsureStageTextureLoaded(StageId id);
 
     StageId m_stageId = STAGE_DEMOLISHED_EAST_WING;
+    std::string m_baseDir = "assets/";
     VenueDetails m_venues[STAGE_COUNT];
     Texture2D m_stageTextures[STAGE_COUNT]{};
     bool m_texturesLoaded = false;

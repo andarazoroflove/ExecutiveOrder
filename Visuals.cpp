@@ -11,8 +11,36 @@ Texture2D VisualsEngine::s_titleSplash = { 0 };
 Texture2D VisualsEngine::s_portraits[CHARACTER_COUNT] = { 0 };
 Texture2D VisualsEngine::s_portraitsLose[CHARACTER_COUNT] = { 0 };
 Texture2D VisualsEngine::s_sprites[CHARACTER_COUNT][6] = { 0 };
-Texture2D VisualsEngine::s_teslaSprites[4] = { 0 };
-Texture2D VisualsEngine::s_bonusStageBg = { 0 };
+Texture2D VisualsEngine::s_strips[CHARACTER_COUNT][STRIP_CLIP_COUNT] = { 0 };
+Texture2D VisualsEngine::s_stripsHillary[STRIP_CLIP_COUNT] = { 0 };
+Texture2D VisualsEngine::s_stripsRoberts[STRIP_CLIP_COUNT] = { 0 };
+Texture2D VisualsEngine::s_stripsSotomayor[STRIP_CLIP_COUNT] = { 0 };
+Texture2D VisualsEngine::s_stripAbdulSpec2 = { 0 };
+Texture2D VisualsEngine::s_stripPaleMothVictory = { 0 };
+Texture2D VisualsEngine::s_stripWVictory = { 0 };
+Texture2D VisualsEngine::s_stripDickLaugh = { 0 };
+Texture2D VisualsEngine::s_stripAyatollahPrayer = { 0 };
+Texture2D VisualsEngine::s_projSprites[16] = { 0 };
+Texture2D VisualsEngine::s_finisherProps[16] = { 0 };
+Texture2D VisualsEngine::s_vfxSprites[16] = { 0 };
+Texture2D VisualsEngine::s_worldProps[16] = { 0 };
+Texture2D VisualsEngine::s_arabicTaunts[3] = { { 0 }, { 0 }, { 0 } };
+Texture2D VisualsEngine::s_mapWorldConflict = { 0 };
+Texture2D VisualsEngine::s_propShawarma = { 0 };
+Texture2D VisualsEngine::s_propWheelchair = { 0 };
+Texture2D VisualsEngine::s_propAtmHack = { 0 };
+Texture2D VisualsEngine::s_propHammerSickle = { 0 };
+Texture2D VisualsEngine::s_teslaSprites[8] = { 0 };
+Texture2D VisualsEngine::s_bonusStageBgs[BONUS_STAGE_COUNT] = { 0 };
+Texture2D VisualsEngine::s_bonusTarGun = { 0 };
+Texture2D VisualsEngine::s_bonusPoolCrack = { 0 };
+Texture2D VisualsEngine::s_bonusTarSplat = { 0 };
+Texture2D VisualsEngine::s_bonusTarPatch = { 0 };
+Texture2D VisualsEngine::s_bonusVillainStrips[3] = { 0 };
+Texture2D VisualsEngine::s_bonusWaterBucket = { 0 };
+Texture2D VisualsEngine::s_bonusBookPiles[4] = { 0 };
+Texture2D VisualsEngine::s_bonusBerlinWall[4] = { 0 };
+Texture2D VisualsEngine::s_bonusEastGermans[4] = { 0 };
 Texture2D VisualsEngine::s_mapEastCoast = { 0 };
 Texture2D VisualsEngine::s_endingSavior = { 0 };
 Texture2D VisualsEngine::s_sprBillaryHillary = { 0 };
@@ -27,6 +55,143 @@ Texture2D VisualsEngine::s_sprSleepyJoeSS = { 0 };
 Texture2D VisualsEngine::s_endingCthulhuThrow = { 0 };
 Texture2D VisualsEngine::s_endingLaserShark = { 0 };
 Texture2D VisualsEngine::s_endingCthulhuNap = { 0 };
+
+static std::string s_visualsBaseDir = "assets/";
+static const char* const kStripClipNames[VisualsEngine::STRIP_CLIP_COUNT] = {
+    "idle", "walk", "jump", "crouch", "block",
+    "lp", "hp", "lk", "hk", "spec", "hit", "taunt"
+};
+
+#if defined(GRAPHICS_API_OPENGL_ES2) || defined(__aarch64__)
+static bool s_charStripsLoaded[CHARACTER_COUNT] = { false };
+static int s_lruChars[4] = { -1, -1, -1, -1 };
+
+static void UnloadCharacterStripsImpl(int cid, Texture2D strips[CHARACTER_COUNT][VisualsEngine::STRIP_CLIP_COUNT],
+                                      Texture2D stripsHillary[VisualsEngine::STRIP_CLIP_COUNT],
+                                      Texture2D stripsRoberts[VisualsEngine::STRIP_CLIP_COUNT],
+                                      Texture2D stripsSotomayor[VisualsEngine::STRIP_CLIP_COUNT],
+                                      Texture2D& stripAbdulSpec2, Texture2D& stripPaleMothVictory,
+                                      Texture2D& stripWVictory, Texture2D& stripDickLaugh,
+                                      Texture2D& stripAyatollahPrayer) {
+    if (cid < 0 || cid >= CHARACTER_COUNT || !s_charStripsLoaded[cid]) return;
+    for (int c = 0; c < VisualsEngine::STRIP_CLIP_COUNT; c++) {
+        if (strips[cid][c].id > 0) { UnloadTexture(strips[cid][c]); strips[cid][c] = { 0 }; }
+    }
+    if (cid == CHAR_BILLARY) {
+        for (int c = 0; c < VisualsEngine::STRIP_CLIP_COUNT; c++) {
+            if (stripsHillary[c].id > 0) { UnloadTexture(stripsHillary[c]); stripsHillary[c] = { 0 }; }
+        }
+    } else if (cid == CHAR_HIGH_BENCH) {
+        for (int c = 0; c < VisualsEngine::STRIP_CLIP_COUNT; c++) {
+            if (stripsRoberts[c].id > 0) { UnloadTexture(stripsRoberts[c]); stripsRoberts[c] = { 0 }; }
+            if (stripsSotomayor[c].id > 0) { UnloadTexture(stripsSotomayor[c]); stripsSotomayor[c] = { 0 }; }
+        }
+    } else if (cid == CHAR_DOCTOR_ABDUL && stripAbdulSpec2.id > 0) {
+        UnloadTexture(stripAbdulSpec2); stripAbdulSpec2 = { 0 };
+    } else if (cid == CHAR_PALE_MOTH && stripPaleMothVictory.id > 0) {
+        UnloadTexture(stripPaleMothVictory); stripPaleMothVictory = { 0 };
+    } else if (cid == CHAR_W && stripWVictory.id > 0) {
+        UnloadTexture(stripWVictory); stripWVictory = { 0 };
+    } else if (cid == CHAR_DICK && stripDickLaugh.id > 0) {
+        UnloadTexture(stripDickLaugh); stripDickLaugh = { 0 };
+    } else if (cid == CHAR_AYATOLLAH && stripAyatollahPrayer.id > 0) {
+        UnloadTexture(stripAyatollahPrayer); stripAyatollahPrayer = { 0 };
+    }
+    s_charStripsLoaded[cid] = false;
+}
+
+static void LoadCharacterStripsImpl(int cid, Texture2D strips[CHARACTER_COUNT][VisualsEngine::STRIP_CLIP_COUNT],
+                                    Texture2D stripsHillary[VisualsEngine::STRIP_CLIP_COUNT],
+                                    Texture2D stripsRoberts[VisualsEngine::STRIP_CLIP_COUNT],
+                                    Texture2D stripsSotomayor[VisualsEngine::STRIP_CLIP_COUNT],
+                                    Texture2D& stripAbdulSpec2, Texture2D& stripPaleMothVictory,
+                                    Texture2D& stripWVictory, Texture2D& stripDickLaugh,
+                                    Texture2D& stripAyatollahPrayer) {
+    if (cid < 0 || cid >= CHARACTER_COUNT) return;
+
+    int existingSlot = -1;
+    for (int i = 0; i < 4; i++) {
+        if (s_lruChars[i] == cid) { existingSlot = i; break; }
+    }
+    if (existingSlot >= 0) {
+        for (int i = existingSlot; i > 0; i--) s_lruChars[i] = s_lruChars[i - 1];
+        s_lruChars[0] = cid;
+    } else {
+        int evicted = s_lruChars[3];
+        if (evicted >= 0 && evicted != cid) {
+            UnloadCharacterStripsImpl(evicted, strips, stripsHillary, stripsRoberts, stripsSotomayor,
+                                      stripAbdulSpec2, stripPaleMothVictory, stripWVictory, stripDickLaugh, stripAyatollahPrayer);
+        }
+        for (int i = 3; i > 0; i--) s_lruChars[i] = s_lruChars[i - 1];
+        s_lruChars[0] = cid;
+    }
+
+    if (s_charStripsLoaded[cid]) return;
+
+    auto loadPoint = [](const char* p, Texture2D& outTex) {
+        if (outTex.id == 0 && AssetManager::FileExists(p)) {
+            outTex = AssetManager::LoadTexture(p);
+            if (outTex.id > 0) SetTextureFilter(outTex, TEXTURE_FILTER_POINT);
+        }
+    };
+
+    for (int c = 0; c < VisualsEngine::STRIP_CLIP_COUNT; c++) {
+        char path[160];
+        snprintf(path, sizeof(path), "%sstrip_%d_%s.png", s_visualsBaseDir.c_str(), cid, kStripClipNames[c]);
+        loadPoint(path, strips[cid][c]);
+    }
+    if (cid == CHAR_BILLARY) {
+        for (int c = 0; c < VisualsEngine::STRIP_CLIP_COUNT; c++) {
+            char path[160];
+            snprintf(path, sizeof(path), "%sstrip_13_hil_%s.png", s_visualsBaseDir.c_str(), kStripClipNames[c]);
+            loadPoint(path, stripsHillary[c]);
+        }
+    } else if (cid == CHAR_HIGH_BENCH) {
+        for (int c = 0; c < VisualsEngine::STRIP_CLIP_COUNT; c++) {
+            char path[160];
+            snprintf(path, sizeof(path), "%sstrip_1_roberts_%s.png", s_visualsBaseDir.c_str(), kStripClipNames[c]);
+            loadPoint(path, stripsRoberts[c]);
+            snprintf(path, sizeof(path), "%sstrip_1_sotomayor_%s.png", s_visualsBaseDir.c_str(), kStripClipNames[c]);
+            loadPoint(path, stripsSotomayor[c]);
+        }
+    } else if (cid == CHAR_DOCTOR_ABDUL) {
+        loadPoint((s_visualsBaseDir + "strip_17_spec2.png").c_str(), stripAbdulSpec2);
+    } else if (cid == CHAR_PALE_MOTH) {
+        loadPoint((s_visualsBaseDir + "strip_23_victory.png").c_str(), stripPaleMothVictory);
+    } else if (cid == CHAR_W) {
+        loadPoint((s_visualsBaseDir + "strip_26_victory.png").c_str(), stripWVictory);
+    } else if (cid == CHAR_DICK) {
+        loadPoint((s_visualsBaseDir + "strip_27_laugh.png").c_str(), stripDickLaugh);
+    } else if (cid == CHAR_AYATOLLAH) {
+        loadPoint((s_visualsBaseDir + "strip_28_prayer.png").c_str(), stripAyatollahPrayer);
+    }
+    s_charStripsLoaded[cid] = true;
+}
+#endif
+
+void VisualsEngine::PrefetchMatchFighters(int p1Char, int p2Char) {
+#if defined(GRAPHICS_API_OPENGL_ES2) || defined(__aarch64__)
+    if (!s_loaded) return;
+    for (int c = 0; c < CHARACTER_COUNT; c++) {
+        if (c != p1Char && c != p2Char && s_charStripsLoaded[c]) {
+            UnloadCharacterStripsImpl(c, s_strips, s_stripsHillary, s_stripsRoberts, s_stripsSotomayor,
+                                      s_stripAbdulSpec2, s_stripPaleMothVictory, s_stripWVictory, s_stripDickLaugh, s_stripAyatollahPrayer);
+        }
+    }
+    for (int i = 0; i < 4; i++) s_lruChars[i] = -1;
+    if (p1Char >= 0 && p1Char < CHARACTER_COUNT) {
+        LoadCharacterStripsImpl(p1Char, s_strips, s_stripsHillary, s_stripsRoberts, s_stripsSotomayor,
+                                s_stripAbdulSpec2, s_stripPaleMothVictory, s_stripWVictory, s_stripDickLaugh, s_stripAyatollahPrayer);
+    }
+    if (p2Char >= 0 && p2Char < CHARACTER_COUNT && p2Char != p1Char) {
+        LoadCharacterStripsImpl(p2Char, s_strips, s_stripsHillary, s_stripsRoberts, s_stripsSotomayor,
+                                s_stripAbdulSpec2, s_stripPaleMothVictory, s_stripWVictory, s_stripDickLaugh, s_stripAyatollahPrayer);
+    }
+#else
+    (void)p1Char;
+    (void)p2Char;
+#endif
+}
 
 void VisualsEngine::Init() {
     if (s_loaded) return;
@@ -50,10 +215,12 @@ void VisualsEngine::Init() {
         }
     }
 
+    s_visualsBaseDir = baseDir;
+
     std::string splashPath = baseDir + "title_splash.png";
     if (AssetManager::FileExists(splashPath.c_str())) {
         s_titleSplash = AssetManager::LoadTexture(splashPath.c_str());
-        SetTextureFilter(s_titleSplash, TEXTURE_FILTER_POINT);
+        SetTextureFilter(s_titleSplash, TEXTURE_FILTER_BILINEAR);
     }
 
     for (int i = 0; i < CHARACTER_COUNT; i++) {
@@ -76,6 +243,24 @@ void VisualsEngine::Init() {
         }
     }
 
+    std::string robPortPath = baseDir + "portrait_1_roberts.png";
+    if (AssetManager::FileExists(robPortPath.c_str())) {
+        s_portraitRoberts = AssetManager::LoadTexture(robPortPath.c_str());
+        SetTextureFilter(s_portraitRoberts, TEXTURE_FILTER_POINT);
+    }
+    std::string sotoPortPath = baseDir + "portrait_1_sotomayor.png";
+    if (AssetManager::FileExists(sotoPortPath.c_str())) {
+        s_portraitSotomayor = AssetManager::LoadTexture(sotoPortPath.c_str());
+        SetTextureFilter(s_portraitSotomayor, TEXTURE_FILTER_POINT);
+    }
+
+    std::string ssPath = baseDir + "spr_8_secret_service.png";
+    if (AssetManager::FileExists(ssPath.c_str())) {
+        s_sprSleepyJoeSS = AssetManager::LoadTexture(ssPath.c_str());
+        SetTextureFilter(s_sprSleepyJoeSS, TEXTURE_FILTER_POINT);
+    }
+
+#if !defined(GRAPHICS_API_OPENGL_ES2) && !defined(__aarch64__)
     const char* animNames[6] = { "idle", "lp", "hp", "lk", "hk", "spec" };
     for (int i = 0; i < CHARACTER_COUNT; i++) {
         for (int a = 0; a < 6; a++) {
@@ -120,16 +305,6 @@ void VisualsEngine::Init() {
         s_spritesHillary[0] = s_sprBillaryHillary;
     }
 
-    std::string robPortPath = baseDir + "portrait_1_roberts.png";
-    if (AssetManager::FileExists(robPortPath.c_str())) {
-        s_portraitRoberts = AssetManager::LoadTexture(robPortPath.c_str());
-        SetTextureFilter(s_portraitRoberts, TEXTURE_FILTER_POINT);
-    }
-    std::string sotoPortPath = baseDir + "portrait_1_sotomayor.png";
-    if (AssetManager::FileExists(sotoPortPath.c_str())) {
-        s_portraitSotomayor = AssetManager::LoadTexture(sotoPortPath.c_str());
-        SetTextureFilter(s_portraitSotomayor, TEXTURE_FILTER_POINT);
-    }
     std::string robIdlePath = baseDir + "spr_1_roberts_idle.png";
     if (AssetManager::FileExists(robIdlePath.c_str())) {
         s_sprHighBenchRoberts = AssetManager::LoadTexture(robIdlePath.c_str());
@@ -151,54 +326,140 @@ void VisualsEngine::Init() {
         SetTextureFilter(s_sprHighBenchSotomayorSpec, TEXTURE_FILTER_POINT);
     }
 
-    std::string ssPath = baseDir + "spr_8_secret_service.png";
-    if (AssetManager::FileExists(ssPath.c_str())) {
-        s_sprSleepyJoeSS = AssetManager::LoadTexture(ssPath.c_str());
-        SetTextureFilter(s_sprSleepyJoeSS, TEXTURE_FILTER_POINT);
-    }
-
     std::string cthulhuThrowPath = baseDir + "ending_cthulhu_throw.png";
     if (AssetManager::FileExists(cthulhuThrowPath.c_str())) {
         s_endingCthulhuThrow = AssetManager::LoadTexture(cthulhuThrowPath.c_str());
-        SetTextureFilter(s_endingCthulhuThrow, TEXTURE_FILTER_POINT);
+        SetTextureFilter(s_endingCthulhuThrow, TEXTURE_FILTER_BILINEAR);
     }
     std::string laserSharkPath = baseDir + "ending_laser_shark.png";
     if (AssetManager::FileExists(laserSharkPath.c_str())) {
         s_endingLaserShark = AssetManager::LoadTexture(laserSharkPath.c_str());
-        SetTextureFilter(s_endingLaserShark, TEXTURE_FILTER_POINT);
+        SetTextureFilter(s_endingLaserShark, TEXTURE_FILTER_BILINEAR);
     }
     std::string cthulhuNapPath = baseDir + "ending_cthulhu_nap.png";
     if (AssetManager::FileExists(cthulhuNapPath.c_str())) {
         s_endingCthulhuNap = AssetManager::LoadTexture(cthulhuNapPath.c_str());
-        SetTextureFilter(s_endingCthulhuNap, TEXTURE_FILTER_POINT);
+        SetTextureFilter(s_endingCthulhuNap, TEXTURE_FILTER_BILINEAR);
     }
+#endif
+
+    auto loadTexPoint = [&](const std::string& rel, Texture2D& dst) {
+        std::string full = baseDir + rel;
+        if (AssetManager::FileExists(full.c_str())) {
+            dst = AssetManager::LoadTexture(full.c_str());
+            SetTextureFilter(dst, TEXTURE_FILTER_POINT);
+        }
+    };
+    auto loadTexBilinear = [&](const std::string& rel, Texture2D& dst) {
+        std::string full = baseDir + rel;
+        if (AssetManager::FileExists(full.c_str())) {
+            dst = AssetManager::LoadTexture(full.c_str());
+            SetTextureFilter(dst, TEXTURE_FILTER_BILINEAR);
+        }
+    };
+
+    for (int i = 0; i < 8; i++) {
+        char fname[64];
+        snprintf(fname, sizeof(fname), "tesla_%d.png", i);
+        loadTexPoint(fname, s_teslaSprites[i]);
+    }
+
+#if !defined(GRAPHICS_API_OPENGL_ES2) && !defined(__aarch64__)
+    loadTexBilinear("stage_bonus_tesla.png",       s_bonusStageBgs[BONUS_STAGE_TESLA]);
+    loadTexBilinear("stage_bonus_pool_tar.png",    s_bonusStageBgs[BONUS_STAGE_POOL_TAR]);
+    loadTexBilinear("stage_bonus_book_fire.png",   s_bonusStageBgs[BONUS_STAGE_BOOK_FIRE]);
+    loadTexBilinear("stage_bonus_berlin_wall.png", s_bonusStageBgs[BONUS_STAGE_BERLIN_WALL]);
+#endif
+
+    loadTexPoint("bonus_tar_gun.png",      s_bonusTarGun);
+    loadTexPoint("bonus_pool_crack.png",   s_bonusPoolCrack);
+    loadTexPoint("bonus_tar_splat.png",    s_bonusTarSplat);
+    loadTexPoint("bonus_tar_patch.png",    s_bonusTarPatch);
+
+    loadTexPoint("bonus_strip_miller.png", s_bonusVillainStrips[0]);
+    loadTexPoint("bonus_strip_barr.png",   s_bonusVillainStrips[1]);
+    loadTexPoint("bonus_strip_bannon.png", s_bonusVillainStrips[2]);
+    loadTexPoint("bonus_water_bucket.png", s_bonusWaterBucket);
 
     for (int i = 0; i < 4; i++) {
-        char path[128];
-        snprintf(path, sizeof(path), "%stesla_%d.png", baseDir.c_str(), i);
-        if (AssetManager::FileExists(path)) {
-            s_teslaSprites[i] = AssetManager::LoadTexture(path);
-            SetTextureFilter(s_teslaSprites[i], TEXTURE_FILTER_POINT);
-        }
-    }
-
-    std::string bonusBgPath = baseDir + "stage_bonus_tesla.png";
-    if (AssetManager::FileExists(bonusBgPath.c_str())) {
-        s_bonusStageBg = AssetManager::LoadTexture(bonusBgPath.c_str());
-        SetTextureFilter(s_bonusStageBg, TEXTURE_FILTER_POINT);
+        char fname[64];
+        snprintf(fname, sizeof(fname), "bonus_book_pile_%d.png", i);
+        loadTexPoint(fname, s_bonusBookPiles[i]);
+        snprintf(fname, sizeof(fname), "bonus_berlin_wall_%d.png", i);
+        loadTexPoint(fname, s_bonusBerlinWall[i]);
+        snprintf(fname, sizeof(fname), "bonus_east_german_%d.png", i);
+        loadTexPoint(fname, s_bonusEastGermans[i]);
     }
 
     std::string mapPath = baseDir + "map_east_coast.png";
     if (AssetManager::FileExists(mapPath.c_str())) {
         s_mapEastCoast = AssetManager::LoadTexture(mapPath.c_str());
-        SetTextureFilter(s_mapEastCoast, TEXTURE_FILTER_POINT);
+        SetTextureFilter(s_mapEastCoast, TEXTURE_FILTER_BILINEAR);
     }
 
+    auto loadTexIfPresent = [](const char* p, Texture2D& outTex) {
+        if (AssetManager::FileExists(p)) {
+            outTex = AssetManager::LoadTexture(p);
+            if (outTex.id > 0) SetTextureFilter(outTex, TEXTURE_FILTER_POINT);
+        }
+    };
+
+#if !defined(GRAPHICS_API_OPENGL_ES2) && !defined(__aarch64__)
     std::string endingPath = baseDir + "ending_savior.png";
     if (AssetManager::FileExists(endingPath.c_str())) {
         s_endingSavior = AssetManager::LoadTexture(endingPath.c_str());
-        SetTextureFilter(s_endingSavior, TEXTURE_FILTER_POINT);
+        SetTextureFilter(s_endingSavior, TEXTURE_FILTER_BILINEAR);
     }
+
+    for (int i = 0; i < CHARACTER_COUNT; i++) {
+        for (int c = 0; c < STRIP_CLIP_COUNT; c++) {
+            char path[160];
+            snprintf(path, sizeof(path), "%sstrip_%d_%s.png", baseDir.c_str(), i, kStripClipNames[c]);
+            loadTexIfPresent(path, s_strips[i][c]);
+        }
+    }
+    for (int c = 0; c < STRIP_CLIP_COUNT; c++) {
+        char path[160];
+        snprintf(path, sizeof(path), "%sstrip_13_hil_%s.png", baseDir.c_str(), kStripClipNames[c]);
+        loadTexIfPresent(path, s_stripsHillary[c]);
+        snprintf(path, sizeof(path), "%sstrip_1_roberts_%s.png", baseDir.c_str(), kStripClipNames[c]);
+        loadTexIfPresent(path, s_stripsRoberts[c]);
+        snprintf(path, sizeof(path), "%sstrip_1_sotomayor_%s.png", baseDir.c_str(), kStripClipNames[c]);
+        loadTexIfPresent(path, s_stripsSotomayor[c]);
+    }
+    loadTexIfPresent((baseDir + "strip_17_spec2.png").c_str(), s_stripAbdulSpec2);
+    loadTexIfPresent((baseDir + "strip_23_victory.png").c_str(), s_stripPaleMothVictory);
+    loadTexIfPresent((baseDir + "strip_26_victory.png").c_str(), s_stripWVictory);
+    loadTexIfPresent((baseDir + "strip_27_laugh.png").c_str(), s_stripDickLaugh);
+    loadTexIfPresent((baseDir + "strip_28_prayer.png").c_str(), s_stripAyatollahPrayer);
+#else
+    for (int i = 0; i < CHARACTER_COUNT; i++) s_charStripsLoaded[i] = false;
+    for (int i = 0; i < 4; i++) s_lruChars[i] = -1;
+#endif
+    for (int p = 0; p < 16; p++) {
+        char pp[160];
+        snprintf(pp, sizeof(pp), "%sprop_proj_%d.png", baseDir.c_str(), p);
+        loadTexIfPresent(pp, s_projSprites[p]);
+        snprintf(pp, sizeof(pp), "%sfinisher_prop_%d.png", baseDir.c_str(), p);
+        loadTexIfPresent(pp, s_finisherProps[p]);
+        snprintf(pp, sizeof(pp), "%svfx_%d.png", baseDir.c_str(), p);
+        loadTexIfPresent(pp, s_vfxSprites[p]);
+        snprintf(pp, sizeof(pp), "%swprop_%d.png", baseDir.c_str(), p);
+        loadTexIfPresent(pp, s_worldProps[p]);
+    }
+    for (int a = 0; a < 3; a++) {
+        char arPath[160];
+        snprintf(arPath, sizeof(arPath), "%staunt_arabic_%d.png", baseDir.c_str(), a);
+        if (AssetManager::FileExists(arPath)) {
+            s_arabicTaunts[a] = AssetManager::LoadTexture(arPath);
+            if (s_arabicTaunts[a].id > 0) SetTextureFilter(s_arabicTaunts[a], TEXTURE_FILTER_BILINEAR);
+        }
+    }
+    loadTexBilinear("map_world_conflict.png", s_mapWorldConflict);
+    loadTexIfPresent((baseDir + "prop_shawarma_sub.png").c_str(), s_propShawarma);
+    loadTexIfPresent((baseDir + "prop_wheelchair_rider.png").c_str(), s_propWheelchair);
+    loadTexIfPresent((baseDir + "prop_atm_hack.png").c_str(), s_propAtmHack);
+    loadTexIfPresent((baseDir + "prop_hammer_sickle.png").c_str(), s_propHammerSickle);
 
     s_loaded = true;
 }
@@ -228,27 +489,35 @@ void VisualsEngine::Shutdown() {
         }
     }
 
+    for (int a = 0; a < 6; a++) {
+        if (s_spritesHillary[a].id > 0 && s_spritesHillary[a].id != s_sprBillaryHillary.id) {
+            UnloadTexture(s_spritesHillary[a]);
+        }
+        s_spritesHillary[a] = { 0 };
+    }
     if (s_sprBillaryHillary.id > 0) {
         UnloadTexture(s_sprBillaryHillary);
         s_sprBillaryHillary = { 0 };
     }
-    for (int a = 0; a < 6; a++) {
-        if (s_spritesHillary[a].id > 0) {
-            UnloadTexture(s_spritesHillary[a]);
-            s_spritesHillary[a] = { 0 };
-        }
-    }
 
+    auto unloadTex = [](Texture2D& t) {
+        if (t.id > 0) {
+            UnloadTexture(t);
+            t = { 0 };
+        }
+    };
+    for (int i = 0; i < 8; i++) unloadTex(s_teslaSprites[i]);
+    for (int i = 0; i < BONUS_STAGE_COUNT; i++) unloadTex(s_bonusStageBgs[i]);
+    unloadTex(s_bonusTarGun);
+    unloadTex(s_bonusPoolCrack);
+    unloadTex(s_bonusTarSplat);
+    unloadTex(s_bonusTarPatch);
+    for (int i = 0; i < 3; i++) unloadTex(s_bonusVillainStrips[i]);
+    unloadTex(s_bonusWaterBucket);
     for (int i = 0; i < 4; i++) {
-        if (s_teslaSprites[i].id > 0) {
-            UnloadTexture(s_teslaSprites[i]);
-            s_teslaSprites[i] = { 0 };
-        }
-    }
-
-    if (s_bonusStageBg.id > 0) {
-        UnloadTexture(s_bonusStageBg);
-        s_bonusStageBg = { 0 };
+        unloadTex(s_bonusBookPiles[i]);
+        unloadTex(s_bonusBerlinWall[i]);
+        unloadTex(s_bonusEastGermans[i]);
     }
 
     if (s_mapEastCoast.id > 0) {
@@ -271,6 +540,41 @@ void VisualsEngine::Shutdown() {
     if (s_endingCthulhuThrow.id > 0) { UnloadTexture(s_endingCthulhuThrow); s_endingCthulhuThrow = { 0 }; }
     if (s_endingLaserShark.id > 0) { UnloadTexture(s_endingLaserShark); s_endingLaserShark = { 0 }; }
     if (s_endingCthulhuNap.id > 0) { UnloadTexture(s_endingCthulhuNap); s_endingCthulhuNap = { 0 }; }
+
+    for (int i = 0; i < CHARACTER_COUNT; i++) {
+        for (int c = 0; c < STRIP_CLIP_COUNT; c++) {
+            if (s_strips[i][c].id > 0) { UnloadTexture(s_strips[i][c]); s_strips[i][c] = { 0 }; }
+        }
+    }
+    for (int c = 0; c < STRIP_CLIP_COUNT; c++) {
+        if (s_stripsHillary[c].id > 0) { UnloadTexture(s_stripsHillary[c]); s_stripsHillary[c] = { 0 }; }
+        if (s_stripsRoberts[c].id > 0) { UnloadTexture(s_stripsRoberts[c]); s_stripsRoberts[c] = { 0 }; }
+        if (s_stripsSotomayor[c].id > 0) { UnloadTexture(s_stripsSotomayor[c]); s_stripsSotomayor[c] = { 0 }; }
+    }
+    if (s_stripAbdulSpec2.id > 0) { UnloadTexture(s_stripAbdulSpec2); s_stripAbdulSpec2 = { 0 }; }
+    if (s_stripPaleMothVictory.id > 0) { UnloadTexture(s_stripPaleMothVictory); s_stripPaleMothVictory = { 0 }; }
+    if (s_stripWVictory.id > 0) { UnloadTexture(s_stripWVictory); s_stripWVictory = { 0 }; }
+    if (s_stripDickLaugh.id > 0) { UnloadTexture(s_stripDickLaugh); s_stripDickLaugh = { 0 }; }
+    if (s_stripAyatollahPrayer.id > 0) { UnloadTexture(s_stripAyatollahPrayer); s_stripAyatollahPrayer = { 0 }; }
+    for (int p = 0; p < 16; p++) {
+        if (s_projSprites[p].id > 0) { UnloadTexture(s_projSprites[p]); s_projSprites[p] = { 0 }; }
+        if (s_finisherProps[p].id > 0) { UnloadTexture(s_finisherProps[p]); s_finisherProps[p] = { 0 }; }
+        if (s_vfxSprites[p].id > 0) { UnloadTexture(s_vfxSprites[p]); s_vfxSprites[p] = { 0 }; }
+        if (s_worldProps[p].id > 0) { UnloadTexture(s_worldProps[p]); s_worldProps[p] = { 0 }; }
+    }
+    for (int a = 0; a < 3; a++) {
+        if (s_arabicTaunts[a].id > 0) { UnloadTexture(s_arabicTaunts[a]); s_arabicTaunts[a] = { 0 }; }
+    }
+    if (s_mapWorldConflict.id > 0) { UnloadTexture(s_mapWorldConflict); s_mapWorldConflict = { 0 }; }
+    if (s_propShawarma.id > 0) { UnloadTexture(s_propShawarma); s_propShawarma = { 0 }; }
+    if (s_propWheelchair.id > 0) { UnloadTexture(s_propWheelchair); s_propWheelchair = { 0 }; }
+    if (s_propAtmHack.id > 0) { UnloadTexture(s_propAtmHack); s_propAtmHack = { 0 }; }
+    if (s_propHammerSickle.id > 0) { UnloadTexture(s_propHammerSickle); s_propHammerSickle = { 0 }; }
+
+#if defined(GRAPHICS_API_OPENGL_ES2) || defined(__aarch64__)
+    for (int i = 0; i < CHARACTER_COUNT; i++) s_charStripsLoaded[i] = false;
+    for (int i = 0; i < 4; i++) s_lruChars[i] = -1;
+#endif
 
     s_loaded = false;
 }
@@ -311,6 +615,32 @@ void VisualsEngine::DrawPixelText(const char* text, int x, int y, int size, Colo
     DrawText(text, x, y, size, col);
 }
 
+const Texture2D& VisualsEngine::GetArabicTauntTexture(int idx) {
+    static Texture2D s_empty = { 0 };
+    if (idx < 0 || idx >= 3) return s_empty;
+    return s_arabicTaunts[idx];
+}
+
+const Texture2D& VisualsEngine::GetVfxSprite(int idx) {
+    static Texture2D s_empty = { 0 };
+    if (idx < 0 || idx >= 16) return s_empty;
+    return s_vfxSprites[idx];
+}
+
+const Texture2D& VisualsEngine::GetWorldProp(int idx) {
+    static Texture2D s_empty = { 0 };
+    if (idx < 0 || idx >= 16) return s_empty;
+    return s_worldProps[idx];
+}
+
+bool VisualsEngine::DrawCenteredSprite(const Texture2D& tex, float cx, float cy, float w, float h, float rotDeg, Color tint, bool flipX) {
+    if (tex.id == 0) return false;
+    Rectangle src = { 0.0f, 0.0f, flipX ? -(float)tex.width : (float)tex.width, (float)tex.height };
+    Rectangle dst = { cx, cy, w, h };
+    DrawTexturePro(tex, src, dst, Vector2{ w * 0.5f, h * 0.5f }, rotDeg, tint);
+    return true;
+}
+
 void VisualsEngine::DrawDropShadow(const Fighter& f) {
     float dist = GROUND_Y - f.GetPosition().y;
     float w = std::max(6.0f, 26.0f - dist * 0.16f);
@@ -323,26 +653,9 @@ void VisualsEngine::DrawDropShadow(const Fighter& f) {
 static void DrawCosmeticPuffs(const Fighter& f) {
     for (const auto& puff : f.GetCosmeticPuffs()) {
         float prog = std::clamp(puff.timer / puff.maxTimer, 0.0f, 1.0f);
-        float r = puff.baseSize * (1.0f + prog * 1.8f);
+        float sz = puff.baseSize * 2.4f * (1.0f + prog * 1.5f);
         unsigned char alpha = (unsigned char)((1.0f - prog) * 230.0f);
-        Color colPuff = Color{ 185, 225, 75, alpha };
-        Color colInner = Color{ 235, 250, 160, (unsigned char)(alpha * 0.9f) };
-        Color colLine = Color{ 110, 155, 40, (unsigned char)(alpha * 0.9f) };
-
-        int cx = (int)puff.pos.x;
-        int cy = (int)puff.pos.y;
-        DrawCircle(cx, cy, r, colPuff);
-        DrawCircle(cx - (int)(r * 0.4f), cy - (int)(r * 0.4f), r * 0.75f, colPuff);
-        DrawCircle(cx - (int)(r * 0.5f), cy + (int)(r * 0.3f), r * 0.65f, colPuff);
-        DrawCircle(cx + (int)(r * 0.4f), cy - (int)(r * 0.2f), r * 0.60f, colPuff);
-
-        DrawCircle(cx, cy, r * 0.55f, colInner);
-        DrawCircleLines(cx, cy, r, colLine);
-        DrawCircleLines(cx - (int)(r * 0.4f), cy - (int)(r * 0.4f), r * 0.75f, colLine);
-
-        int lx = cx - (int)(r * 1.2f);
-        DrawLine(lx, cy - 3, lx - 6, cy - 6, colLine);
-        DrawLine(lx, cy + 2, lx - 7, cy + 4, colLine);
+        VisualsEngine::DrawCenteredSprite(VisualsEngine::GetVfxSprite(10), puff.pos.x, puff.pos.y, sz, sz, prog * 35.0f, Color{ 195, 245, 95, alpha });
     }
 }
 
@@ -350,26 +663,58 @@ void VisualsEngine::DrawFighterSprite(const Fighter& f) {
     int charId = (int)f.GetCharacterId();
     if (charId < 0 || charId >= CHARACTER_COUNT) charId = 0;
 
+#if defined(GRAPHICS_API_OPENGL_ES2) || defined(__aarch64__)
+    if (s_loaded && !s_charStripsLoaded[charId]) {
+        LoadCharacterStripsImpl(charId, s_strips, s_stripsHillary, s_stripsRoberts, s_stripsSotomayor,
+                                s_stripAbdulSpec2, s_stripPaleMothVictory, s_stripWVictory, s_stripDickLaugh, s_stripAyatollahPrayer);
+    }
+#endif
+
     Vector2 pos = f.GetPosition();
     bool fr = f.IsFacingRight();
     FighterState state = f.GetState();
     int frame = f.GetStateFrame();
     float dir = fr ? 1.0f : -1.0f;
 
-    if (!ChampionshipEdition::s_forceProceduralRig && s_loaded && s_sprites[charId][0].id > 0) {
-        int animIdx = 0;
-        if (state == FSTATE_ATTACK) {
-            AttackMoveType mtype = f.GetCurrentAttack().moveType;
-            if (mtype == MOVE_LIGHT_PUNCH) animIdx = 1;
-            else if (mtype == MOVE_HEAVY_PUNCH) animIdx = 2;
-            else if (mtype == MOVE_LIGHT_KICK) animIdx = 3;
-            else if (mtype == MOVE_HEAVY_KICK) animIdx = 4;
-            else if (mtype == MOVE_SPECIAL) animIdx = 5;
-            else animIdx = f.GetCurrentAttack().isHeavy ? 2 : 1;
-        } else if (state == FSTATE_SPECIAL) {
-            animIdx = 5;
-        } else {
-            animIdx = 0;
+    bool hasStrip = (s_loaded && s_strips[charId][STRIP_IDLE].id > 0);
+    bool hasLegacySpr = (s_loaded && s_sprites[charId][0].id > 0);
+    if (!ChampionshipEdition::s_forceProceduralRig && (hasStrip || hasLegacySpr)) {
+
+        if (f.GetJengaTimer() > 0) {
+            float prog = std::clamp(1.0f - (float)f.GetJengaTimer() / 68.0f, 0.0f, 1.0f);
+            float tCollapse = std::max(0.0f, (prog - 0.12f) / 0.88f);
+            for (int b = 0; b < 18; b++) {
+                int layer = b / 3;
+                int slot = b % 3;
+                bool crossLayer = (layer % 2 == 1);
+                float bw = crossLayer ? 16.0f : 28.0f;
+                float bh = 12.0f;
+                float stackX = pos.x + (crossLayer ? ((slot - 1) * 9.5f) : ((slot - 1) * 1.5f));
+                float stackY = (GROUND_Y - 5.0f) - layer * 8.2f;
+
+                float sideSign = ((b % 2 == 0) ? 1.0f : -1.0f) * (0.45f + (slot * 0.4f) + (layer * 0.18f));
+                float scatterX = sideSign * 28.0f * tCollapse;
+                float dropDist = (GROUND_Y - 5.0f - (b % 3) * 3.5f) - stackY;
+                float fallT = std::min(1.0f, tCollapse * (1.35f + (5 - layer) * 0.12f));
+                float curX = stackX + scatterX + ((prog < 0.12f) ? sinf(prog * 95.0f + layer) * 2.0f : 0.0f);
+                float curY = stackY + dropDist * (fallT * fallT);
+                float rot = sideSign * 68.0f * fallT;
+
+                Color woodTint = (b % 3 == 0) ? WHITE : ((b % 3 == 1) ? Color{ 242, 228, 210, 255 } : Color{ 226, 206, 184, 255 });
+                DrawCenteredSprite(s_worldProps[15], curX, curY, bw, bh, rot, woodTint, (b % 2 == 1));
+            }
+            if (prog < 0.65f) {
+                DrawPixelText("JENGA!", (int)pos.x - 18, (int)(GROUND_Y - 66.0f + tCollapse * 18.0f), 8, Color{ 255, 230, 65, 255 });
+            }
+            ChampionshipEdition::DrawFighterWorldOverlays(f);
+            DrawCosmeticPuffs(f);
+            return;
+        }
+
+        if (charId == CHAR_THE_DICTATOR && f.IsSpiderHoleHidden()) {
+            ChampionshipEdition::DrawFighterWorldOverlays(f);
+            DrawCosmeticPuffs(f);
+            return;
         }
 
         static const float s_charScale[CHARACTER_COUNT] = {
@@ -380,7 +725,7 @@ void VisualsEngine::DrawFighterSprite(const Fighter& f) {
             80.0f / 253.0f,
             78.0f / 262.0f,
             82.0f / 305.0f,
-            78.0f / 196.0f,
+            82.0f / 258.0f,
             86.0f / 265.0f,
             100.0f / 260.0f,
             88.0f / 264.0f,
@@ -389,41 +734,116 @@ void VisualsEngine::DrawFighterSprite(const Fighter& f) {
             84.0f / 276.0f,
             86.0f / 295.0f,
             84.0f / 262.0f,
-            86.0f / 268.0f
+            86.0f / 268.0f,
+            84.0f / 262.0f,
+            83.0f / 262.0f,
+            90.0f / 272.0f,
+            86.0f / 266.0f,
+            82.0f / 258.0f,
+            84.0f / 262.0f,
+            84.0f / 262.0f,
+            85.0f / 262.0f,
+            85.0f / 262.0f,
+            84.0f / 262.0f,
+            84.0f / 262.0f,
+            86.0f / 262.0f
         };
 
-        Texture2D tex = s_sprites[charId][animIdx];
-        if (charId == CHAR_HIGH_BENCH) {
-            HighBenchStage hbStage = f.GetHighBenchStage();
-            if (hbStage == HB_STAGE_ROBERTS) {
-                if (animIdx == 0 && s_sprHighBenchRoberts.id > 0) tex = s_sprHighBenchRoberts;
-                else if (s_sprHighBenchRobertsSpec.id > 0) tex = s_sprHighBenchRobertsSpec;
-                else if (s_sprHighBenchRoberts.id > 0) tex = s_sprHighBenchRoberts;
-            } else if (hbStage == HB_STAGE_SOTOMAYOR) {
-                if (animIdx == 0 && s_sprHighBenchSotomayor.id > 0) tex = s_sprHighBenchSotomayor;
-                else if (s_sprHighBenchSotomayorSpec.id > 0) tex = s_sprHighBenchSotomayorSpec;
-                else if (s_sprHighBenchSotomayor.id > 0) tex = s_sprHighBenchSotomayor;
-            }
-        }
-
-        if (charId == CHAR_BILLARY) {
-            if (!fr) {
-
-                if (s_spritesHillary[animIdx].id > 0) tex = s_spritesHillary[animIdx];
-                else if (animIdx == 0 && s_sprBillaryHillary.id > 0) tex = s_sprBillaryHillary;
+        StripClipId clipId = STRIP_IDLE;
+        int animIdx = 0;
+        if (state == FSTATE_VICTORY) {
+            clipId = STRIP_TAUNT;
+        } else if (state == FSTATE_WALK_FWD || state == FSTATE_WALK_BACK || state == FSTATE_DASH_FWD || state == FSTATE_DASH_BACK) {
+            clipId = STRIP_WALK;
+        } else if (state == FSTATE_JUMP) {
+            clipId = STRIP_JUMP;
+        } else if (state == FSTATE_CROUCH) {
+            clipId = STRIP_CROUCH;
+        } else if (state == FSTATE_BLOCK_HIGH || state == FSTATE_BLOCK_LOW || state == FSTATE_BLOCKSTUN) {
+            clipId = STRIP_BLOCK;
+        } else if (state == FSTATE_HITSTUN || state == FSTATE_FINISH_HIM_DIZZY || state == FSTATE_FINISHER_VICTIM || state == FSTATE_KNOCKDOWN_AIR || state == FSTATE_KNOCKDOWN_GROUND || state == FSTATE_DEFEAT || state == FSTATE_WAKEUP) {
+            clipId = STRIP_HIT;
+        } else if (state == FSTATE_TAUNT || state == FSTATE_CALL_TO_PRAYER) {
+            clipId = STRIP_TAUNT;
+        } else if (state == FSTATE_FINISHER) {
+            if (frame < 20) {
+                clipId = STRIP_TAUNT;
+            } else if (frame < 46 || charId == CHAR_FLOTUS) {
+                clipId = STRIP_SPEC;
+                animIdx = 5;
             } else {
-
-                if (s_sprites[CHAR_BILLARY][animIdx].id > 0) tex = s_sprites[CHAR_BILLARY][animIdx];
+                clipId = (charId == CHAR_MASCOT || charId == CHAR_POPULIST || charId == CHAR_COASTAL_GOV) ? STRIP_HK : STRIP_HP;
+                animIdx = 2;
             }
+        } else if (state == FSTATE_SPECIAL && f.IsSuperMoveActive()) {
+            int sub = (frame / 4) % 3;
+            clipId = (sub == 0) ? STRIP_SPEC : ((sub == 1) ? STRIP_HP : STRIP_HK);
+            animIdx = 5;
+        } else if (state == FSTATE_SPECIAL) {
+            clipId = STRIP_SPEC;
+            animIdx = 5;
+        } else if (state == FSTATE_ATTACK) {
+            AttackMoveType mtype = f.GetCurrentAttack().moveType;
+            if (mtype == MOVE_THROW) { clipId = STRIP_HP; animIdx = 2; }
+            else if (mtype == MOVE_LIGHT_PUNCH) { clipId = STRIP_LP; animIdx = 1; }
+            else if (mtype == MOVE_HEAVY_PUNCH) { clipId = STRIP_HP; animIdx = 2; }
+            else if (mtype == MOVE_LIGHT_KICK) { clipId = STRIP_LK; animIdx = 3; }
+            else if (mtype == MOVE_HEAVY_KICK) { clipId = STRIP_HK; animIdx = 4; }
+            else if (mtype == MOVE_SPECIAL || mtype == MOVE_SUPER) { clipId = STRIP_SPEC; animIdx = 5; }
+            else { clipId = f.GetCurrentAttack().isHeavy ? STRIP_HP : STRIP_LP; animIdx = f.GetCurrentAttack().isHeavy ? 2 : 1; }
         }
 
-        if (tex.id == 0) {
-            if (animIdx == 1 && s_sprites[charId][2].id > 0) tex = s_sprites[charId][2];
-            else if (animIdx == 2 && s_sprites[charId][1].id > 0) tex = s_sprites[charId][1];
-            else if (animIdx == 3 && s_sprites[charId][4].id > 0) tex = s_sprites[charId][4];
-            else if (animIdx == 4 && s_sprites[charId][3].id > 0) tex = s_sprites[charId][3];
-            else if (animIdx == 5 && s_sprites[charId][2].id > 0) tex = s_sprites[charId][2];
-            else tex = s_sprites[charId][0];
+        Texture2D tex = { 0 };
+        bool usingStrip = false;
+        bool isPaleMothHorse = false;
+        bool isWGolfVictory = false;
+        bool isDickCameraLaugh = false;
+
+        if (hasStrip) {
+            if (charId == CHAR_AYATOLLAH && state == FSTATE_CALL_TO_PRAYER && s_stripAyatollahPrayer.id > 0) {
+                tex = s_stripAyatollahPrayer;
+            } else if (charId == CHAR_DICK && f.IsLaughingAtCamera() && s_stripDickLaugh.id > 0 &&
+                state != FSTATE_HITSTUN && state != FSTATE_KNOCKDOWN_AIR && state != FSTATE_KNOCKDOWN_GROUND && state != FSTATE_DEFEAT) {
+                tex = s_stripDickLaugh;
+                isDickCameraLaugh = true;
+            } else if (charId == CHAR_W && state == FSTATE_VICTORY && s_stripWVictory.id > 0) {
+                tex = s_stripWVictory;
+                isWGolfVictory = true;
+            } else if (charId == CHAR_PALE_MOTH && state == FSTATE_VICTORY && s_stripPaleMothVictory.id > 0) {
+                tex = s_stripPaleMothVictory;
+                isPaleMothHorse = true;
+            } else if (charId == CHAR_DOCTOR_ABDUL && state == FSTATE_SPECIAL && f.GetSpecialIndex() == 2 && s_stripAbdulSpec2.id > 0) {
+                tex = s_stripAbdulSpec2;
+            } else if (charId == CHAR_HIGH_BENCH) {
+                HighBenchStage hbStage = f.GetHighBenchStage();
+                if (hbStage == HB_STAGE_ROBERTS && s_stripsRoberts[clipId].id > 0) tex = s_stripsRoberts[clipId];
+                else if (hbStage == HB_STAGE_SOTOMAYOR && s_stripsSotomayor[clipId].id > 0) tex = s_stripsSotomayor[clipId];
+                else tex = s_strips[charId][clipId];
+            } else if (charId == CHAR_BILLARY && !fr && s_stripsHillary[clipId].id > 0) {
+                tex = s_stripsHillary[clipId];
+            } else {
+                tex = s_strips[charId][clipId];
+            }
+            if (tex.id == 0) tex = s_strips[charId][STRIP_IDLE];
+            if (tex.id > 0) usingStrip = true;
+        }
+
+        if (!usingStrip) {
+            tex = s_sprites[charId][animIdx];
+            if (charId == CHAR_HIGH_BENCH) {
+                HighBenchStage hbStage = f.GetHighBenchStage();
+                if (hbStage == HB_STAGE_ROBERTS) {
+                    if (animIdx == 0 && s_sprHighBenchRoberts.id > 0) tex = s_sprHighBenchRoberts;
+                    else if (s_sprHighBenchRobertsSpec.id > 0) tex = s_sprHighBenchRobertsSpec;
+                } else if (hbStage == HB_STAGE_SOTOMAYOR) {
+                    if (animIdx == 0 && s_sprHighBenchSotomayor.id > 0) tex = s_sprHighBenchSotomayor;
+                    else if (s_sprHighBenchSotomayorSpec.id > 0) tex = s_sprHighBenchSotomayorSpec;
+                }
+            }
+            if (charId == CHAR_BILLARY && !fr && s_spritesHillary[animIdx].id > 0) {
+                tex = s_spritesHillary[animIdx];
+            }
+            if (tex.id == 0) tex = s_sprites[charId][0];
         }
 
         constexpr float CANVAS_W = 440.0f;
@@ -431,7 +851,7 @@ void VisualsEngine::DrawFighterSprite(const Fighter& f) {
         constexpr float ANCHOR_X = 180.0f;
         constexpr float BASELINE_Y = 320.0f;
 
-        float baseScale = s_charScale[charId];
+        float baseScale = s_charScale[charId] * (isPaleMothHorse ? 1.12f : 1.0f);
         float drawW = CANVAS_W * baseScale;
         float drawH = CANVAS_H * baseScale;
 
@@ -439,23 +859,36 @@ void VisualsEngine::DrawFighterSprite(const Fighter& f) {
         float posY = pos.y;
         float rotation = 0.0f;
 
-        if (charId == CHAR_SLEEPY_JOE && state == FSTATE_SPECIAL) {
-            posY = GROUND_Y + 4.0f;
+        if ((charId == CHAR_SLEEPY_JOE && state == FSTATE_SPECIAL) ||
+            (charId == CHAR_COUCHIE && state == FSTATE_SPECIAL)) {
+            posY = GROUND_Y + 3.0f;
+        }
+        if (isDickCameraLaugh) {
+            posY -= ((f.GetLaughTimer() % 4) < 2) ? 1.5f : 0.0f;
         }
 
-        if (state == FSTATE_IDLE) {
-            float breath = sinf(frame * 0.12f) * 1.5f;
-            posY += breath;
-        } else if (state == FSTATE_WALK_FWD || state == FSTATE_WALK_BACK) {
-            float walkBob = fabsf(sinf(frame * 0.28f)) * 2.2f;
-            posY -= walkBob;
+        if (!usingStrip) {
+            if (state == FSTATE_IDLE) {
+                posY += sinf(frame * 0.12f) * 1.5f;
+            } else if (state == FSTATE_WALK_FWD || state == FSTATE_WALK_BACK) {
+                posY -= fabsf(sinf(frame * 0.28f)) * 2.2f;
+                rotation = (state == FSTATE_WALK_FWD ? 2.5f : -2.5f) * (fr ? 1.0f : -1.0f);
+            } else if (state == FSTATE_TAUNT) {
+                rotation = fr ? -4.5f : 4.5f;
+                posY -= 1.5f;
+            }
+        }
 
-            rotation = (state == FSTATE_WALK_FWD ? 2.5f : -2.5f) * (fr ? 1.0f : -1.0f);
-        } else if (state == FSTATE_TAUNT) {
-            rotation = fr ? -4.5f : 4.5f;
-            posY -= 1.5f;
-        } else if (state == FSTATE_HITSTUN) {
-            posX += (fr ? -1.0f : 1.0f) * 4.0f;
+        if (state == FSTATE_HITSTUN) {
+            posX += (fr ? -1.0f : 1.0f) * 3.0f;
+        } else if (state == FSTATE_FINISH_HIM_DIZZY) {
+            posX += sinf(frame * 0.22f) * 2.5f;
+        } else if (state == FSTATE_FINISHER_VICTIM) {
+            posX += sinf(frame * 1.35f) * 3.2f;
+        } else if (state == FSTATE_FINISHER && charId == CHAR_A_NEW_HOPE && frame >= 24 && frame <= 62) {
+            float dunkT = (float)(frame - 24) / 38.0f;
+            posY -= sinf(dunkT * PI_F) * 56.0f;
+            posX += (fr ? 1.0f : -1.0f) * sinf(dunkT * PI_F) * 44.0f;
         } else if (state == FSTATE_BLOCKSTUN) {
             posX += (fr ? -1.0f : 1.0f) * 2.0f;
         } else if (state == FSTATE_KNOCKDOWN_AIR) {
@@ -470,22 +903,79 @@ void VisualsEngine::DrawFighterSprite(const Fighter& f) {
             posY = (GROUND_Y - 4.0f) * (1.0f - riseProg) + pos.y * riseProg;
         }
 
-        float texW = (float)tex.width;
-        float texH = (float)tex.height;
-        Rectangle srcRec = { 0.0f, 0.0f, texW, texH };
-        if (!fr) srcRec.width = -texW;
+        Rectangle srcRec = { 0.0f, 0.0f, (float)tex.width, (float)tex.height };
+        if (usingStrip) {
+            int numFrames = std::max(1, (int)(tex.width / 440));
+            int frameIdx = 0;
+            if (isDickCameraLaugh) {
+                frameIdx = ((40 - std::clamp(f.GetLaughTimer(), 0, 40)) / 3) % numFrames;
+            } else if (state == FSTATE_IDLE) {
+                frameIdx = (frame / 6) % numFrames;
+            } else if (state == FSTATE_WALK_FWD) {
+                frameIdx = (frame / 4) % numFrames;
+            } else if (state == FSTATE_WALK_BACK) {
+                frameIdx = (numFrames - 1) - ((frame / 4) % numFrames);
+            } else if (state == FSTATE_DASH_FWD || state == FSTATE_DASH_BACK) {
+                frameIdx = (frame / 2) % numFrames;
+            } else if (state == FSTATE_JUMP) {
+                float vy = f.GetVelocity().y;
+                if (vy < -2.2f) frameIdx = std::min(1, numFrames - 1);
+                else if (vy <= 2.2f) frameIdx = std::min(2, numFrames - 1);
+                else frameIdx = std::min(3, numFrames - 1);
+            } else if (state == FSTATE_CROUCH || state == FSTATE_BLOCK_HIGH || state == FSTATE_BLOCK_LOW || state == FSTATE_BLOCKSTUN) {
+                frameIdx = std::min(numFrames - 1, frame / 3);
+            } else if (state == FSTATE_TAUNT || state == FSTATE_FINISH_HIM_DIZZY || state == FSTATE_FINISHER_VICTIM) {
+                frameIdx = (frame / 6) % numFrames;
+            } else if (state == FSTATE_CALL_TO_PRAYER) {
+                frameIdx = (frame / 6) % numFrames;
+            } else if (state == FSTATE_FINISHER) {
+                frameIdx = (frame / 5) % numFrames;
+            } else if (state == FSTATE_VICTORY) {
+
+                if (isWGolfVictory) {
+                    frameIdx = std::min(numFrames - 1, frame / 6);
+                } else if (isPaleMothHorse && numFrames >= 4) {
+                    int raw = frame / 8;
+                    frameIdx = (raw < numFrames) ? raw : (2 + ((raw - numFrames) % (numFrames - 2)));
+                } else {
+                    frameIdx = (frame / 6) % numFrames;
+                }
+            } else if (state == FSTATE_ATTACK || state == FSTATE_SPECIAL) {
+                int totalDur = std::max(8, f.GetCurrentAttack().startupFrames + f.GetCurrentAttack().activeFrames + f.GetCurrentAttack().recoveryFrames);
+                if (state == FSTATE_SPECIAL && charId == CHAR_COUCHIE) {
+
+                    frameIdx = (frame < 6) ? 0 : (1 + ((frame / 3) % std::max(1, numFrames - 1)));
+                } else {
+                    frameIdx = std::clamp((frame * numFrames) / totalDur, 0, numFrames - 1);
+                }
+            } else {
+                frameIdx = std::min(numFrames - 1, frame / 4);
+            }
+            bool drawUnflipped = isDickCameraLaugh;
+            srcRec = Rectangle{ frameIdx * CANVAS_W, 0.0f, (fr || drawUnflipped) ? CANVAS_W : -CANVAS_W, CANVAS_H };
+        } else {
+            if (!fr) srcRec.width = -srcRec.width;
+        }
 
         Color tint = WHITE;
         if (f.IsInHitstop()) {
             if ((frame % 2) == 0) tint = Color{ 255, 255, 255, 255 };
         } else if (state == FSTATE_HITSTUN) {
             if (((frame / 2) % 2) == 0) tint = Color{ 255, 100, 100, 255 };
+        } else if (state == FSTATE_FINISH_HIM_DIZZY || state == FSTATE_FINISHER_VICTIM) {
+            if (((frame / 4) % 2) == 0) tint = Color{ 255, 210, 190, 255 };
+        } else if (state == FSTATE_CALL_TO_PRAYER) {
+            if (((frame / 3) % 2) == 0) tint = Color{ 235, 255, 210, 255 };
+        } else if (state == FSTATE_FINISHER) {
+            if (((frame / 2) % 2) == 0) tint = Color{ 255, 245, 190, 255 };
         } else if (state == FSTATE_BLOCK_HIGH || state == FSTATE_BLOCK_LOW || state == FSTATE_BLOCKSTUN) {
-            tint = Color{ 170, 215, 255, 255 };
+            tint = Color{ 190, 225, 255, 255 };
+        } else if (f.IsSuperMoveActive()) {
+            if (((frame / 2) % 2) == 0) tint = Color{ 255, 245, 175, 255 };
         }
 
         float crouchYScale = 1.0f;
-        if (f.IsCrouching()) {
+        if (!usingStrip && f.IsCrouching()) {
             crouchYScale = 0.85f;
             drawH *= crouchYScale;
         }
@@ -508,25 +998,36 @@ void VisualsEngine::DrawFighterSprite(const Fighter& f) {
 
         if (!isDownOrKo && f.GetTauntTimer() > 0 && !f.GetActiveTaunt().empty()) {
             const char* quote = f.GetActiveTaunt().c_str();
-            float headTopY = (f.GetCharacterId() == CHAR_WAR_PIG) ? (pos.y - 84.0f) : (pos.y - 66.0f);
-            int bubbleCenterX = (int)(pos.x + (f.IsFacingRight() ? -8.0f : 8.0f));
+            float headTopY = (charId == CHAR_WAR_PIG || charId == CHAR_BLEXAS) ? (pos.y - 96.0f) : (pos.y - 90.0f);
+            if (charId == CHAR_COUCHIE && state == FSTATE_SPECIAL) headTopY = pos.y - 46.0f;
+            int bubbleCenterX = (int)(pos.x + (f.IsFacingRight() ? -6.0f : 6.0f));
             ChampionshipEdition::DrawComicThoughtBubble(
                 quote,
                 bubbleCenterX,
-                (int)(headTopY - 3.0f),
+                (int)(headTopY - 4.0f),
                 (int)pos.x,
-                (int)(headTopY + 3.0f),
-                6,
+                (int)(headTopY + 4.0f),
+                10,
                 Color{ 15, 22, 38, 255 }
+            );
+        } else if (!isDownOrKo && isDickCameraLaugh) {
+            ChampionshipEdition::DrawComicThoughtBubble(
+                "HAHAHAHAHA!",
+                (int)pos.x,
+                (int)(pos.y - 92.0f),
+                (int)pos.x,
+                (int)(pos.y - 82.0f),
+                10,
+                Color{ 185, 20, 25, 255 }
             );
         } else if (!isDownOrKo && f.GetCharacterId() == CHAR_SLEEPY_JOE && state == FSTATE_SPECIAL && f.GetSpecialIndex() == 1) {
             ChampionshipEdition::DrawComicThoughtBubble(
                 "Zzz... ICE CREAM...",
                 (int)pos.x,
-                (int)(pos.y - 46.0f),
+                (int)(pos.y - 52.0f),
                 (int)pos.x,
-                (int)(pos.y - 38.0f),
-                6,
+                (int)(pos.y - 42.0f),
+                10,
                 Color{ 20, 40, 95, 255 }
             );
         }
@@ -747,57 +1248,50 @@ void VisualsEngine::DrawFighterSprite(const Fighter& f) {
 
 void VisualsEngine::DrawProjectiles(const Fighter& f) {
     const auto& projs = f.GetProjectiles();
+    auto drawCompiledProj = [&](int slot, Vector2 pos, float w, float h, bool faceRight, float rotDeg = 0.0f) -> bool {
+        if (slot < 0 || slot >= 16 || s_projSprites[slot].id == 0) return false;
+        Texture2D t = s_projSprites[slot];
+        Rectangle src = { 0.0f, 0.0f, faceRight ? (float)t.width : -(float)t.width, (float)t.height };
+        Rectangle dst = { pos.x, pos.y, w, h };
+        DrawTexturePro(t, src, dst, Vector2{ w * 0.5f, h * 0.5f }, rotDeg, WHITE);
+        return true;
+    };
+
     for (const auto& p : projs) {
         if (!p.active) continue;
 
-        if (p.type == 0) {
-
-            DrawCircle((int)p.pos.x, (int)p.pos.y, 10, Color{ 80, 180, 255, 240 });
-            DrawCircle((int)p.pos.x, (int)p.pos.y, 6, WHITE);
-
-            float trailDir = p.facingRight ? -1.0f : 1.0f;
-            DrawTriangle(
-                Vector2{ p.pos.x, p.pos.y - 8 },
-                Vector2{ p.pos.x, p.pos.y + 8 },
-                Vector2{ p.pos.x + trailDir * 18, p.pos.y },
-                Color{ 30, 130, 240, 180 }
-            );
-        } else if (p.type == 1) {
-
-            DrawRectangle((int)(p.pos.x - p.width * 0.5f), (int)(p.pos.y - p.height * 0.5f), (int)p.width, (int)p.height, Color{ 245, 245, 240, 240 });
-
-            for (int y = -20; y < 20; y += 8) {
-                DrawLine((int)p.pos.x - 5, (int)p.pos.y + y, (int)p.pos.x + 5, (int)p.pos.y + y, Color{ 80, 80, 90, 220 });
+        if (p.type == PROJ_SPARK) {
+            if (!drawCompiledProj(0, p.pos, 32.0f, 22.0f, p.facingRight)) {
+                DrawCircle((int)p.pos.x, (int)p.pos.y, 8, Color{ 80, 180, 255, 240 });
             }
-        } else if (p.type == 2) {
-
-            DrawCircle((int)p.pos.x, (int)p.pos.y, 7, Color{ 240, 40, 150, 255 });
-            DrawCircle((int)p.pos.x, (int)p.pos.y, 4, Color{ 255, 240, 120, 255 });
-        } else if (p.type == 3) {
-
-            DrawRectangle((int)p.pos.x - 3, (int)GROUND_Y - 26, 6, 26, Color{ 160, 160, 170, 255 });
-            DrawCircle((int)p.pos.x, (int)GROUND_Y - 28, 4, Color{ 40, 40, 45, 255 });
-        } else if (p.type == 4) {
-
-            float dir = p.facingRight ? 1.0f : -1.0f;
-            DrawCircle((int)p.pos.x, (int)p.pos.y, 8, Color{ 70, 30, 15, 255 });
-            DrawCircle((int)p.pos.x, (int)p.pos.y, 5, Color{ 140, 65, 30, 240 });
-            DrawCircle((int)(p.pos.x - dir * 8), (int)p.pos.y - 4, 4, Color{ 255, 235, 190, 220 });
-            DrawCircle((int)(p.pos.x - dir * 14), (int)p.pos.y + 3, 3, Color{ 255, 245, 220, 200 });
-            DrawCircle((int)(p.pos.x - dir * 20), (int)p.pos.y - 2, 2, WHITE);
-        } else if (p.type == 5) {
-
-            DrawEllipse((int)p.pos.x, (int)GROUND_Y - 4, 16, 8, Color{ 255, 215, 50, 220 });
-            DrawEllipseLines((int)p.pos.x, (int)GROUND_Y - 4, 22, 11, Color{ 255, 180, 20, 240 });
-            DrawLine((int)p.pos.x - 14, (int)GROUND_Y - 4, (int)p.pos.x + 14, (int)GROUND_Y - 4, WHITE);
-        } else if (p.type == 6) {
-
-            DrawRectangle((int)(p.pos.x - 10), (int)(p.pos.y - 8), 20, 16, Color{ 255, 245, 210, 255 });
-            DrawRectangleLines((int)(p.pos.x - 10), (int)(p.pos.y - 8), 20, 16, Color{ 255, 215, 40, 255 });
-            DrawLine((int)p.pos.x - 14, (int)p.pos.y - 12, (int)p.pos.x + 14, (int)p.pos.y + 12, Color{ 80, 210, 255, 240 });
-            DrawLine((int)p.pos.x + 12, (int)p.pos.y - 10, (int)p.pos.x - 12, (int)p.pos.y + 10, Color{ 255, 240, 60, 240 });
-        } else if (p.type == 7) {
-
+        } else if (p.type == PROJ_LEDGER) {
+            float spin = (float)p.age * 10.0f * (p.facingRight ? 1.0f : -1.0f);
+            if (!drawCompiledProj(1, p.pos, 30.0f, 30.0f, p.facingRight, spin)) {
+                DrawRectangle((int)(p.pos.x - 8), (int)(p.pos.y - 12), 16, 24, Color{ 120, 80, 45, 245 });
+            }
+        } else if (p.type == PROJ_ARC_BOMB) {
+            if (!drawCompiledProj(2, p.pos, 30.0f, 24.0f, p.facingRight)) {
+                DrawCircle((int)p.pos.x, (int)p.pos.y, 7, Color{ 240, 40, 150, 255 });
+            }
+        } else if (p.type == PROJ_TRAP_FIELD) {
+            Vector2 trapPos{ p.pos.x, GROUND_Y - 12.0f };
+            if (!drawCompiledProj(3, trapPos, 32.0f, 24.0f, true)) {
+                DrawEllipse((int)p.pos.x, (int)GROUND_Y - 4, 14, 6, Color{ 65, 220, 255, 230 });
+            }
+        } else if (p.type == PROJ_COKE_SPRAY) {
+            if (!drawCompiledProj(4, p.pos, 32.0f, 24.0f, p.facingRight)) {
+                DrawCircle((int)p.pos.x, (int)p.pos.y, 7, Color{ 140, 65, 30, 240 });
+            }
+        } else if (p.type == PROJ_GAVEL_WAVE) {
+            Vector2 gwPos{ p.pos.x, GROUND_Y - 14.0f };
+            if (!drawCompiledProj(5, gwPos, 32.0f, 28.0f, p.facingRight)) {
+                DrawEllipse((int)p.pos.x, (int)GROUND_Y - 4, 16, 8, Color{ 255, 215, 50, 220 });
+            }
+        } else if (p.type == PROJ_DISSENT_FLAME) {
+            if (!drawCompiledProj(6, p.pos, 34.0f, 28.0f, p.facingRight)) {
+                DrawCircle((int)p.pos.x, (int)p.pos.y, 9, Color{ 255, 140, 35, 245 });
+            }
+        } else if (p.type == PROJ_SECRET_SERVICE) {
             if (s_sprSleepyJoeSS.id > 0) {
                 Rectangle srcRec = { 0.0f, 0.0f, (float)s_sprSleepyJoeSS.width, (float)s_sprSleepyJoeSS.height };
                 if (!p.facingRight) srcRec.width = -srcRec.width;
@@ -805,67 +1299,221 @@ void VisualsEngine::DrawProjectiles(const Fighter& f) {
                 DrawTexturePro(s_sprSleepyJoeSS, srcRec, dstRec, Vector2{ 0.0f, 0.0f }, 0.0f, WHITE);
             } else {
                 DrawRectangle((int)p.pos.x - 12, (int)p.pos.y - 24, 24, 48, Color{ 15, 20, 25, 255 });
-                DrawCircle((int)p.pos.x, (int)p.pos.y - 28, 8, Color{ 230, 190, 150, 255 });
             }
-        } else if (p.type == 8) {
-
+        } else if (p.type == PROJ_SAX_NOTES) {
+            if (!drawCompiledProj(7, p.pos, 34.0f, 28.0f, p.facingRight)) {
+                DrawEllipse((int)p.pos.x, (int)p.pos.y, 14, 8, Color{ 255, 220, 60, 220 });
+            }
+        } else if (p.type == PROJ_POLLING_MAP) {
+            if (!drawCompiledProj(8, p.pos, 36.0f, 26.0f, p.facingRight)) {
+                DrawRectangle((int)p.pos.x - 16, (int)p.pos.y - 8, 32, 16, Color{ 35, 105, 245, 245 });
+            }
+        } else if (p.type == PROJ_HOPE_BASKETBALL) {
+            float spinDeg = (float)p.age * 14.0f * (p.facingRight ? 1.0f : -1.0f);
+            if (!drawCompiledProj(9, p.pos, 28.0f, 24.0f, p.facingRight, spinDeg)) {
+                DrawCircle((int)p.pos.x, (int)p.pos.y, 9.5f, Color{ 235, 105, 25, 255 });
+            }
+        } else if (p.type == PROJ_SHAWARMA) {
+            float spinDeg = (float)p.lifetime * 14.0f * (p.facingRight ? 1.0f : -1.0f);
+            if (s_propShawarma.id > 0) {
+                Rectangle src = { 0.0f, 0.0f, (float)s_propShawarma.width, (float)s_propShawarma.height };
+                Rectangle dst = { p.pos.x, p.pos.y, 34.0f, 18.0f };
+                DrawTexturePro(s_propShawarma, src, dst, Vector2{ 17.0f, 9.0f }, spinDeg, WHITE);
+            }
+        } else if (p.type == PROJ_WHEELCHAIR) {
             float dir = p.facingRight ? 1.0f : -1.0f;
-
-            DrawEllipse((int)p.pos.x, (int)p.pos.y, 14, 8, Color{ 255, 220, 60, 220 });
-            DrawEllipseLines((int)p.pos.x, (int)p.pos.y, 18, 11, Color{ 255, 180, 20, 240 });
-            DrawCircle((int)p.pos.x + (int)(dir * 4.0f), (int)p.pos.y, 6, WHITE);
-
-            DrawCircle((int)(p.pos.x - dir * 10), (int)p.pos.y - 6, 4, Color{ 255, 230, 80, 255 });
-            DrawLine((int)(p.pos.x - dir * 7), (int)p.pos.y - 6, (int)(p.pos.x - dir * 7), (int)p.pos.y - 14, Color{ 255, 230, 80, 255 });
-            DrawCircle((int)(p.pos.x - dir * 18), (int)p.pos.y + 4, 3, Color{ 255, 200, 40, 220 });
-            DrawLine((int)(p.pos.x - dir * 15), (int)p.pos.y + 4, (int)(p.pos.x - dir * 15), (int)p.pos.y - 4, Color{ 255, 200, 40, 220 });
-
-            DrawCircle((int)(p.pos.x + dir * 12), (int)p.pos.y - 2, 2, WHITE);
-        } else if (p.type == 9) {
-
-            float dir = p.facingRight ? 1.0f : -1.0f;
-            int mode = ((p.lifetime / 5) % 3);
-            bool isRedState = (mode != 1);
-            Color stateCol = isRedState ? Color{ 230, 35, 45, 245 } : Color{ 35, 105, 245, 245 };
+            DrawCenteredSprite(s_vfxSprites[12], p.pos.x - dir * 24.0f, GROUND_Y - 9.0f, 24.0f, 18.0f, 0.0f, Color{ 255, 255, 255, 210 }, !p.facingRight);
+            if (s_propWheelchair.id > 0) {
+                Rectangle src = { 0.0f, 0.0f, p.facingRight ? (float)s_propWheelchair.width : -(float)s_propWheelchair.width, (float)s_propWheelchair.height };
+                Rectangle dst = { p.pos.x - 28.0f, GROUND_Y - 56.0f, 56.0f, 58.0f };
+                DrawTexturePro(s_propWheelchair, src, dst, Vector2{ 0.0f, 0.0f }, 0.0f, WHITE);
+            }
+        } else if (p.type == PROJ_ATM_HACK) {
+            float rise = std::min(1.0f, (30.0f - (float)std::min(p.lifetime, 30)) / 5.0f + 0.35f);
+            float atmH = 62.0f * rise;
+            if (s_propAtmHack.id > 0) {
+                Rectangle src = { 0.0f, 0.0f, (float)s_propAtmHack.width, (float)s_propAtmHack.height * rise };
+                Rectangle dst = { p.pos.x - 23.0f, GROUND_Y - atmH + 2.0f, 46.0f, atmH };
+                DrawTexturePro(s_propAtmHack, src, dst, Vector2{ 0.0f, 0.0f }, 0.0f, WHITE);
+            }
+            for (int b = 0; b < 5; b++) {
+                float bx = p.pos.x - 18.0f + ((b * 13 + p.lifetime * 3) % 36);
+                float by = GROUND_Y - 26.0f - ((p.lifetime * 2 + b * 9) % 34);
+                DrawCenteredSprite(s_worldProps[10], bx, by, 14.0f, 9.0f, (float)(p.lifetime * 8 + b * 28));
+            }
+            VisualsEngine::DrawPixelText("-25% HP!", (int)p.pos.x - 20, (int)(GROUND_Y - atmH - 10.0f), 6, Color{ 80, 255, 115, 255 });
+        } else if (p.type == PROJ_SUPREME_WAVE) {
+            drawCompiledProj(10, p.pos, 38.0f, 44.0f, p.facingRight);
+        } else if (p.type == PROJ_EYE_LASER) {
+            drawCompiledProj(11, p.pos, 52.0f, 20.0f, p.facingRight);
+        } else if (p.type == PROJ_HAMMER_SICKLE) {
+            float spinDeg = (float)p.lifetime * 22.0f * (p.facingRight ? 1.0f : -1.0f);
+            if (s_propHammerSickle.id > 0) {
+                Rectangle src = { 0.0f, 0.0f, (float)s_propHammerSickle.width, (float)s_propHammerSickle.height };
+                Rectangle dst = { p.pos.x, p.pos.y, 32.0f, 32.0f };
+                DrawTexturePro(s_propHammerSickle, src, dst, Vector2{ 16.0f, 16.0f }, spinDeg, WHITE);
+            }
+        } else if (p.type == PROJ_SPY_RADIO) {
+            drawCompiledProj(12, p.pos, 36.0f, 28.0f, p.facingRight);
+        } else if (p.type == PROJ_PAPER_PLANE) {
+            float bob = sinf((float)p.lifetime * 0.25f) * 1.6f;
+            drawCompiledProj(13, Vector2{ p.pos.x, p.pos.y + bob }, 30.0f, 16.0f, p.facingRight);
+        } else if (p.type == PROJ_SHOTGUN_BLAST) {
+            drawCompiledProj(14, p.pos, 42.0f, 28.0f, p.facingRight);
+        } else if (p.type == PROJ_HORMUZ_BLOCKADE) {
             int px = (int)p.pos.x;
-            int py = (int)p.pos.y;
+            int gy = (int)GROUND_Y;
+            float waveBob = sinf((float)p.lifetime * 0.25f) * 2.0f;
+            DrawCenteredSprite(s_worldProps[11], p.pos.x, gy - 11.0f + waveBob * 0.5f, 60.0f, 24.0f, 0.0f, WHITE, ((p.lifetime / 10) % 2 == 1));
+            float bob = fabsf(sinf((float)p.lifetime * 0.20f)) * 4.0f;
+            drawCompiledProj(15, Vector2{ p.pos.x - 11.0f, gy - 26.0f - bob }, 22.0f, 28.0f, true);
+            drawCompiledProj(15, Vector2{ p.pos.x + 11.0f, gy - 24.0f - bob * 0.6f }, 22.0f, 28.0f, false);
+            DrawRectangle(px - 17, gy - 48, 34, 10, Color{ 205, 25, 30, 245 });
+            DrawRectangleLines(px - 17, gy - 48, 34, 10, Color{ 255, 230, 75, 255 });
+            VisualsEngine::DrawPixelText("CLOSED", px - 14, gy - 46, 6, WHITE);
+        }
+    }
+}
 
-            DrawRectangle(px - 17, py - 8, 34, 16, WHITE);
-            DrawRectangle(px - 15, py - 6, 30, 12, stateCol);
-            DrawRectangleLines(px - 17, py - 8, 34, 16, Color{ 255, 230, 70, 255 });
+void VisualsEngine::DrawFinisherBackdrop(const Fighter& p1, const Fighter& p2, float camX) {
+    if (!p1.IsPerformingFinisher() && !p2.IsPerformingFinisher()) return;
+    const Fighter& atk = p1.IsPerformingFinisher() ? p1 : p2;
+    const Fighter& vic = p1.IsPerformingFinisher() ? p2 : p1;
+    int fr = atk.GetStateFrame();
 
-            const char* stateLabel = (mode == 0) ? "270!" : ((mode == 1) ? "PA 19" : "TX 40");
-            VisualsEngine::DrawPixelText(stateLabel, px - 13, py - 5, 10, (mode == 0) ? Color{ 255, 245, 90, 255 } : WHITE);
+    unsigned char veilA = (fr >= 54 && fr <= 61) ? 90 : 185;
+    DrawRectangle((int)(camX - 260.0f), -40, SCREEN_WIDTH + 520, SCREEN_HEIGHT + 100, Color{ 6, 4, 16, veilA });
 
-            int tipX = px + (int)(dir * 22.0f);
-            DrawLineEx(Vector2{ (float)(px + dir * 16.0f), (float)py }, Vector2{ (float)tipX, (float)py }, 2.5f, Color{ 255, 235, 80, 255 });
-            DrawTriangle(
-                Vector2{ (float)(tipX + dir * 4.0f), (float)py },
-                Vector2{ (float)tipX, (float)(py - 4) },
-                Vector2{ (float)tipX, (float)(py + 4) },
-                Color{ 255, 60, 60, 255 }
-            );
-            DrawCircle((int)(px - dir * 20.0f), py - 4, 2.0f, Color{ 230, 45, 55, 220 });
-            DrawCircle((int)(px - dir * 25.0f), py + 3, 2.0f, Color{ 45, 130, 255, 220 });
-        } else if (p.type == 10) {
+    auto drawSpot = [](float sx, Color col) {
+        DrawTriangle(Vector2{ sx, -20.0f }, Vector2{ sx - 36.0f, GROUND_Y + 6.0f }, Vector2{ sx + 36.0f, GROUND_Y + 6.0f }, col);
+        DrawEllipse((int)sx, (int)GROUND_Y + 1, 34, 6, Color{ col.r, col.g, col.b, 95 });
+    };
+    drawSpot(atk.GetPosition().x, Color{ 255, 225, 90, 42 });
+    drawSpot(vic.GetPosition().x, Color{ 255, 45, 55, 52 });
+}
 
-            int px = (int)p.pos.x;
-            int py = (int)p.pos.y;
-            float spin = (float)p.lifetime * 0.35f;
+void VisualsEngine::DrawFinisherWorldFX(const Fighter& p1, const Fighter& p2) {
+    if (!p1.IsPerformingFinisher() && !p2.IsPerformingFinisher()) return;
+    const Fighter& atk = p1.IsPerformingFinisher() ? p1 : p2;
+    const Fighter& vic = p1.IsPerformingFinisher() ? p2 : p1;
+    int fr = atk.GetStateFrame();
+    CharacterId cid = atk.GetCharacterId();
+    int propIdx = std::clamp(Fighter::GetFinisherPropIndex(cid), 0, 15);
+    float vx = vic.GetPosition().x;
+    float ax = atk.GetPosition().x;
+    float dir = atk.IsFacingRight() ? 1.0f : -1.0f;
 
-            DrawCircle((int)(p.pos.x - p.vel.x * 2.2f), (int)(p.pos.y - p.vel.y * 2.2f), 6.0f, Color{ 255, 215, 60, 120 });
-            DrawCircle((int)(p.pos.x - p.vel.x * 4.0f), (int)(p.pos.y - p.vel.y * 4.0f), 3.5f, Color{ 100, 220, 255, 100 });
+    if (fr < 48) {
+        float pulse = sinf(fr * 0.5f) * 6.0f;
+        DrawCenteredSprite(s_vfxSprites[14], ax, GROUND_Y - 3.0f, 64.0f + pulse, 15.0f);
+        for (int r = 0; r < 3; r++) {
+            float ry = GROUND_Y - fmodf(fr * 4.5f + r * 24.0f, 78.0f);
+            float rx = ax + ((r % 2 == 0) ? -18.0f : 18.0f);
+            DrawCenteredSprite(s_vfxSprites[0], rx, ry, 10.0f, 10.0f, (float)(fr * 8 + r * 35));
+        }
+    }
 
-            DrawCircle(px, py, 10.5f, Color{ 20, 12, 8, 255 });
-            DrawCircle(px, py, 9.0f, Color{ 235, 105, 25, 255 });
-            DrawCircle(px - 3, py - 3, 4.0f, Color{ 255, 155, 65, 230 });
+    if (fr >= 12 && s_finisherProps[propIdx].id > 0) {
+        Texture2D pt = s_finisherProps[propIdx];
+        float dropT = std::clamp((float)(fr - 12) / 42.0f, 0.0f, 1.0f);
+        float easeIn = dropT * dropT;
 
-            int sx = (int)(cosf(spin) * 7.5f);
-            int sy = (int)(sinf(spin) * 7.5f);
-            DrawLine(px - 8, py, px + 8, py, Color{ 25, 18, 14, 240 });
-            DrawLine(px, py - 8, px, py + 8, Color{ 25, 18, 14, 240 });
-            DrawLine(px - sx, py - sy, px + sx, py + sy, Color{ 25, 18, 14, 220 });
-            DrawCircleLines(px, py, 6.5f, Color{ 25, 18, 14, 200 });
+        bool isHorizontalSweep = (cid == CHAR_REDCAP || cid == CHAR_BLEXAS || cid == CHAR_DICK);
+        bool isOrbitalSatellite = (cid == CHAR_MTG || cid == CHAR_FLOTUS || cid == CHAR_POPULIST);
+        bool isBackboardDunk = (cid == CHAR_A_NEW_HOPE);
+        bool isTerminator = (cid == CHAR_SI);
+
+        float px = vx;
+        float py = GROUND_Y - 46.0f;
+        float pw = 86.0f;
+        float ph = 86.0f;
+        float rot = 0.0f;
+
+        if (isHorizontalSweep) {
+            px = (ax - dir * 35.0f) + (vx - (ax - dir * 35.0f)) * easeIn + (fr > 54 ? dir * (fr - 54) * 3.5f : 0.0f);
+            py = GROUND_Y - 38.0f - fabsf(sinf(fr * 0.8f)) * 4.0f;
+            pw = 92.0f; ph = 78.0f;
+
+            for (int f = 0; f < 4; f++) {
+                float fx = px - dir * (22.0f + f * 12.0f);
+                float fsz = 18.0f - f * 2.5f;
+                DrawCenteredSprite(s_vfxSprites[11], fx, GROUND_Y - 10.0f, fsz, fsz + 4.0f, 0.0f, WHITE, (f % 2 == 1));
+            }
+            if (cid == CHAR_DICK && fr >= 32) {
+                for (int b = 0; b < 4; b++) {
+                    float bx = ax + dir * (28.0f + fmodf(fr * 7.0f + b * 24.0f, std::max(25.0f, fabsf(vx - ax) + 25.0f)));
+                    float by = GROUND_Y - 52.0f + ((b % 3) - 1) * 10.0f;
+                    DrawCenteredSprite(s_vfxSprites[1], bx, by, 14.0f, 14.0f, (float)(fr * 12 + b * 40));
+                }
+            }
+        } else if (isOrbitalSatellite) {
+            px = vx + sinf(fr * 0.08f) * 6.0f;
+            py = 86.0f;
+            pw = 68.0f; ph = 68.0f;
+            if (fr >= 30 && fr <= 74) {
+
+                float beamW = (fr >= 52 && fr <= 64) ? 26.0f : 14.0f;
+                Color outerC = (cid == CHAR_FLOTUS) ? Color{ 255, 55, 85, 205 } : ((cid == CHAR_POPULIST) ? Color{ 255, 95, 235, 205 } : Color{ 65, 220, 255, 215 });
+                int beamTop = (int)py + 16;
+                int beamH = std::max(10, (int)GROUND_Y - beamTop);
+                DrawRectangleGradientH((int)(vx - beamW * 0.5f), beamTop, (int)(beamW * 0.5f), beamH, Color{ outerC.r, outerC.g, outerC.b, 35 }, outerC);
+                DrawRectangleGradientH((int)vx, beamTop, (int)(beamW * 0.5f), beamH, outerC, Color{ outerC.r, outerC.g, outerC.b, 35 });
+                DrawRectangle((int)(vx - beamW * 0.18f), beamTop, std::max(3, (int)(beamW * 0.36f)), beamH, Color{ 255, 255, 255, 235 });
+                for (int k = 0; k < 4; k++) {
+                    float ly = (float)beamTop + 14.0f + k * (beamH * 0.22f);
+                    const Texture2D& bolt = ((fr + k) % 2 == 0) ? s_vfxSprites[8] : s_vfxSprites[9];
+                    DrawCenteredSprite(bolt, vx + ((k % 2 == 0) ? -8.0f : 8.0f), ly, 30.0f, 30.0f, (float)((k % 2 == 0) ? 25 : -25), WHITE, (k % 2 == 1));
+                }
+            }
+        } else if (isBackboardDunk) {
+            px = vx + dir * 12.0f;
+            py = GROUND_Y - 78.0f;
+            pw = 88.0f; ph = 88.0f;
+            if (fr >= 32 && fr <= 58 && s_projSprites[9].id > 0) {
+                Rectangle bSrc = { 0, 0, (float)s_projSprites[9].width, (float)s_projSprites[9].height };
+                float bProg = (float)(fr - 32) / 26.0f;
+                Rectangle bDst = { ax + (vx - ax) * bProg, (GROUND_Y - 96.0f) + bProg * 42.0f, 26.0f, 24.0f };
+                DrawTexturePro(s_projSprites[9], bSrc, bDst, Vector2{ 13.0f, 12.0f }, fr * 18.0f, WHITE);
+            }
+        } else if (isTerminator) {
+            float grow = std::min(1.0f, dropT * 1.4f);
+            px = vx;
+            py = GROUND_Y - 48.0f * grow;
+            pw = 94.0f * grow; ph = 94.0f * grow;
+            VisualsEngine::DrawPixelText("-100% TERMINATED!", (int)vx - 44, (int)GROUND_Y - 106, 7, Color{ 75, 255, 115, 255 });
+        } else {
+
+            if (cid == CHAR_THE_DICTATOR) {
+                DrawCenteredSprite(s_worldProps[12], vx, GROUND_Y - 12.0f, 64.0f, 42.0f);
+            }
+            float startY = -55.0f;
+            float endY = GROUND_Y - 38.0f;
+            py = startY + (endY - startY) * easeIn;
+            if (fr > 54) {
+                float bnc = (float)(fr - 54) / 36.0f;
+                py = endY - fabsf(sinf(bnc * PI_F * 2.0f)) * (14.0f * (1.0f - bnc));
+            }
+            if (cid == CHAR_HIGH_BENCH || cid == CHAR_BILLARY) {
+                rot = -38.0f * (1.0f - easeIn);
+            }
+        }
+
+        Rectangle src = { 0.0f, 0.0f, (dir >= 0.0f || !isHorizontalSweep) ? (float)pt.width : -(float)pt.width, (float)pt.height };
+        Rectangle dst = { px, py, pw, ph };
+        DrawTexturePro(pt, src, dst, Vector2{ pw * 0.5f, ph * 0.5f }, rot, WHITE);
+
+        if (fr >= 52 && fr <= 78) {
+            float ringT = (float)(fr - 52) / 26.0f;
+            unsigned char ringA = (unsigned char)(255.0f * (1.0f - ringT));
+            DrawCenteredSprite(s_vfxSprites[14], vx, GROUND_Y - 4.0f, 54.0f + ringT * 86.0f, 16.0f + ringT * 12.0f, 0.0f, Color{ 255, 255, 255, ringA });
+            DrawCenteredSprite(s_vfxSprites[12], vx - 28.0f - ringT * 32.0f, GROUND_Y - 12.0f, 28.0f, 20.0f, 0.0f, Color{ 255, 255, 255, ringA }, true);
+            DrawCenteredSprite(s_vfxSprites[12], vx + 28.0f + ringT * 32.0f, GROUND_Y - 12.0f, 28.0f, 20.0f, 0.0f, Color{ 255, 255, 255, ringA }, false);
+            if (cid == CHAR_AYATOLLAH && s_projSprites[15].id > 0) {
+                Texture2D sm = s_projSprites[15];
+                Rectangle mSrc = { 0, 0, (float)sm.width, (float)sm.height };
+                DrawTexturePro(sm, mSrc, Rectangle{ vx - 38.0f - ringT * 18.0f, GROUND_Y - 24.0f, 22.0f, 26.0f }, Vector2{ 11, 13 }, 0.0f, WHITE);
+                DrawTexturePro(sm, mSrc, Rectangle{ vx + 38.0f + ringT * 18.0f, GROUND_Y - 24.0f, 22.0f, 26.0f }, Vector2{ 11, 13 }, 0.0f, WHITE);
+            }
         }
     }
 }
@@ -873,43 +1521,25 @@ void VisualsEngine::DrawProjectiles(const Fighter& f) {
 void VisualsEngine::DrawSparks(const std::vector<SparkEffect>& sparks) {
     for (const auto& sp : sparks) {
         if (!sp.alive) continue;
-        int step = sp.frame / 2;
+        float tNorm = std::clamp((float)sp.frame / (float)std::max(1, sp.maxFrames), 0.0f, 1.0f);
+        unsigned char alpha = (unsigned char)std::clamp((int)((1.0f - tNorm * 0.65f) * 255.0f), 45, 255);
+        float rot = (float)(((int)(sp.pos.x * 3.0f + sp.pos.y * 5.0f) % 4) * 90);
 
         if (sp.isBlock) {
-
-            if (step == 0) {
-                DrawCircle((int)sp.pos.x, (int)sp.pos.y, 6, WHITE);
-                DrawCircle((int)sp.pos.x, (int)sp.pos.y, 10, Color{ 0, 210, 255, 180 });
-            } else if (step == 1) {
-                DrawCircleLines((int)sp.pos.x, (int)sp.pos.y, 14, Color{ 140, 235, 255, 230 });
-                DrawLine((int)sp.pos.x - 12, (int)sp.pos.y, (int)sp.pos.x + 12, (int)sp.pos.y, WHITE);
-                DrawLine((int)sp.pos.x, (int)sp.pos.y - 12, (int)sp.pos.x, (int)sp.pos.y + 12, WHITE);
-            } else {
-                DrawCircle((int)sp.pos.x - 6, (int)sp.pos.y - 4, 2, Color{ 60, 160, 255, 160 });
-                DrawCircle((int)sp.pos.x + 6, (int)sp.pos.y + 4, 2, Color{ 60, 160, 255, 160 });
-            }
+            const Texture2D& gTex = (tNorm < 0.45f) ? s_vfxSprites[4] : s_vfxSprites[5];
+            float sz = 28.0f + tNorm * 10.0f;
+            DrawCenteredSprite(gTex, sp.pos.x, sp.pos.y, sz, sz, (tNorm < 0.45f) ? rot : 0.0f, Color{ 255, 255, 255, alpha });
         } else {
-
-            if (step == 0) {
-                DrawCircle((int)sp.pos.x, (int)sp.pos.y, 8, WHITE);
-                DrawCircle((int)sp.pos.x, (int)sp.pos.y, 12, Color{ 255, 230, 40, 240 });
-            } else if (step == 1) {
-
-                DrawCircle((int)sp.pos.x, (int)sp.pos.y, 10, Color{ 255, 180, 20, 255 });
-                DrawCircle((int)sp.pos.x, (int)sp.pos.y, 5, WHITE);
-                for (int a = 0; a < 8; a++) {
-                    float ang = a * (PI_F / 4.0f);
-                    float sx = sp.pos.x + cosf(ang) * 16.0f;
-                    float sy = sp.pos.y + sinf(ang) * 16.0f;
-                    DrawLine((int)sp.pos.x, (int)sp.pos.y, (int)sx, (int)sy, Color{ 255, 100, 20, 255 });
-                }
+            bool isHeavy = (sp.maxFrames >= 9);
+            int vIdx = 0;
+            if (isHeavy) {
+                vIdx = (tNorm < 0.45f) ? 3 : 2;
             } else {
-
-                DrawCircle((int)sp.pos.x - 10, (int)sp.pos.y - 8, 3, Color{ 240, 80, 20, 200 });
-                DrawCircle((int)sp.pos.x + 10, (int)sp.pos.y - 6, 2, Color{ 255, 140, 20, 200 });
-                DrawCircle((int)sp.pos.x + 8, (int)sp.pos.y + 9, 3, Color{ 240, 80, 20, 200 });
-                DrawCircle((int)sp.pos.x - 9, (int)sp.pos.y + 7, 2, Color{ 255, 180, 40, 200 });
+                vIdx = (tNorm < 0.35f) ? 0 : ((tNorm < 0.72f) ? 1 : 2);
             }
+            float baseSz = isHeavy ? 38.0f : 28.0f;
+            float sz = baseSz * (0.85f + tNorm * 0.40f);
+            DrawCenteredSprite(s_vfxSprites[vIdx], sp.pos.x, sp.pos.y, sz, sz, rot, Color{ 255, 255, 255, alpha });
         }
     }
 }
@@ -988,37 +1618,67 @@ void VisualsEngine::DrawBattleHUD(const Fighter& p1, const Fighter& p2, int roun
         DrawCircle(SCREEN_WIDTH - 28 - r * 14, TOP_Y + 18, 4, c);
         DrawPixelText("V", SCREEN_WIDTH - 30 - r * 14, TOP_Y + 14, 8, (r < p2.GetRoundsWon()) ? Color{ 50, 30, 0, 255 } : Color{ 100, 100, 110, 255 });
     }
+
+    auto drawBossRefillPips = [](const Fighter& f, bool isP1) {
+        int maxRefills = 0;
+        if (f.GetCharacterId() == CHAR_AYATOLLAH) maxRefills = 7;
+        else if (f.GetCharacterId() == CHAR_PALM_BEACH_PETE) maxRefills = 4;
+        else if (f.GetCharacterId() == CHAR_WAR_PIG) maxRefills = 2;
+        if (maxRefills <= 0) return;
+
+        int remaining = std::max(0, maxRefills - f.GetRefillCount());
+        int baseX = isP1 ? 58 : (SCREEN_WIDTH - 58);
+        int stepX = isP1 ? 10 : -10;
+        int cy = TOP_Y + 18;
+        for (int i = 0; i < maxRefills; i++) {
+            int cx = baseX + i * stepX;
+            bool lit = (i < remaining);
+            if (f.GetCharacterId() == CHAR_AYATOLLAH) {
+                DrawCenteredSprite(s_vfxSprites[15], (float)cx, (float)cy, 9.0f, 9.0f, 0.0f, lit ? WHITE : Color{ 60, 70, 80, 150 });
+            } else {
+                DrawCenteredSprite(s_vfxSprites[6], (float)cx, (float)cy, 8.5f, 8.5f, 0.0f, lit ? Color{ 235, 110, 255, 255 } : Color{ 60, 70, 80, 150 });
+            }
+        }
+        char barLbl[24];
+        snprintf(barLbl, sizeof(barLbl), "BAR %d/%d", remaining + 1, maxRefills + 1);
+        int bw = MeasureText(barLbl, 6);
+        int lx = isP1 ? 58 : (SCREEN_WIDTH - 58 - bw);
+        VisualsEngine::DrawPixelText(barLbl, lx, TOP_Y + 25, 6, Color{ 110, 250, 195, 240 });
+    };
+    drawBossRefillPips(p1, true);
+    drawBossRefillPips(p2, false);
 }
 
 void VisualsEngine::DrawCinematicIntro(float timer, bool logoDropped, const Shader& flagShader, const Texture2D& flagTex) {
     if (s_loaded && s_titleSplash.id > 0) {
 
-        Rectangle srcRec = { 0.0f, 0.0f, (float)s_titleSplash.width, (float)s_titleSplash.height };
+        float cropH = std::min((float)s_titleSplash.height, 694.0f);
+        Rectangle srcRec = { 0.0f, 0.0f, (float)s_titleSplash.width, cropH };
         Rectangle dstRec = { 0.0f, 0.0f, (float)SCREEN_WIDTH, (float)SCREEN_HEIGHT };
         DrawTexturePro(s_titleSplash, srcRec, dstRec, Vector2{ 0.0f, 0.0f }, 0.0f, WHITE);
 
-        float pulse = 0.5f + 0.5f * sinf(timer * 6.0f);
-        int banW = 248;
-        int banH = 22;
-        int banX = (SCREEN_WIDTH - banW) / 2;
-        int banY = SCREEN_HEIGHT - 48;
-        DrawRectangle(banX - 2, banY - 2, banW + 4, banH + 4, Color{ 15, 10, 25, 240 });
-        DrawRectangleGradientH(banX, banY, banW, banH, Color{ 180, 20, 35, 245 }, Color{ 40, 60, 170, 245 });
-        DrawRectangleLines(banX, banY, banW, banH, Color{ 255, 215, 50, 255 });
-        DrawRectangleLines(banX - 1, banY - 1, banW + 2, banH + 2, Color{ 255, 245, 150, (unsigned char)(140 + pulse * 115) });
-        int ctw = MeasureText("CHAMPIONSHIP EDITION", 14);
-        DrawPixelText("CHAMPIONSHIP EDITION", (SCREEN_WIDTH - ctw) / 2, banY + 4, 14, Color{ 255, 235, 70, 255 });
+        for (int s = 0; s < 10; s++) {
+            float sx = 195.0f + fmodf(s * 23.0f + timer * (34.0f + s * 3.0f), 182.0f);
+            float sy = SCREEN_HEIGHT - 24.0f - fmodf(s * 17.0f + timer * (28.0f + s * 4.0f), 112.0f);
+            const Texture2D& spTex = (s % 2 == 0) ? s_vfxSprites[13] : s_vfxSprites[0];
+            DrawCenteredSprite(spTex, sx, sy, 8.0f, 8.0f, timer * 25.0f + s * 18.0f);
+        }
 
-        if (((int)(timer * 3.0f) % 2) == 0) {
-            int ptw = MeasureText("INSERT COIN / PRESS START", 10);
-            DrawRectangle((SCREEN_WIDTH - ptw) / 2 - 6, SCREEN_HEIGHT - 20, ptw + 12, 14, Color{ 10, 12, 20, 210 });
-            DrawPixelText("INSERT COIN / PRESS START", (SCREEN_WIDTH - ptw) / 2, SCREEN_HEIGHT - 18, 10, WHITE);
+        DrawRectangle(0, SCREEN_HEIGHT - 16, SCREEN_WIDTH, 16, Color{ 6, 10, 22, 215 });
+        DrawLine(0, SCREEN_HEIGHT - 16, SCREEN_WIDTH, SCREEN_HEIGHT - 16, Color{ 60, 210, 255, 220 });
+
+        if (((int)(timer * 3.2f) % 2) == 0) {
+            DrawPixelText("INSERT COIN / PRESS START", 10, SCREEN_HEIGHT - 12, 9, Color{ 255, 240, 90, 255 });
+        } else {
+            DrawPixelText("INSERT COIN / PRESS START", 10, SCREEN_HEIGHT - 12, 9, Color{ 180, 230, 255, 220 });
         }
-        for (int s = 0; s < 12; s++) {
-            float sx = fmodf(s * 33.0f + timer * (25.0f + s * 3.0f), (float)SCREEN_WIDTH);
-            float sy = SCREEN_HEIGHT - fmodf(s * 19.0f + timer * (32.0f + s * 4.0f), (float)SCREEN_HEIGHT);
-            DrawCircle((int)sx, (int)sy, 1.5f, (s % 2 == 0) ? Color{ 255, 225, 80, 210 } : Color{ 100, 220, 255, 200 });
-        }
+
+        const char* tSpd = (ChampionshipEdition::s_turboSpeed == TURBO_SPEED_1) ? "TURBO 1"
+                         : ((ChampionshipEdition::s_turboSpeed == TURBO_SPEED_3) ? "TURBO 3 MAX" : "TURBO 2");
+        int tsw = MeasureText(tSpd, 8);
+        DrawRectangle(SCREEN_WIDTH - tsw - 14, SCREEN_HEIGHT - 14, tsw + 8, 12, Color{ 18, 45, 95, 240 });
+        DrawRectangleLines(SCREEN_WIDTH - tsw - 14, SCREEN_HEIGHT - 14, tsw + 8, 12, Color{ 95, 235, 255, 255 });
+        DrawPixelText(tSpd, SCREEN_WIDTH - tsw - 10, SCREEN_HEIGHT - 12, 8, Color{ 120, 245, 255, 255 });
         return;
     }
 
@@ -1087,64 +1747,49 @@ void VisualsEngine::DrawStageAndCharSelect(int selectedStage, int p1Char, int p2
             DrawRectangle(0, 16, SCREEN_WIDTH, 130, Color{ 12, 22, 38, 255 });
         }
 
-        for (int y = 16; y < 146; y += 18) {
-            DrawLine(0, y, SCREEN_WIDTH, y, Color{ 25, 45, 70, 70 });
-        }
-        for (int x = 0; x < SCREEN_WIDTH; x += 32) {
-            DrawLine(x, 16, x, 146, Color{ 25, 45, 70, 70 });
-        }
-
         Vector2 nyPt{ 275.0f, 48.0f };
-        Vector2 chiPt{ 126.0f, 44.0f };
+        Vector2 wyPt{ 92.0f, 52.0f };
+        Vector2 chiPt{ 138.0f, 42.0f };
         Vector2 dcPt{ 245.0f, 74.0f };
         Vector2 flPt{ 188.0f, 124.0f };
 
-        for (int step = 0; step <= 10; step++) {
-            float f = (float)step / 10.0f;
-            Vector2 p1 = { nyPt.x + (chiPt.x - nyPt.x) * f, nyPt.y + (chiPt.y - nyPt.y) * f };
-            DrawCircle((int)p1.x, (int)p1.y, 1.5f, Color{ 255, 220, 60, 200 });
-            Vector2 p2 = { chiPt.x + (dcPt.x - chiPt.x) * f, chiPt.y + (dcPt.y - chiPt.y) * f };
-            DrawCircle((int)p2.x, (int)p2.y, 1.5f, Color{ 255, 165, 50, 200 });
-            Vector2 p3 = { dcPt.x + (flPt.x - dcPt.x) * f, dcPt.y + (flPt.y - dcPt.y) * f };
-            DrawCircle((int)p3.x, (int)p3.y, 1.5f, Color{ 80, 220, 255, 200 });
-        }
+        auto drawFlightLine = [](Vector2 a, Vector2 b, Color col) {
+            DrawLineEx(a, b, 2.2f, col);
+        };
+        drawFlightLine(nyPt, wyPt, Color{ 255, 145, 45, 200 });
+        drawFlightLine(wyPt, dcPt, Color{ 255, 220, 60, 200 });
+        drawFlightLine(dcPt, chiPt, Color{ 80, 220, 255, 200 });
+        drawFlightLine(chiPt, flPt, Color{ 255, 165, 50, 200 });
 
         struct MapTarget {
             Vector2 pos;
             const char* city;
             CharacterId charId;
         };
-        MapTarget targets[4] = {
-            { nyPt, "NEW YORK", CHAR_SOCIALIST },
-            { chiPt, "CHICAGO", CHAR_A_NEW_HOPE },
-            { dcPt, "D.C.", CHAR_BILLARY },
-            { flPt, "FLORIDA KEYS", CHAR_PALM_BEACH_PETE }
+        MapTarget targets[5] = {
+            { nyPt,  "NEW YORK",     CHAR_SOCIALIST },
+            { wyPt,  "WYOMING",      CHAR_DICK },
+            { dcPt,  "D.C.",         CHAR_BILLARY },
+            { chiPt, "CHICAGO",      CHAR_A_NEW_HOPE },
+            { flPt,  "FLORIDA KEYS", CHAR_PALM_BEACH_PETE }
         };
 
-        for (int i = 0; i < 4; i++) {
+        for (int i = 0; i < 5; i++) {
             const auto& t = targets[i];
             bool isDef = (defeatedFighters != nullptr && defeatedFighters[t.charId]);
             bool isActive = (p2Char == t.charId);
 
             if (isDef) {
-
-                DrawLine((int)t.pos.x - 7, (int)t.pos.y - 7, (int)t.pos.x + 7, (int)t.pos.y + 7, Color{ 230, 40, 40, 255 });
-                DrawLine((int)t.pos.x - 7, (int)t.pos.y + 7, (int)t.pos.x + 7, (int)t.pos.y - 7, Color{ 230, 40, 40, 255 });
+                DrawCenteredSprite(s_vfxSprites[2], t.pos.x, t.pos.y, 18.0f, 18.0f);
                 DrawPixelText("BEATEN", (int)t.pos.x - 14, (int)t.pos.y + 8, 7, Color{ 240, 80, 80, 255 });
             } else if (isActive) {
-
-                float ringR = 6.0f + fmodf(timer * 22.0f, 12.0f);
-                DrawCircleLines((int)t.pos.x, (int)t.pos.y, ringR, Color{ 255, 60, 60, (unsigned char)(255 - ringR * 15) });
-                DrawCircle((int)t.pos.x, (int)t.pos.y, 3, Color{ 255, 230, 60, 255 });
-                DrawLine((int)t.pos.x - 11, (int)t.pos.y, (int)t.pos.x + 11, (int)t.pos.y, Color{ 255, 220, 60, 255 });
-                DrawLine((int)t.pos.x, (int)t.pos.y - 11, (int)t.pos.x, (int)t.pos.y + 11, Color{ 255, 220, 60, 255 });
+                float pulse = 1.0f + 0.14f * sinf(timer * 9.0f);
+                DrawCenteredSprite(s_vfxSprites[6], t.pos.x, t.pos.y, 18.0f * pulse, 18.0f * pulse, timer * 36.0f);
                 int cw = MeasureText(t.city, 7);
                 DrawRectangle((int)t.pos.x - cw / 2 - 2, (int)t.pos.y + 8, cw + 4, 10, Color{ 10, 15, 25, 220 });
                 DrawPixelText(t.city, (int)t.pos.x - cw / 2, (int)t.pos.y + 9, 7, Color{ 255, 230, 80, 255 });
             } else {
-
-                DrawCircleLines((int)t.pos.x, (int)t.pos.y, 4, Color{ 0, 210, 255, 180 });
-                DrawCircle((int)t.pos.x, (int)t.pos.y, 2, Color{ 0, 210, 255, 240 });
+                DrawCenteredSprite(s_vfxSprites[6], t.pos.x, t.pos.y, 11.0f, 11.0f, 0.0f, Color{ 95, 225, 255, 235 });
                 int cw = MeasureText(t.city, 7);
                 DrawRectangle((int)t.pos.x - cw / 2 - 2, (int)t.pos.y + 7, cw + 4, 9, Color{ 10, 15, 25, 180 });
                 DrawPixelText(t.city, (int)t.pos.x - cw / 2, (int)t.pos.y + 8, 7, Color{ 160, 195, 225, 220 });
@@ -1152,21 +1797,7 @@ void VisualsEngine::DrawStageAndCharSelect(int selectedStage, int p1Char, int p2
         }
     } else {
 
-        for (int x = 0; x < SCREEN_WIDTH; x += 32) {
-            DrawLine(x, 0, x, 145, Color{ 16, 28, 42, 255 });
-        }
-        for (int y = 0; y < 145; y += 24) {
-            DrawLine(0, y, SCREEN_WIDTH, y, Color{ 16, 28, 42, 255 });
-        }
-
-        DrawCircleLines(185, 88, 35.0f, Color{ 22, 45, 65, 180 });
-        DrawCircleLines(185, 88, 75.0f, Color{ 20, 40, 58, 140 });
-        DrawCircleLines(185, 88, 115.0f, Color{ 18, 35, 52, 100 });
-
-        float radarAngle = timer * 1.8f;
-        Vector2 radarCenter{ 185.0f, 88.0f };
-        Vector2 radarEnd{ radarCenter.x + cosf(radarAngle) * 125.0f, radarCenter.y + sinf(radarAngle) * 125.0f };
-        DrawLine((int)radarCenter.x, (int)radarCenter.y, (int)radarEnd.x, (int)radarEnd.y, Color{ 0, 220, 160, 40 });
+        DrawRectangleGradientV(0, 16, SCREEN_WIDTH, 130, Color{ 10, 20, 36, 255 }, Color{ 14, 28, 48, 255 });
 
     Vector2 potomacPoints[] = {
         { 55, 18 }, { 68, 32 }, { 82, 48 }, { 96, 62 }, { 104, 76 },
@@ -1183,16 +1814,7 @@ void VisualsEngine::DrawStageAndCharSelect(int selectedStage, int p1Char, int p2
     }
 
     DrawEllipse(100, 68, 5, 9, Color{ 20, 50, 35, 255 });
-    DrawEllipseLines(100, 68, 5, 9, Color{ 40, 100, 60, 255 });
-
-    DrawCircle(182, 106, 11, Color{ 14, 40, 68, 255 });
-    DrawCircleLines(182, 106, 11, Color{ 35, 100, 150, 220 });
-
-    DrawCircle(174, 98, 1, Color{ 255, 160, 200, 220 });
-    DrawCircle(188, 98, 1, Color{ 255, 160, 200, 220 });
-    DrawCircle(172, 110, 1, Color{ 255, 160, 200, 220 });
-    DrawCircle(192, 110, 1, Color{ 255, 160, 200, 220 });
-    DrawCircle(182, 117, 1, Color{ 255, 160, 200, 220 });
+    DrawEllipse(182, 106, 11, 9, Color{ 14, 40, 68, 255 });
 
     Vector2 anacostiaPoints[] = {
         { 345, 105 }, { 320, 120 }, { 285, 134 }, { 250, 145 }
@@ -1288,29 +1910,11 @@ void VisualsEngine::DrawStageAndCharSelect(int selectedStage, int p1Char, int p2
 
     DrawLineEx(Vector2{ 175, 136 }, Vector2{ 150, 145 }, 2.0f, Color{ 200, 165, 60, 220 });
 
-    DrawCircleLines(152, 34, 4.0f, Color{ 0, 200, 230, 255 });
-    DrawCircleLines(132, 46, 3.0f, Color{ 0, 200, 230, 255 });
-
     DrawRectangle(176, 48, 8, 5, Color{ 245, 245, 250, 255 });
-    DrawRectangleLines(175, 47, 10, 7, Color{ 0, 220, 255, 255 });
-
     DrawRectangle(134, 86, 7, 7, Color{ 240, 240, 245, 255 });
-    DrawRectangleLines(133, 85, 9, 9, Color{ 0, 220, 255, 255 });
-
-    DrawRectangle(184, 87, 3, 3, WHITE);
-    DrawLine(180, 88, 191, 88, Color{ 0, 230, 255, 255 });
-    DrawLine(185, 83, 185, 94, Color{ 0, 230, 255, 255 });
-
-    DrawCircle(288, 78, 4, Color{ 245, 245, 250, 255 });
+    DrawRectangle(184, 82, 3, 10, WHITE);
     DrawRectangle(284, 72, 8, 12, Color{ 200, 205, 220, 255 });
-    DrawRectangleLines(283, 71, 10, 14, Color{ 0, 220, 255, 255 });
-
     DrawPoly(Vector2{ 75, 115 }, 5, 15, 0.0f, Color{ 35, 55, 75, 255 });
-    DrawPolyLines(Vector2{ 75, 115 }, 5, 15, 0.0f, Color{ 0, 200, 220, 255 });
-    DrawPolyLines(Vector2{ 75, 115 }, 5, 8, 0.0f, Color{ 0, 160, 180, 200 });
-
-    DrawCircle(182, 110, 4, Color{ 240, 240, 245, 255 });
-    DrawCircleLines(182, 110, 4, Color{ 0, 210, 240, 255 });
 
     auto drawTacticalLabel = [](const char* txt, int x, int y, int sz, Color col) {
         int w = MeasureText(txt, sz);
@@ -1335,20 +1939,13 @@ void VisualsEngine::DrawStageAndCharSelect(int selectedStage, int p1Char, int p2
     DrawPixelText("38.89 N / 77.03 W", 210, 30, 6, Color{ 0, 170, 160, 180 });
 
     Vector2 pins[STAGE_COUNT] = {
-        { 180, 48 },
-        { 158, 88 },
-        { 288, 78 },
-        { 180, 64 },
-        { 168, 42 },
-        { 82, 148 },
-        { 295, 38 },
-        { 145, 36 },
-        { 260, 138 },
-        { 118, 88 },
-        { 228, 92 },
-        { 78, 118 },
-        { 212, 54 },
-        { 96, 34 }
+        { 180, 48 }, { 158, 88 }, { 288, 78 }, { 180, 64 },
+        { 168, 42 }, { 82, 148 }, { 295, 38 }, { 145, 36 },
+        { 260, 138 }, { 118, 88 }, { 228, 92 }, { 78, 118 },
+        { 212, 54 }, { 96, 34 },
+        { 342, 34 }, { 342, 62 }, { 342, 90 }, { 342, 118 },
+        { 104, 72 }, { 300, 96 }, { 160, 26 }, { 190, 46 },
+        { 68, 36 },  { 342, 134 }
     };
 
     const char* pinNames[STAGE_COUNT] = {
@@ -1365,21 +1962,27 @@ void VisualsEngine::DrawStageAndCharSelect(int selectedStage, int p1Char, int p2
         "11. SMITHSONIAN AERO",
         "12. TOMB OF UNKNOWN",
         "13. ENN NEWS STUDIO",
-        "14. CHICAGO WRIGLEY"
+        "14. CHICAGO WRIGLEY",
+        "15. RYUGYONG HOTEL",
+        "16. WESTERN WALL",
+        "17. SOVIET FOUNDRY",
+        "18. PALACE COURTYARD",
+        "19. PERFORMING ARTS CTR",
+        "20. THE HOOD (3AM)",
+        "21. PROGRESS AVENUE",
+        "22. LINCOLN BEDROOM",
+        "23. WYOMING RODEO",
+        "24. TEHRAN CASBAH"
     };
 
     for (int i = 0; i < STAGE_COUNT; i++) {
+        if (i >= STAGE_RYUGYONG_HOTEL && i <= STAGE_PALACE_COURTYARD) continue;
+        if (i == STAGE_TEHRAN_CASBAH) continue;
         bool sel = (i == selectedStage);
         Color pinCol = sel ? Color{ 255, 230, 40, 255 } : Color{ 0, 180, 220, 255 };
 
-        DrawCircle((int)pins[i].x, (int)pins[i].y, sel ? 6 : 4, pinCol);
+        DrawCenteredSprite(s_vfxSprites[6], pins[i].x, pins[i].y, sel ? 14.0f : 9.0f, sel ? 14.0f : 9.0f, sel ? (timer * 45.0f) : 0.0f, pinCol);
         if (sel) {
-
-            float pulse = 10.0f + sinf(timer * 8.0f) * 4.0f;
-            DrawCircleLines((int)pins[i].x, (int)pins[i].y, pulse, pinCol);
-            DrawLine((int)pins[i].x - 14, (int)pins[i].y, (int)pins[i].x + 14, (int)pins[i].y, pinCol);
-            DrawLine((int)pins[i].x, (int)pins[i].y - 14, (int)pins[i].x, (int)pins[i].y + 14, pinCol);
-
             int pnw = MeasureText(pinNames[i], 8);
             int boxX = (int)pins[i].x + 10;
             int boxY = (int)pins[i].y - 8;
@@ -1395,8 +1998,9 @@ void VisualsEngine::DrawStageAndCharSelect(int selectedStage, int p1Char, int p2
 
     int defeatedOriginalCount = 0;
     if (defeatedFighters != nullptr) {
-        for (int i = 0; i < PLAYABLE_CHARACTER_COUNT; i++) {
-            if (i != p1Char && defeatedFighters[i]) defeatedOriginalCount++;
+        for (int s = 0; s < PLAYABLE_CHARACTER_COUNT; s++) {
+            int cid = (int)PLAYABLE_ROSTER[s];
+            if (cid != p1Char && defeatedFighters[cid]) defeatedOriginalCount++;
         }
     }
 
@@ -1405,31 +2009,34 @@ void VisualsEngine::DrawStageAndCharSelect(int selectedStage, int p1Char, int p2
     Color headerCol = Color{ 255, 220, 80, 255 };
 
     if (!playerLocked) {
-        headerTitle = "SELECT YOUR FIGHTER";
+        headerTitle = "SELECT YOUR FIGHTER (16 CHALLENGERS)";
         headerCol = Color{ 255, 220, 80, 255 };
     } else if (warPigBeaten) {
         if (!defeatedFighters[CHAR_SOCIALIST]) {
             headerTitle = "*** NATIONAL TOUR: NEW YORK (THE SOCIALIST) ***";
             headerCol = Color{ 80, 220, 255, 255 };
-        } else if (!defeatedFighters[CHAR_A_NEW_HOPE]) {
-            headerTitle = "*** NATIONAL TOUR: CHICAGO WRIGLEY (A NEW HOPE) ***";
-            headerCol = Color{ 255, 195, 60, 255 };
+        } else if (!defeatedFighters[CHAR_DICK]) {
+            headerTitle = "*** NATIONAL TOUR: WYOMING RODEO (DICK) ***";
+            headerCol = Color{ 255, 145, 45, 255 };
         } else if (!defeatedFighters[CHAR_BILLARY]) {
             headerTitle = "*** NATIONAL TOUR: D.C. BASEMENT (BILLARY) ***";
             headerCol = Color{ 255, 120, 240, 255 };
+        } else if (!defeatedFighters[CHAR_A_NEW_HOPE]) {
+            headerTitle = "*** NATIONAL TOUR: CHICAGO WRIGLEY (A NEW HOPE) ***";
+            headerCol = Color{ 255, 195, 60, 255 };
         } else if (!defeatedFighters[CHAR_PALM_BEACH_PETE]) {
-            headerTitle = "*** GRAND FINALE: FLORIDA KEYS (PALM BEACH PETE) ***";
+            headerTitle = "*** U.S. FINALE: FLORIDA KEYS (PALM BEACH PETE) ***";
             headerCol = Color{ 255, 215, 0, 255 };
         } else {
-            headerTitle = "*** TOTAL VETO GRAND CHAMPION! ***";
-            headerCol = Color{ 255, 215, 0, 255 };
+            headerTitle = "*** NEXT ACT: GLOBAL CONFLICT WORLD TOUR! ***";
+            headerCol = Color{ 255, 95, 70, 255 };
         }
-    } else if (defeatedOriginalCount < 9) {
+    } else if (defeatedOriginalCount < (PLAYABLE_CHARACTER_COUNT - 1)) {
         if (ChampionshipEdition::s_opponentLocked) {
             headerTitle = "SELECT BATTLE VENUE (D-PAD: PIN | ATTACK: FIGHT!)";
             headerCol = Color{ 80, 235, 255, 255 };
         } else {
-            headerTitle = "CHOOSE NEXT OPPONENT";
+            headerTitle = "CHOOSE NEXT OPPONENT (BEAT ALL 15 CHALLENGERS)";
             headerCol = Color{ 255, 120, 80, 255 };
         }
     } else if (!defeatedFighters[CHAR_SUCKRATERY_RKF]) {
@@ -1447,11 +2054,7 @@ void VisualsEngine::DrawStageAndCharSelect(int selectedStage, int p1Char, int p2
     }
 
     int stw = MeasureText(headerTitle, 9);
-    DrawPixelText(headerTitle, (SCREEN_WIDTH - stw) / 2, 2, 9, headerCol);
-
-    const char* eggHint = "EASTER EGG: HOLD LT+RT (OR Q+E / T) FOR TESLA BONUS";
-    int ehw = MeasureText(eggHint, 6);
-    DrawPixelText(eggHint, (SCREEN_WIDTH - ehw) / 2, 11, 6, Color{ 80, 200, 255, 220 });
+    DrawPixelText(headerTitle, (SCREEN_WIDTH - stw) / 2, 4, 9, headerCol);
 
     const char* pinNamesAll[STAGE_COUNT] = {
         "EAST WING DEMO",
@@ -1467,18 +2070,28 @@ void VisualsEngine::DrawStageAndCharSelect(int selectedStage, int p1Char, int p2
         "SMITHSONIAN AIR & SPACE",
         "TOMB OF THE UNKNOWN",
         "ENN NEWS STUDIO",
-        "CHICAGO WRIGLEY FIELD"
+        "CHICAGO WRIGLEY FIELD",
+        "RYUGYONG HOTEL (DPRK)",
+        "WESTERN WALL (JERUSALEM)",
+        "SOVIET STEEL FOUNDRY",
+        "PALACE COURTYARD (GULF)",
+        "PERFORMING ARTS CENTER",
+        "THE HOOD (3AM CARRYOUT)",
+        "PROGRESS AVENUE",
+        "THE LINCOLN BEDROOM",
+        "WYOMING (OLD FAITHFUL)",
+        "TEHRAN (CASBAH)"
     };
 
     char venueBanner[80];
-    if (ChampionshipEdition::s_opponentLocked && !warPigBeaten && defeatedOriginalCount < 9) {
+    if (ChampionshipEdition::s_opponentLocked && !warPigBeaten && defeatedOriginalCount < (PLAYABLE_CHARACTER_COUNT - 1)) {
         snprintf(venueBanner, sizeof(venueBanner), "< STAGE: %s >", pinNamesAll[selectedStage < STAGE_COUNT ? selectedStage : 0]);
     } else {
         snprintf(venueBanner, sizeof(venueBanner), "[STAGE: %s]", pinNamesAll[selectedStage < STAGE_COUNT ? selectedStage : 0]);
     }
     int vbw = MeasureText(venueBanner, 8);
     DrawRectangle((SCREEN_WIDTH - vbw) / 2 - 4, 132, vbw + 8, 12, Color{ 10, 14, 22, 235 });
-    if (ChampionshipEdition::s_opponentLocked && !warPigBeaten && defeatedOriginalCount < 9) {
+    if (ChampionshipEdition::s_opponentLocked && !warPigBeaten && defeatedOriginalCount < (PLAYABLE_CHARACTER_COUNT - 1)) {
         DrawRectangleLines((SCREEN_WIDTH - vbw) / 2 - 4, 132, vbw + 8, 12, Color{ 255, 225, 60, 255 });
         DrawPixelText(venueBanner, (SCREEN_WIDTH - vbw) / 2, 134, 8, Color{ 255, 235, 80, 255 });
     } else {
@@ -1490,7 +2103,10 @@ void VisualsEngine::DrawStageAndCharSelect(int selectedStage, int p1Char, int p2
         "TECHBRO", "FILIBUSTER", "FREAGLE", "POPULIST",
         "SLEEPY JOE", "MARJORY T.G.",
         "SUCKRATERY RKF", "WAR PIG", "THE SOCIALIST", "BILLARY",
-        "PALM BEACH PETE", "THE PUNDIT", "A NEW HOPE"
+        "PALM BEACH PETE", "THE PUNDIT", "A NEW HOPE",
+        "DOCTOR ABDUL", "COUCHIE", "BLEXAS", "S.I.",
+        "KIM", "BEBE", "PALE MOTH", "THE DICTATOR",
+        "FLOTUS", "W", "DICK", "THE AYATOLLAH"
     };
 
     const char* rosterArchetypes[CHARACTER_COUNT] = {
@@ -1499,7 +2115,10 @@ void VisualsEngine::DrawStageAndCharSelect(int selectedStage, int p1Char, int p2
         "Power Nap Counter", "Trailer Brawler",
         "Brain Worm Cobra", "Pentagon Final Boss", "Produce & Cash",
         "Dual Clinton Electro", "Adrenochrome Mogul", "Decision 2028 Map",
-        "Windy City Hoop"
+        "Windy City Hoop",
+        "Shawarma & Shakira", "Hiawatha Couch Tank", "Hotwheels Titan", "25% ATM Terminator",
+        "Supreme Wave Boss", "Star-Burst Lasers", "Hammer & Sickle", "Spider Hole Boss",
+        "Natasha Spy Radio", "Paper Plane Jenga", "Wyoming Shotgun", "Strait of Hormuz"
     };
 
     int p1BoxX = 10;
@@ -1528,7 +2147,7 @@ void VisualsEngine::DrawStageAndCharSelect(int selectedStage, int p1Char, int p2
             DrawTexturePro(s_portraits[p2Char], p2Src, p2Dst, Vector2{ 0.0f, 0.0f }, 0.0f, WHITE);
         }
         DrawRectangleLines(p2BoxX, p2BoxY, p2BoxSize, p2BoxSize, Color{ 255, 60, 60, 255 });
-        const char* p2Tag = (p2Char >= 10) ? "BOSS TARGET" : "2P TARGET";
+        const char* p2Tag = (!IsPlayableCharacter((CharacterId)p2Char)) ? "BOSS TARGET" : "2P TARGET";
         int tagW = MeasureText(p2Tag, 9);
         int nameW = MeasureText(rosterNames[p2Char], 9);
         int archW = MeasureText(rosterArchetypes[p2Char], 7);
@@ -1551,7 +2170,7 @@ void VisualsEngine::DrawStageAndCharSelect(int selectedStage, int p1Char, int p2
     DrawLine(0, GRID_Y, SCREEN_WIDTH, GRID_Y, Color{ 200, 160, 40, 255 });
 
     if (warPigBeaten) {
-        int cWidth = 90;
+        int cWidth = 72;
         int cHeight = 44;
         int cY = GRID_Y + 14;
 
@@ -1565,19 +2184,21 @@ void VisualsEngine::DrawStageAndCharSelect(int selectedStage, int p1Char, int p2
             bool defeated;
         };
 
-        bool socDef = (defeatedFighters != nullptr && defeatedFighters[CHAR_SOCIALIST]);
-        bool hopeDef = (defeatedFighters != nullptr && defeatedFighters[CHAR_A_NEW_HOPE]);
-        bool bilDef = (defeatedFighters != nullptr && defeatedFighters[CHAR_BILLARY]);
+        bool socDef  = (defeatedFighters != nullptr && defeatedFighters[CHAR_SOCIALIST]);
+        bool dickDef = (defeatedFighters != nullptr && defeatedFighters[CHAR_DICK]);
+        bool bilDef  = (defeatedFighters != nullptr && defeatedFighters[CHAR_BILLARY]);
         bool peteDef = (defeatedFighters != nullptr && defeatedFighters[CHAR_PALM_BEACH_PETE]);
+        bool hopeDef = (defeatedFighters != nullptr && defeatedFighters[CHAR_A_NEW_HOPE]);
 
-        ECCard ecCards[4] = {
-            { 6,   CHAR_SOCIALIST,       "1: NEW YORK", "SOCIALIST",  "WTC Plaza",    false,   socDef },
-            { 100, CHAR_A_NEW_HOPE,      "2: CHICAGO",  "A NEW HOPE", "Wrigleyville", !socDef, hopeDef },
-            { 194, CHAR_BILLARY,         "3: D.C.",     "BILLARY",    "Comet Ping",   !hopeDef, bilDef },
-            { 288, CHAR_PALM_BEACH_PETE, "4: FL KEYS",  "P.B. PETE",  "Temple Isle",  !bilDef, peteDef }
+        ECCard ecCards[5] = {
+            { 6,   CHAR_SOCIALIST,       "1: NY",   "SOCIALIST", "WTC Plaza",   false,    socDef },
+            { 81,  CHAR_DICK,            "2: WY",   "DICK",      "Wyoming",     !socDef,  dickDef },
+            { 156, CHAR_BILLARY,         "3: D.C.", "BILLARY",   "Comet Ping",  !dickDef, bilDef },
+            { 231, CHAR_A_NEW_HOPE,      "4: CHI",  "NEW HOPE",  "Wrigley",     !bilDef,  hopeDef },
+            { 306, CHAR_PALM_BEACH_PETE, "5: KEYS", "P.B. PETE", "Temple Isle", !hopeDef, peteDef }
         };
 
-        for (int k = 0; k < 4; k++) {
+        for (int k = 0; k < 5; k++) {
             const auto& cd = ecCards[k];
             bool active = (p2Char == cd.id);
             Color bgCol = cd.defeated ? Color{ 15, 15, 20, 255 } : (cd.locked ? Color{ 18, 18, 22, 255 } : Color{ 28, 32, 46, 255 });
@@ -1585,40 +2206,40 @@ void VisualsEngine::DrawStageAndCharSelect(int selectedStage, int p1Char, int p2
 
             if (s_loaded && s_portraits[cd.id].id > 0) {
                 Rectangle srcRec = { 0.0f, 0.0f, (float)s_portraits[cd.id].width, (float)s_portraits[cd.id].height };
-                Rectangle dstRec = { (float)cd.x + 2, (float)cY + 6, 32.0f, 32.0f };
+                Rectangle dstRec = { (float)cd.x + 2, (float)cY + 8, 24.0f, 28.0f };
                 Color pTint = cd.locked ? Color{ 55, 55, 60, 180 } : (cd.defeated ? Color{ 80, 80, 85, 200 } : WHITE);
                 DrawTexturePro(s_portraits[cd.id], srcRec, dstRec, Vector2{ 0.0f, 0.0f }, 0.0f, pTint);
             }
 
             if (cd.locked) {
-                DrawRectangle(cd.x + 35, cY + 2, cWidth - 37, cHeight - 4, Color{ 16, 16, 22, 250 });
-                DrawPixelText("LOCKED", cd.x + 38, cY + 12, 8, Color{ 170, 170, 185, 220 });
-                DrawPixelText("BEAT PREV", cd.x + 37, cY + 25, 6, Color{ 130, 130, 145, 200 });
+                DrawRectangle(cd.x + 27, cY + 2, cWidth - 29, cHeight - 4, Color{ 16, 16, 22, 250 });
+                DrawPixelText("LOCKED", cd.x + 29, cY + 12, 7, Color{ 170, 170, 185, 220 });
+                DrawPixelText("WIN PREV", cd.x + 28, cY + 25, 6, Color{ 130, 130, 145, 200 });
             } else {
-                Color hdrCol = (k == 3 ? Color{ 255, 215, 50, 255 } : Color{ 80, 210, 255, 255 });
-                DrawPixelText(cd.header, cd.x + 36, cY + 4, 6, hdrCol);
-                DrawPixelText(cd.name, cd.x + 36, cY + 15, 7, Color{ 255, 220, 60, 255 });
-                DrawPixelText(cd.stage, cd.x + 36, cY + 27, 6, Color{ 170, 190, 220, 220 });
+                Color hdrCol = (k == 4 ? Color{ 255, 215, 50, 255 } : (k == 1 ? Color{ 255, 155, 55, 255 } : Color{ 80, 210, 255, 255 }));
+                DrawPixelText(cd.header, cd.x + 28, cY + 4, 6, hdrCol);
+                DrawPixelText(cd.name, cd.x + 28, cY + 15, 6, Color{ 255, 220, 60, 255 });
+                DrawPixelText(cd.stage, cd.x + 28, cY + 27, 6, Color{ 170, 190, 220, 220 });
             }
 
             if (cd.defeated) {
                 DrawRectangle(cd.x + 2, cY + 2, cWidth - 4, cHeight - 4, Color{ 35, 0, 0, 140 });
                 DrawLineEx(Vector2{ (float)cd.x + 4, (float)cY + 4 }, Vector2{ (float)cd.x + cWidth - 4, (float)cY + cHeight - 4 }, 2.0f, Color{ 230, 30, 30, 240 });
                 DrawLineEx(Vector2{ (float)cd.x + cWidth - 4, (float)cY + 4 }, Vector2{ (float)cd.x + 4, (float)cY + cHeight - 4 }, 2.0f, Color{ 230, 30, 30, 240 });
-                DrawRectangle(cd.x + 10, cY + 16, cWidth - 20, 12, Color{ 190, 20, 20, 230 });
-                int dw = MeasureText("DEFEATED", 8);
-                DrawPixelText("DEFEATED", cd.x + (cWidth - dw) / 2, cY + 18, 8, WHITE);
+                DrawRectangle(cd.x + 6, cY + 16, cWidth - 12, 12, Color{ 190, 20, 20, 230 });
+                int dw = MeasureText("DEFEATED", 7);
+                DrawPixelText("DEFEATED", cd.x + (cWidth - dw) / 2, cY + 18, 7, WHITE);
             }
 
             Color borderCol = active ? Color{ 255, 50, 50, 255 } : (cd.locked ? Color{ 50, 50, 60, 255 } : Color{ 80, 140, 200, 255 });
             DrawRectangleLines(cd.x, cY, cWidth, cHeight, borderCol);
             if (active) {
                 DrawRectangleLines(cd.x - 2, cY - 2, cWidth + 4, cHeight + 4, Color{ 255, 215, 0, 255 });
-                int ctW = MeasureText("NEXT TARGET", 7);
-                DrawPixelText("NEXT TARGET", cd.x + (cWidth - ctW) / 2, cY - 9, 7, Color{ 255, 220, 50, 255 });
+                int ctW = MeasureText("TARGET", 7);
+                DrawPixelText("TARGET", cd.x + (cWidth - ctW) / 2, cY - 9, 7, Color{ 255, 220, 50, 255 });
             }
         }
-    } else if (defeatedOriginalCount >= 9) {
+    } else if (defeatedOriginalCount >= (PLAYABLE_CHARACTER_COUNT - 1)) {
         int cWidth = 118;
         int cHeight = 44;
         int cY = GRID_Y + 14;
@@ -1689,67 +2310,184 @@ void VisualsEngine::DrawStageAndCharSelect(int selectedStage, int p1Char, int p2
         }
     } else {
 
-        int boxW = 46;
-        int boxH = 26;
-        int startX = 33;
-        int colSpacing = 68;
+        int boxW = 41;
+        int boxH = 22;
+        int startX = 11;
+        int colSpacing = 46;
 
         const char* rosterGridNames[PLAYABLE_CHARACTER_COUNT] = {
-            "POTUS", "HIGH BENCH", "REDCAP", "GOVERNATOR", "TECHBRO",
-            "FILIBUSTER", "FREAGLE", "POPULIST", "SLEEPY JOE", "M.T.G."
+            "POTUS", "BENCH", "REDCAP", "GOV", "TECH", "TWEED", "EAGLE", "POP",
+            "JOE", "M.T.G.", "ABDUL", "COUCH", "BLEXAS", "S.I.", "FLOTUS", "W"
         };
 
-        for (int i = 0; i < PLAYABLE_CHARACTER_COUNT; i++) {
-            int col = i % 5;
-            int row = i / 5;
+        for (int slot = 0; slot < PLAYABLE_CHARACTER_COUNT; slot++) {
+            int cid = (int)PLAYABLE_ROSTER[slot];
+            int col = slot % 8;
+            int row = slot / 8;
             int bx = startX + col * colSpacing;
-            int by = GRID_Y + 4 + row * 36;
+            int by = GRID_Y + 3 + row * 39;
 
-            bool isDefeated = (defeatedFighters != nullptr && defeatedFighters[i]);
-            Color cardBg = isDefeated ? Color{ 15, 15, 20, 255 } : Color{ 25, 30, 42, 255 };
+            bool isDefeated = (defeatedFighters != nullptr && defeatedFighters[cid]);
+            bool isNewFighter = (slot >= 10);
+            Color cardBg = isDefeated ? Color{ 15, 15, 20, 255 } : (isNewFighter ? Color{ 22, 34, 52, 255 } : Color{ 25, 30, 42, 255 });
             DrawRectangle(bx, by, boxW, boxH, cardBg);
 
             Color portraitTint = isDefeated ? Color{ 85, 85, 90, 200 } : WHITE;
 
-            if (s_loaded && s_portraits[i].id > 0) {
+            if (s_loaded && s_portraits[cid].id > 0) {
                 float targetAspect = (float)(boxW - 2) / (float)(boxH - 2);
-                float cropW = (float)s_portraits[i].width;
+                float cropW = (float)s_portraits[cid].width;
                 float cropH = cropW / targetAspect;
-                float cropY = ((float)s_portraits[i].height - cropH) * 0.28f;
+                float cropY = ((float)s_portraits[cid].height - cropH) * 0.26f;
                 if (cropY < 0.0f) cropY = 0.0f;
-                if (cropY + cropH > (float)s_portraits[i].height) cropH = (float)s_portraits[i].height - cropY;
+                if (cropY + cropH > (float)s_portraits[cid].height) cropH = (float)s_portraits[cid].height - cropY;
                 Rectangle srcRec = { 0.0f, cropY, cropW, cropH };
                 Rectangle dstRec = { (float)bx + 1, (float)by + 1, (float)boxW - 2, (float)boxH - 2 };
-                DrawTexturePro(s_portraits[i], srcRec, dstRec, Vector2{ 0.0f, 0.0f }, 0.0f, portraitTint);
+                DrawTexturePro(s_portraits[cid], srcRec, dstRec, Vector2{ 0.0f, 0.0f }, 0.0f, portraitTint);
             } else {
-                DrawCircle(bx + 23, by + 13, 10, isDefeated ? Color{ 70, 70, 70, 255 } : Color{ 200, 160, 120, 255 });
+                DrawCircle(bx + 22, by + 12, 9, isDefeated ? Color{ 70, 70, 70, 255 } : Color{ 200, 160, 120, 255 });
             }
 
             if (isDefeated) {
                 DrawRectangle(bx + 1, by + 1, boxW - 2, boxH - 2, Color{ 35, 0, 0, 140 });
-                DrawLineEx(Vector2{ (float)bx + 3, (float)by + 3 }, Vector2{ (float)bx + boxW - 3, (float)by + boxH - 3 }, 2.5f, Color{ 230, 30, 30, 240 });
-                DrawLineEx(Vector2{ (float)bx + boxW - 3, (float)by + 3 }, Vector2{ (float)bx + 3, (float)by + boxH - 3 }, 2.5f, Color{ 230, 30, 30, 240 });
-                DrawRectangle(bx, by + 8, boxW, 10, Color{ 190, 20, 20, 230 });
-                DrawPixelText("DEFEATED", bx + 3, by + 9, 8, WHITE);
+                DrawLineEx(Vector2{ (float)bx + 3, (float)by + 3 }, Vector2{ (float)bx + boxW - 3, (float)by + boxH - 3 }, 2.2f, Color{ 230, 30, 30, 240 });
+                DrawLineEx(Vector2{ (float)bx + boxW - 3, (float)by + 3 }, Vector2{ (float)bx + 3, (float)by + boxH - 3 }, 2.2f, Color{ 230, 30, 30, 240 });
+                DrawRectangle(bx, by + 8, boxW, 8, Color{ 190, 20, 20, 230 });
+                int vw = MeasureText("VETOED", 6);
+                DrawPixelText("VETOED", bx + (boxW - vw) / 2, by + 9, 6, WHITE);
             }
 
-            DrawRectangleLines(bx, by, boxW, boxH, isDefeated ? Color{ 55, 40, 40, 255 } : Color{ 65, 75, 95, 255 });
+            DrawRectangleLines(bx, by, boxW, boxH, isDefeated ? Color{ 55, 40, 40, 255 } : (isNewFighter ? Color{ 75, 180, 235, 255 } : Color{ 65, 75, 95, 255 }));
 
-            if (i == p1Char) {
+            if (cid == p1Char) {
                 DrawRectangleLines(bx - 2, by - 2, boxW + 4, boxH + 4, Color{ 50, 170, 255, 255 });
-                DrawRectangle(bx, by, 14, 9, Color{ 15, 60, 180, 230 });
-                DrawPixelText("1P", bx + 2, by + 1, 8, WHITE);
+                DrawRectangle(bx, by, 13, 8, Color{ 15, 60, 180, 230 });
+                DrawPixelText("1P", bx + 2, by + 1, 7, WHITE);
             }
 
-            if (playerLocked && i == p2Char && !isDefeated) {
+            if (playerLocked && cid == p2Char && !isDefeated) {
                 DrawRectangleLines(bx - 1, by - 1, boxW + 2, boxH + 2, Color{ 245, 50, 50, 255 });
-                DrawRectangle(bx + boxW - 14, by, 14, 9, Color{ 180, 20, 20, 230 });
-                DrawPixelText("2P", bx + boxW - 13, by + 1, 8, WHITE);
+                DrawRectangle(bx + boxW - 13, by, 13, 8, Color{ 180, 20, 20, 230 });
+                DrawPixelText("2P", bx + boxW - 12, by + 1, 7, WHITE);
             }
 
-            int nw = MeasureText(rosterGridNames[i], 7);
-            DrawPixelText(rosterGridNames[i], bx + (boxW - nw) / 2, by + boxH + 2, 7, isDefeated ? Color{ 110, 110, 120, 255 } : Color{ 230, 235, 245, 255 });
+            int nw = MeasureText(rosterGridNames[slot], 6);
+            Color nameCol = isDefeated ? Color{ 110, 110, 120, 255 } : (isNewFighter ? Color{ 125, 240, 255, 255 } : Color{ 230, 235, 245, 255 });
+            DrawPixelText(rosterGridNames[slot], bx + (boxW - nw) / 2, by + boxH + 1, 6, nameCol);
         }
+    }
+}
+
+void VisualsEngine::DrawWorldConflictMap(int worldActIndex, int p1Char, float timer, const bool defeatedFighters[CHARACTER_COUNT]) {
+    if (s_loaded && s_mapWorldConflict.id > 0) {
+        Rectangle src = { 0.0f, 0.0f, (float)s_mapWorldConflict.width, (float)s_mapWorldConflict.height };
+        Rectangle dst = { 0.0f, 0.0f, (float)SCREEN_WIDTH, (float)SCREEN_HEIGHT };
+        DrawTexturePro(s_mapWorldConflict, src, dst, Vector2{ 0.0f, 0.0f }, 0.0f, WHITE);
+    } else {
+        DrawRectangle(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT, Color{ 8, 22, 68, 255 });
+    }
+
+    DrawRectangle(0, 0, SCREEN_WIDTH, 20, Color{ 8, 12, 24, 235 });
+    DrawLine(0, 20, SCREEN_WIDTH, 20, Color{ 255, 215, 45, 255 });
+    const char* hdr = "GLOBAL CONFLICT  -  WORLD BOSS TOUR";
+    int hw = MeasureText(hdr, 10);
+    DrawPixelText(hdr, (SCREEN_WIDTH - hw) / 2, 5, 10, Color{ 255, 230, 65, 255 });
+
+    struct WorldStop {
+        Vector2 pt;
+        const char* city;
+        const char* bossName;
+        const char* stageName;
+        CharacterId bossId;
+    };
+    const Vector2 chicagoOrigin{ 102.0f, 102.0f };
+    const WorldStop stops[5] = {
+        { Vector2{ 314.0f, 88.0f },  "PYONGYANG, DPRK",   "KIM",           "Ryugyong Hotel",    CHAR_KIM },
+        { Vector2{ 220.0f, 99.0f },  "JERUSALEM",         "BEBE",          "The Western Wall",  CHAR_BEBE },
+        { Vector2{ 258.0f, 62.0f },  "SIBERIA, RUSSIA",   "PALE MOTH",     "Soviet Foundry",    CHAR_PALE_MOTH },
+        { Vector2{ 234.0f, 110.0f }, "BAGHDAD / GULF",    "THE DICTATOR",  "Palace Courtyard",  CHAR_THE_DICTATOR },
+        { Vector2{ 250.0f, 97.0f },  "TEHRAN, IRAN",      "THE AYATOLLAH", "Tehran Casbah",     CHAR_AYATOLLAH }
+    };
+
+    int act = std::clamp(worldActIndex, 0, 4);
+    Vector2 fromPt = (act == 0) ? chicagoOrigin : stops[act - 1].pt;
+    Vector2 toPt   = stops[act].pt;
+
+    for (int i = 0; i < act; i++) {
+        Vector2 a = (i == 0) ? chicagoOrigin : stops[i - 1].pt;
+        Vector2 b = stops[i].pt;
+        DrawLineEx(a, b, 2.0f, Color{ 255, 90, 70, 190 });
+    }
+
+    float flightProg = std::clamp(timer / 2.2f, 0.0f, 1.0f);
+    int segs = 16;
+    for (int d = 0; d < segs; d++) {
+        float u0 = (float)d / (float)segs;
+        float u1 = std::min(flightProg, (float)(d + 1) / (float)segs);
+        if (u0 >= flightProg) break;
+        Vector2 p0{ fromPt.x + (toPt.x - fromPt.x) * u0, fromPt.y + (toPt.y - fromPt.y) * u0 - sinf(u0 * PI_F) * 14.0f };
+        Vector2 p1{ fromPt.x + (toPt.x - fromPt.x) * u1, fromPt.y + (toPt.y - fromPt.y) * u1 - sinf(u1 * PI_F) * 14.0f };
+        DrawLineEx(p0, p1, 2.4f, (d % 2 == 0) ? Color{ 255, 240, 80, 245 } : WHITE);
+    }
+
+    float jetLift = sinf(flightProg * PI_F) * 14.0f;
+    Vector2 jetPos{ fromPt.x + (toPt.x - fromPt.x) * flightProg, fromPt.y + (toPt.y - fromPt.y) * flightProg - jetLift };
+    DrawCenteredSprite(s_vfxSprites[0], jetPos.x, jetPos.y, 12.0f, 12.0f, timer * 90.0f);
+
+    DrawCenteredSprite(s_vfxSprites[6], chicagoOrigin.x, chicagoOrigin.y, 10.0f, 10.0f, 0.0f, Color{ 90, 225, 255, 245 });
+    DrawPixelText("USA", (int)chicagoOrigin.x - 9, (int)chicagoOrigin.y + 6, 6, Color{ 160, 235, 255, 230 });
+
+    for (int i = 0; i < 5; i++) {
+        bool beaten = (defeatedFighters != nullptr && defeatedFighters[stops[i].bossId]);
+        bool isCur  = (i == act);
+        Vector2 p = stops[i].pt;
+        if (beaten) {
+            DrawCenteredSprite(s_vfxSprites[2], p.x, p.y, 13.0f, 13.0f);
+        } else if (isCur) {
+            float pulse = 14.0f + sinf(timer * 10.0f) * 3.0f;
+            DrawCenteredSprite(s_vfxSprites[6], p.x, p.y, pulse, pulse, timer * 40.0f);
+            int cw = MeasureText(stops[i].city, 7);
+            DrawRectangle((int)p.x - cw / 2 - 3, (int)p.y - 17, cw + 6, 10, Color{ 10, 14, 24, 230 });
+            DrawPixelText(stops[i].city, (int)p.x - cw / 2, (int)p.y - 16, 7, Color{ 255, 235, 80, 255 });
+        } else {
+            DrawCenteredSprite(s_vfxSprites[6], p.x, p.y, 8.0f, 8.0f, 0.0f, Color{ 255, 145, 110, 210 });
+        }
+    }
+
+    int barY = SCREEN_HEIGHT - 54;
+    DrawRectangle(10, barY, SCREEN_WIDTH - 20, 48, Color{ 8, 14, 28, 242 });
+    DrawRectangleLines(10, barY, SCREEN_WIDTH - 20, 48, Color{ 255, 210, 55, 255 });
+
+    int bossId = (int)stops[act].bossId;
+    if (s_loaded && s_portraits[p1Char].id > 0) {
+        DrawTexturePro(s_portraits[p1Char], Rectangle{ 0, 0, (float)s_portraits[p1Char].width, (float)s_portraits[p1Char].height },
+                       Rectangle{ 14, (float)barY + 4, 40, 40 }, Vector2{ 0, 0 }, 0.0f, WHITE);
+        DrawRectangleLines(14, barY + 4, 40, 40, Color{ 80, 195, 255, 255 });
+    }
+    if (s_loaded && s_portraits[bossId].id > 0) {
+        DrawTexturePro(s_portraits[bossId], Rectangle{ (float)s_portraits[bossId].width, 0, -(float)s_portraits[bossId].width, (float)s_portraits[bossId].height },
+                       Rectangle{ (float)SCREEN_WIDTH - 54, (float)barY + 4, 40, 40 }, Vector2{ 0, 0 }, 0.0f, WHITE);
+        DrawRectangleLines(SCREEN_WIDTH - 54, barY + 4, 40, 40, Color{ 255, 65, 65, 255 });
+    }
+
+    char actLine[96];
+    if (act == 4) {
+        snprintf(actLine, sizeof(actLine), "FINAL WORLD BOSS 5/5: %s", stops[act].bossName);
+    } else {
+        snprintf(actLine, sizeof(actLine), "WORLD TARGET %d/5: %s", act + 1, stops[act].bossName);
+    }
+    int alw = MeasureText(actLine, 10);
+    DrawPixelText(actLine, (SCREEN_WIDTH - alw) / 2, barY + 6, 10, Color{ 255, 230, 65, 255 });
+
+    char locLine[96];
+    snprintf(locLine, sizeof(locLine), "%s  -  %s", stops[act].city, stops[act].stageName);
+    int llw = MeasureText(locLine, 8);
+    DrawPixelText(locLine, (SCREEN_WIDTH - llw) / 2, barY + 20, 8, Color{ 95, 230, 255, 255 });
+
+    if (((int)(timer * 4.0f) % 2) == 0) {
+        const char* pr = "PRESS ATTACK / START TO ENGAGE!";
+        int prw = MeasureText(pr, 7);
+        DrawPixelText(pr, (SCREEN_WIDTH - prw) / 2, barY + 34, 7, Color{ 255, 130, 110, 255 });
     }
 }
 
@@ -1791,15 +2529,21 @@ void VisualsEngine::DrawSecretSelectScreen(int step, int p1Char, int p2Char, int
         "TECHBRO", "FILIBUSTER", "FREAGLE", "POPULIST",
         "SLEEPY JOE", "MARJORY T.G.",
         "SUCKRATERY", "WAR PIG", "SOCIALIST", "BILLARY",
-        "P.B. PETE", "THE PUNDIT", "A NEW HOPE"
+        "P.B. PETE", "THE PUNDIT", "A NEW HOPE",
+        "DR. ABDUL", "COUCHIE", "BLEXAS", "S.I.",
+        "KIM", "BEBE", "PALE MOTH", "THE DICTATOR",
+        "FLOTUS", "W", "DICK", "THE AYATOLLAH"
     };
 
     const char* rosterShortNames[CHARACTER_COUNT] = {
-        "POTUS", "BENCH", "REDCAP", "GOV",
-        "TECHBRO", "TWEED", "FREAGLE", "POP",
+        "POTUS", "BENCH", "RDCAP", "GOV",
+        "TECH", "TWEED", "EAGLE", "POP",
         "JOE", "MTG",
-        "RKF", "WAR PIG", "ZOHRAN", "BILLARY",
-        "PETE", "PUNDIT", "OBAMA"
+        "RKF", "WRPIG", "ZOHRN", "CLNTN",
+        "PETE", "PNDIT", "OBAMA",
+        "ABDUL", "COUCH", "BLEXS", "S.I.",
+        "KIM", "BEBE", "MOTH", "SADAM",
+        "FLOTS", "W", "DICK", "AYTLH"
     };
 
     const char* rosterArchetypes[CHARACTER_COUNT] = {
@@ -1807,7 +2551,10 @@ void VisualsEngine::DrawSecretSelectScreen(int step, int p1Char, int p2Char, int
         "Drone & Laser", "Turtle Filibuster", "Direct Action Furry", "Viral Kicks",
         "Power Nap Counter", "Trailer Brawler",
         "Brain Worm Cobra", "Pentagon Juggernaut", "Groceries & Cash", "Dual Clinton Laptop",
-        "Florida Keys Boss", "Decision 2028 Map", "Arcing Hoop Shot"
+        "Florida Keys Boss", "Decision 2028 Map", "Arcing Hoop Shot",
+        "Shawarma & Shakira", "Hiawatha Couch Tank", "Hotwheels Titan", "Matrix T-800 AI",
+        "Juche Wave Boss", "Twin Eye Laser", "USSR Nunchuck Boss", "Spider Hole Boss",
+        "Natasha Spy Radio", "Paper Plane Jenga", "Wyoming Shotgun", "Strait of Hormuz"
     };
 
     const char* stageNames[STAGE_COUNT] = {
@@ -1824,41 +2571,71 @@ void VisualsEngine::DrawSecretSelectScreen(int step, int p1Char, int p2Char, int
         "11. SMITHSONIAN AERO",
         "12. TOMB OF UNKNOWN",
         "13. ENN NEWS STUDIO",
-        "14. CHICAGO WRIGLEY"
+        "14. CHICAGO WRIGLEY",
+        "15. RYUGYONG HOTEL",
+        "16. WESTERN WALL",
+        "17. SOVIET FOUNDRY",
+        "18. PALACE COURTYARD",
+        "19. PERFORMING ARTS",
+        "20. THE HOOD (3AM)",
+        "21. PROGRESS AVENUE",
+        "22. LINCOLN BEDROOM",
+        "23. WYOMING RODEO",
+        "24. TEHRAN CASBAH"
     };
 
     const char* stageCardTitles[STAGE_COUNT] = {
-        "1. EAST WING",
-        "2. REFLECT POOL",
-        "3. CONGRESS",
-        "4. W.H. MMA",
-        "5. PRESS ROOM",
-        "6. PENTAGON",
-        "7. WTC PLAZA",
-        "8. COMET PING",
-        "9. TEMPLE ISLE",
-        "10. LINCOLN MEM",
-        "11. AIR & SPACE",
-        "12. UNKNOWN TOMB",
-        "13. ENN STUDIO",
-        "14. WRIGLEY FLD"
+        "1.E.WING",
+        "2.POOL",
+        "3.HOUSE",
+        "4.LAWN",
+        "5.PRESS",
+        "6.PENTGN",
+        "7.WTC NY",
+        "8.COMET",
+        "9.KEYS",
+        "10.LNCLN",
+        "11.SPACE",
+        "12.TOMB",
+        "13.ENN",
+        "14.WRGLY",
+        "15.HOTEL",
+        "16.WALL",
+        "17.STEEL",
+        "18.COURT",
+        "19.ARTS",
+        "20.HOOD",
+        "21.PROGR",
+        "22.BEDRM",
+        "23.WYOMG",
+        "24.TEHRN"
     };
 
     const char* stageCardSub[STAGE_COUNT] = {
-        "White House, D.C.",
-        "National Mall",
-        "Capitol Chamber",
-        "South Lawn Cage",
-        "Press Briefing",
-        "War Altar",
-        "Pre-9/11 NYC",
-        "Basement Club",
-        "Florida Keys",
-        "Memorial Steps",
-        "Smithsonian",
-        "Arlington, VA",
-        "Cable News Desk",
-        "Chicago, IL"
+        "W. House",
+        "D.C.Mall",
+        "Capitol",
+        "MMA Lawn",
+        "Briefing",
+        "Pentagon",
+        "90s NYC",
+        "Club DC",
+        "FL Keys",
+        "Steps DC",
+        "Air&Spc",
+        "Arlingtn",
+        "TV Desk",
+        "Chicago",
+        "N. Korea",
+        "Jerusalm",
+        "USSR Fac",
+        "Mid-East",
+        "RUMP Ctr",
+        "3AM Food",
+        "Trumpf",
+        "USSR Bed",
+        "Rodeo WY",
+        "Casbah"
     };
 
     const char* stageVenues[STAGE_COUNT] = {
@@ -1875,7 +2652,17 @@ void VisualsEngine::DrawSecretSelectScreen(int step, int p1Char, int p2Char, int
         "Smithsonian Air & Space",
         "Tomb of the Unknown Soldier",
         "ENN Broadcast News Studio",
-        "Chicago - Wrigleyville Plaza"
+        "Chicago - Wrigleyville Plaza",
+        "Pyongyang - Ryugyong Upper Floor",
+        "Jerusalem - The Western Wall",
+        "Siberia - Soviet Steel Foundry",
+        "Persian Gulf - Palace Courtyard",
+        "D.C. - Performing Arts Center (RUMP)",
+        "D.C. - The Hood (3AM Carryout)",
+        "D.C. - Progress Avenue (Trumpf Ctr)",
+        "White House - The Lincoln Bedroom",
+        "Wyoming - Rodeo & Old Faithful",
+        "Tehran - Rock the Casbah"
     };
 
     int cardW = 62;
@@ -1914,7 +2701,7 @@ void VisualsEngine::DrawSecretSelectScreen(int step, int p1Char, int p2Char, int
     }
     DrawRectangleLines(port2X, port2Y, portW, portH, (step == 1) ? Color{ 255, 60, 60, 255 } : Color{ 140, 50, 60, 255 });
     DrawRectangleLines(p2CardX, p2CardY, cardW, cardH, (step == 1) ? Color{ 255, 60, 60, 255 } : Color{ 120, 40, 50, 200 });
-    const char* p2Tag = (p2Char >= 10) ? "BOSS 2P" : "PLAYER 2";
+    const char* p2Tag = (!IsPlayableCharacter((CharacterId)p2Char)) ? "BOSS 2P" : "PLAYER 2";
     int p2tw = MeasureText(p2Tag, 7);
     DrawPixelText(p2Tag, p2CardX + (cardW - p2tw) / 2, p2CardY + 40, 7, Color{ 255, 90, 90, 255 });
     int p2nw = MeasureText(rosterShortNames[p2Char], 7);
@@ -1964,61 +2751,20 @@ void VisualsEngine::DrawSecretSelectScreen(int step, int p1Char, int p2Char, int
     }
 
     if (step == 0 || step == 1) {
+        int boxW = 35;
+        int boxH = 21;
 
-        int boxW = 42;
-        int boxH = 24;
+        for (int i = 0; i < CHARACTER_COUNT; i++) {
+            int row = (i < 10) ? 0 : ((i < 20) ? 1 : 2);
+            int col = (i < 10) ? i : ((i < 20) ? (i - 10) : (i - 20));
+            int startX = (row < 2) ? 7 : 25;
+            int pitchX = 37;
+            int bx = startX + col * pitchX;
+            int by = 90 + row * 35;
 
-        int startX0 = 6;
-        int startY0 = 94;
-        for (int i = 0; i < 8; i++) {
-            int bx = startX0 + i * 47;
-            int by = startY0;
+            bool isBoss = !IsPlayableCharacter((CharacterId)i);
 
-            DrawRectangle(bx, by, boxW, boxH, Color{ 18, 24, 36, 255 });
-            if (s_loaded && s_portraits[i].id > 0) {
-                float targetAspect = (float)(boxW - 2) / (float)(boxH - 2);
-                float cropW = (float)s_portraits[i].width;
-                float cropH = cropW / targetAspect;
-                float cropY = ((float)s_portraits[i].height - cropH) * 0.28f;
-                if (cropY < 0.0f) cropY = 0.0f;
-                if (cropY + cropH > (float)s_portraits[i].height) cropH = (float)s_portraits[i].height - cropY;
-                Rectangle src = { 0.0f, cropY, cropW, cropH };
-                Rectangle dst = { (float)bx + 1, (float)by + 1, (float)boxW - 2, (float)boxH - 2 };
-                DrawTexturePro(s_portraits[i], src, dst, Vector2{ 0.0f, 0.0f }, 0.0f, WHITE);
-            }
-            DrawRectangleLines(bx, by, boxW, boxH, Color{ 50, 70, 100, 255 });
-
-            if (i == p1Char) {
-                DrawRectangleLines(bx - 1, by - 1, boxW + 2, boxH + 2, Color{ 80, 200, 255, 255 });
-                DrawRectangle(bx + 1, by + 1, 12, 7, Color{ 20, 80, 200, 240 });
-                DrawPixelText("1P", bx + 2, by + 1, 6, WHITE);
-            }
-            if (i == p2Char) {
-                DrawRectangleLines(bx - 1, by - 1, boxW + 2, boxH + 2, Color{ 255, 60, 60, 255 });
-                DrawRectangle(bx + 1, by + boxH - 8, 12, 7, Color{ 200, 20, 20, 240 });
-                DrawPixelText("2P", bx + 2, by + boxH - 8, 6, WHITE);
-            }
-
-            bool isCursor = (step == 0 && i == p1Char) || (step == 1 && i == p2Char);
-            if (isCursor) {
-                float pulse = 2.0f + sinf(timer * 8.0f) * 1.5f;
-                DrawRectangleLines(bx - (int)pulse, by - (int)pulse, boxW + (int)pulse * 2, boxH + (int)pulse * 2, Color{ 255, 215, 0, 255 });
-            }
-
-            int fSize0 = (MeasureText(rosterShortNames[i], 6) > boxW + 2) ? 5 : 6;
-            int nw0 = MeasureText(rosterShortNames[i], fSize0);
-            DrawPixelText(rosterShortNames[i], bx + (boxW - nw0) / 2, by + boxH + 2, fSize0, Color{ 210, 220, 240, 255 });
-        }
-
-        boxW = 38;
-        int startX1 = 5;
-        int startY1 = 138;
-        for (int i = 8; i < CHARACTER_COUNT; i++) {
-            int col = i - 8;
-            int bx = startX1 + col * 42;
-            int by = startY1;
-
-            DrawRectangle(bx, by, boxW, boxH, (i >= 10) ? Color{ 28, 18, 22, 255 } : Color{ 18, 24, 36, 255 });
+            DrawRectangle(bx, by, boxW, boxH, isBoss ? Color{ 28, 18, 22, 255 } : Color{ 18, 24, 36, 255 });
             if (s_loaded && s_portraits[i].id > 0) {
                 float targetAspect = (float)(boxW - 2) / (float)(boxH - 2);
                 float cropW = (float)s_portraits[i].width;
@@ -2031,9 +2777,9 @@ void VisualsEngine::DrawSecretSelectScreen(int step, int p1Char, int p2Char, int
                 DrawTexturePro(s_portraits[i], src, dst, Vector2{ 0.0f, 0.0f }, 0.0f, WHITE);
             }
 
-            DrawRectangleLines(bx, by, boxW, boxH, (i >= 10) ? Color{ 220, 45, 45, 255 } : Color{ 50, 70, 100, 255 });
+            DrawRectangleLines(bx, by, boxW, boxH, isBoss ? Color{ 220, 45, 45, 255 } : Color{ 50, 70, 100, 255 });
 
-            if (i >= 10) {
+            if (isBoss) {
                 DrawRectangle(bx + boxW - 8, by + 1, 7, 7, Color{ 200, 20, 20, 255 });
                 DrawPixelText("B", bx + boxW - 7, by + 1, 6, Color{ 255, 220, 50, 255 });
             }
@@ -2055,33 +2801,37 @@ void VisualsEngine::DrawSecretSelectScreen(int step, int p1Char, int p2Char, int
                 DrawRectangleLines(bx - (int)pulse, by - (int)pulse, boxW + (int)pulse * 2, boxH + (int)pulse * 2, Color{ 255, 215, 0, 255 });
             }
 
-            int fSize1 = (MeasureText(rosterShortNames[i], 6) > boxW + 2) ? 5 : 6;
-            int nw1 = MeasureText(rosterShortNames[i], fSize1);
-            DrawPixelText(rosterShortNames[i], bx + (boxW - nw1) / 2, by + boxH + 2, fSize1, (i >= 10) ? Color{ 255, 120, 120, 255 } : Color{ 210, 220, 240, 255 });
+            int nw = MeasureText(rosterShortNames[i], 7);
+            DrawPixelText(rosterShortNames[i], bx + (boxW - nw) / 2, by + boxH + 1, 7,
+                          isBoss ? Color{ 255, 130, 130, 255 } : Color{ 210, 220, 240, 255 });
         }
     } else if (step == 2) {
 
-        int cardW = 88;
-        int cardH = 20;
+        int cardW = 60;
+        int cardH = 24;
         for (int i = 0; i < STAGE_COUNT; i++) {
-            int col = i % 4;
-            int row = i / 4;
-            int cx = 10 + col * 92;
-            int cy = 89 + row * 23;
+            int col = i % 6;
+            int row = i / 6;
+            int cx = 7 + col * 62;
+            int cy = 89 + row * 27;
 
             bool isSelected = (i == selectedStage);
-            DrawRectangle(cx, cy, cardW, cardH, isSelected ? Color{ 25, 45, 75, 255 } : Color{ 14, 20, 32, 255 });
+            bool isWorld = (i >= STAGE_RYUGYONG_HOTEL && i <= STAGE_PALACE_COURTYARD) || (i == STAGE_TEHRAN_CASBAH);
+            Color baseCardBg = isWorld ? Color{ 26, 16, 22, 255 } : Color{ 14, 20, 32, 255 };
+            DrawRectangle(cx, cy, cardW, cardH, isSelected ? Color{ 25, 45, 75, 255 } : baseCardBg);
 
-            Color borderCol = isSelected ? Color{ 255, 215, 40, 255 } : Color{ 50, 75, 110, 255 };
+            Color borderCol = isSelected ? Color{ 255, 215, 40, 255 } : (isWorld ? Color{ 170, 55, 65, 255 } : Color{ 50, 75, 110, 255 });
             DrawRectangleLines(cx, cy, cardW, cardH, borderCol);
 
             if (isSelected) {
                 DrawRectangleLines(cx - 2, cy - 2, cardW + 4, cardH + 4, Color{ 0, 220, 255, 255 });
-                DrawRectangle(cx + 2, cy + 2, 5, cardH - 4, Color{ 255, 215, 0, 255 });
+                DrawRectangle(cx + 2, cy + 2, 3, cardH - 4, Color{ 255, 215, 0, 255 });
             }
 
-            DrawPixelText(stageCardTitles[i], cx + (isSelected ? 10 : 5), cy + 3, 7, isSelected ? Color{ 255, 230, 80, 255 } : Color{ 190, 205, 230, 255 });
-            DrawPixelText(stageCardSub[i], cx + (isSelected ? 10 : 5), cy + 13, 6, isSelected ? Color{ 0, 220, 255, 240 } : Color{ 120, 140, 170, 220 });
+            DrawPixelText(stageCardTitles[i], cx + (isSelected ? 7 : 4), cy + 3, 7,
+                          isSelected ? Color{ 255, 230, 80, 255 } : (isWorld ? Color{ 255, 165, 150, 255 } : Color{ 190, 205, 230, 255 }));
+            DrawPixelText(stageCardSub[i], cx + (isSelected ? 7 : 4), cy + 13, 6,
+                          isSelected ? Color{ 0, 220, 255, 240 } : Color{ 130, 150, 180, 220 });
         }
     }
 
@@ -2149,7 +2899,11 @@ void VisualsEngine::DrawSecretSelectScreen(int step, int p1Char, int p2Char, int
     DrawRectangle(0, SCREEN_HEIGHT - 16, SCREEN_WIDTH, 16, Color{ 6, 8, 14, 255 });
     DrawLine(0, SCREEN_HEIGHT - 16, SCREEN_WIDTH, SCREEN_HEIGHT - 16, Color{ 50, 70, 100, 255 });
 
-    const char* navHint = "MOVE: D-PAD | CONFIRM: ATTACK | [SELECT/TAB]: TITLE";
+#if defined(GRAPHICS_API_OPENGL_ES2) || defined(__aarch64__)
+    const char* navHint = "MOVE: D-PAD | CONFIRM: ATTACK | [SELECT]: TITLE";
+#else
+    const char* navHint = "MOVE: D-PAD | CONFIRM: ATTACK | [ESC/BKSP/SELECT]: TITLE";
+#endif
     int nhw = MeasureText(navHint, 7);
     DrawPixelText(navHint, (SCREEN_WIDTH - nhw) / 2, SCREEN_HEIGHT - 12, 7, Color{ 190, 210, 235, 230 });
 }
@@ -2188,10 +2942,12 @@ void VisualsEngine::DrawVersusScreen(const Fighter& p1, const Fighter& p2, float
     }
     DrawRectangleLines(p2X - 2, p2Y - 2, portraitSize + 4, portraitSize + 4, Color{ 255, 60, 60, 255 });
 
-    Vector2 topPt{ (float)SCREEN_WIDTH / 2 + 25.0f, 0.0f };
-    Vector2 botPt{ (float)SCREEN_WIDTH / 2 - 25.0f, (float)SCREEN_HEIGHT };
-    DrawLineEx(topPt, botPt, 5.0f, Color{ 255, 240, 100, 255 });
-    DrawLineEx(Vector2{ topPt.x - 2, topPt.y }, Vector2{ botPt.x - 2, botPt.y }, 2.0f, WHITE);
+    for (int k = 0; k < 5; k++) {
+        float ly = 22.0f + k * 48.0f;
+        float lx = (float)SCREEN_WIDTH / 2.0f + 18.0f - k * 9.0f;
+        const Texture2D& bolt = (k % 2 == 0) ? GetVfxSprite(8) : GetVfxSprite(9);
+        DrawCenteredSprite(bolt, lx, ly, 58.0f, 58.0f, -12.0f, WHITE, (k % 2 == 1));
+    }
 
     int vsX = (SCREEN_WIDTH / 2) - 22;
     int vsY = (SCREEN_HEIGHT / 2) - 22;
@@ -2269,7 +3025,10 @@ void VisualsEngine::DrawVictorySplash(int winnerChar, int loserChar, float timer
         "TECHBRO", "THE FILIBUSTER", "FREAGLE", "JUNIOR POPULIST",
         "SLEEPY JOE", "MARJORY T. GREEN",
         "SUCKRATERY RKF", "WAR PIG", "THE SOCIALIST", "BILLARY",
-        "PALM BEACH PETE", "THE PUNDIT", "A NEW HOPE"
+        "PALM BEACH PETE", "THE PUNDIT", "A NEW HOPE",
+        "DOCTOR ABDUL", "COUCHIE", "BLEXAS", "S.I.",
+        "KIM", "BEBE", "PALE MOTH", "THE DICTATOR",
+        "FLOTUS", "W", "DICK", "THE AYATOLLAH"
     };
 
     int pSize = 78;
@@ -2314,9 +3073,9 @@ void VisualsEngine::DrawVictorySplash(int winnerChar, int loserChar, float timer
 
     int centerX = SCREEN_WIDTH / 2;
     int centerY = winY + 36;
-    DrawCircle(centerX, centerY, 28.0f, Color{ 20, 25, 40, 255 });
-    DrawCircleLines(centerX, centerY, 28.0f, Color{ 255, 215, 0, 255 });
-    DrawCircleLines(centerX, centerY, 25.0f, Color{ 200, 40, 40, 255 });
+    DrawCenteredSprite(GetVfxSprite(3), (float)centerX, (float)centerY, 64.0f, 64.0f);
+    DrawRectangle(centerX - 24, centerY - 10, 48, 20, Color{ 16, 22, 38, 235 });
+    DrawRectangleLines(centerX - 24, centerY - 10, 48, 20, Color{ 255, 215, 45, 255 });
     int vtw = MeasureText("VETO", 16);
     DrawPixelText("VETO", centerX - vtw / 2, centerY - 8, 16, Color{ 255, 220, 40, 255 });
 
@@ -2444,6 +3203,78 @@ void VisualsEngine::DrawVictorySplash(int winnerChar, int loserChar, float timer
             "\"Yes we can! That crossover and jump shot",
             "\"Don't boo—vote! Or better yet, work on your",
             "\"From the South Side of Chicago to the White"
+        },
+        {
+            "\"Prescription: one foil-wrapped Shawarma sub!",
+            "\"My hips don't lie—that's Shakira Law, baby!",
+            "\"Detroit Tigers grit and public health fury:",
+            "\"Shawarma Law has officially been enacted"
+        },
+        {
+            "\"HIAWATHA! Nobody breaks through the couch!",
+            "\"Hey... got a glove, bro? Asking for a friend",
+            "\"Buttoned blue suit, sectional leather armor,",
+            "\"Whatever makes sense! Two cushions and"
+        },
+        {
+            "\"Remember the Alamo—and remember that punch!",
+            "\"Ye shall know the truth, and the truth",
+            "\"Everything is 1.5x bigger in Blexas, pal—",
+            "\"Roll out the wheelchair express! Texas"
+        },
+        {
+            "\"BANK ACCOUNT HACK COMPLETE: -$25,000.00!",
+            "\"Invest in the Future. Invest in Kalshi.",
+            "\"Chooms love data, and the telemetry says",
+            "\"From green Matrix cloud to liquid T-800:"
+        },
+        {
+            "\"JU CHE! Behold the Supreme One-Hand Wave!",
+            "\"Crack open another cold Tsingtao, Generals!",
+            "\"From the top floor of the Ryugyong Hotel,",
+            "\"Homorseskual! Your weak capitalist block"
+        },
+        {
+            "\"Look at this chart—they could already have",
+            "\"Nice country, nice health bar... I think",
+            "\"Twin eye lasers calibrated from Jerusalem!",
+            "\"Count the spinning arcade stars above your"
+        },
+        {
+            "\"If he dies, he dies. Bring my white stallion!",
+            "\"Blyat! Taste USSR Hammer & Sickle steel!",
+            "\"Shirt ripped off, bare-chested on horseback:",
+            "\"Forged in the Siberian steel foundry—"
+        },
+        {
+            "\"Nothing can touch me inside the Spider Hole!",
+            "\"God is great! You punched empty desert sand",
+            "\"The nation will be victorious in this",
+            "\"From underground bunker to palace courtyard,"
+        },
+        {
+            "\"I don't really care, do you? Moscow received",
+            "\"For the Motherland! Natasha's shortwave",
+            "\"Oh Vladimir! Did you see how fast that",
+            "\"Black trenchcoat, fedora, and 10,000 volts"
+        },
+        {
+            "\"We must stop the terror... now watch this drive!",
+            "\"Fool me once, shame on... you! Can't get",
+            "\"Don't let the terrorists win—go shopping!",
+            "\"One paper airplane and you crumbled like"
+        },
+        {
+            "\"Hahahahaha! Weapons of Mass Destruction",
+            "\"Wyoming must be free—and you should apologize",
+            "\"Thought I was aiming at a quail? Hahahaha!",
+            "\"Undisclosed bunker, blaze-orange vest, and"
+        },
+        {
+            "\"The Strait of Hormuz is officially CLOSED!",
+            "\"Naval sea mines and tankers have blockaded",
+            "\"Not even the Sheik's Cadillac or The Clash",
+            "\"From Tehran to the Persian Gulf, your"
         }
     };
 
@@ -2549,6 +3380,78 @@ void VisualsEngine::DrawVictorySplash(int winnerChar, int loserChar, float timer
             "just sent your ankles to Wrigleyville!\"",
             "perimeter defense before stepping on my court!\"",
             "House lawn, that's what I call a mandate!\""
+        },
+        {
+            "Extra garlic toum right on your glass jaw!\"",
+            "Go Tigers! Motor City takes this round!\"",
+            "Medicare for All—starting with your nose!\"",
+            "across all fifty states!\""
+        },
+        {
+            "on this fine leather loveseat!\"",
+            "back in the Senate cloakroom!\"",
+            "and pure defensive twerk dominance!\"",
+            "zero damage taken—Hiawatha forever!\""
+        },
+        {
+            "shall make you free—right on the canvas!\"",
+            "including my punch speed and defense!\"",
+            "just flipped the whole tournament blue!\"",
+            "You can't out-preach or out-brawl Blexas!\""
+        },
+        {
+            "Prediction market odds of your KO: 99.9%!\"",
+            "your human reflexes are obsolete!\"",
+            "superintelligence owns the mainframe!\"",
+            "Your bank balance is now $0.00!\""
+        },
+        {
+            "Ten thousand medals for my victory!\"",
+            "my Supreme Wave swept you off the roof!\"",
+            "Pyongyang declares total triumph!\"",
+            "crumbled before Supreme Leader power!\""
+        },
+        {
+            "a nuclear weapon in 90% of that red line!\"",
+            "I'll take it! Annexed in two straight rounds!\"",
+            "Your defense Treaty has been rescinded!\"",
+            "head—total orbital laser precision!\""
+        },
+        {
+            "Victory lap across the tundra!\"",
+            "Two golden sickles straight through your guard!\"",
+            "that is peak Kremlin alpha conditioning!\"",
+            "no challenger survives the Pale Moth!\""
+        },
+        {
+            "while I waited safely beneath the trapdoor!\"",
+            "and walked straight into my counterattack!\"",
+            "courtyard! Bow before the beret!\"",
+            "total victory belongs to The Dictator!\""
+        },
+        {
+            "every volt of my encrypted transmission!\"",
+            "radio shocked your entire campaign!\"",
+            "amateur lit up like a chandelier?!\"",
+            "straight from the Lincoln Bedroom!\""
+        },
+        {
+            "Right down the middle of the fairway, baby!\"",
+            "fooled again! Heh-heh-heh!\"",
+            "And pick up some Jenga blocks on the way!\"",
+            "a stack of wooden Jenga bricks!\""
+        },
+        {
+            "confirmed right on your forehead!\"",
+            "for stepping in front of my shotgun!\"",
+            "Welcome to Jackson Hole hunting season!\"",
+            "100% pure executive vice-power!\""
+        },
+        {
+            "Zero passage for your defeated health bar!\"",
+            "every inch of your escape route!\"",
+            "can rock past this blockade!\"",
+            "campaign has been permanently embargoed!\""
         }
     };
 
@@ -2569,11 +3472,40 @@ void VisualsEngine::DrawVictorySplash(int winnerChar, int loserChar, float timer
         { "WIPE THIS MATCH WITH A CLOTH...", "BILL! DO SOMETHING! / HILLARY! HELP!", "MY LAPTOP SCREEN CRACKED!", "VAST RIGHT-WING HAYMAKER!" },
         { "SPILLED MY ADRENOCHROME...", "GET THE SUBMARINE READY...", "DELETE THE FLIGHT LOGS...", "MY AVIATORS ARE SHATTERED!" },
         { "WAIT! CHECK FLORIDA AGAIN!", "MY WHITEBOARD MARKER DRIED UP!", "THE EXIT POLLS WERE WRONG!", "KARL'S GLASSES ARE BROKEN!" },
-        { "CLANGED OFF THE BACK RIM...", "UHH... LET ME ICE MY JAW...", "FOUL! THAT WAS A CHARGING FOUL!", "MICHELLE, GET THE ICE PACK..." }
+        { "CLANGED OFF THE BACK RIM...", "UHH... LET ME ICE MY JAW...", "FOUL! THAT WAS A CHARGING FOUL!", "MICHELLE, GET THE ICE PACK..." },
+        { "DROPPED MY SHAWARMA SUB...", "TIGERS BULLPEN BLEW THE LEAD...", "SHAKIRA DODGE TIMED OUT...", "GET ME A DOCTOR... WAIT, I AM ONE!" },
+        { "THEY TORE MY SECTIONAL COUCH!", "...STILL GOT THAT GLOVE, BRO?", "HIAWATHA INVULNERABILITY EXPIRED...", "DON'T SCUFF THE CUSHIONS!" },
+        { "REMEMBER... MY JAW...", "WHEELCHAIR RAMP WAS BLOCKED!", "EVEN 1.5X WASN'T ENOUGH?!", "TEXAS RECOUNT IN PROGRESS..." },
+        { "SEGFAULT IN T-800 CHASSIS...", "KALSHI ODDS CRASHING TO ZERO...", "ATM OUT OF SERVICE...", "MATRIX CLOUD DISSIPATING..." },
+        { "SPILLED MY TSINGTAO BEER!", "GENERALS, CATCH ME!", "NOT VERY JU CHE OF YOU...", "RYUGYONG ELEVATOR IS STUCK!" },
+        { "MY RED-LINE BOMB DRAWING!", "OPTIC LASER OVERHEATED...", "CALL AN EMERGENCY SESSION!", "SEEING STARS OF MY OWN..." },
+        { "BLYAT! WHERE IS MY HORSE?!", "DROPPED MY HAMMER & SICKLE...", "PUT MY SHIRT BACK ON...", "FOUNDRY FURNACE WENT COLD..." },
+        { "BACK DOWN THE SPIDER HOLE!", "TRAPDOOR GOT JAMMED OPEN!", "MY MUSTACHE IS SINGED!", "RETREAT TO THE BUNKER!" },
+        { "I STILL DON'T REALLY CARE...", "MOSCOW SIGNAL LOST...", "MY TRENCHCOAT IS WRINKLED!", "OH VLADIMIR, PICK UP!" },
+        { "MISUNDERESTIMATED THAT PUNCH...", "SHANKED MY GOLF DRIVE!", "MY PAPER AIRPLANE CRASHED!", "FOOLED ME TWICE...? WAIT..." },
+        { "THOUGHT YOU WERE A QUAIL...", "RETREATING TO UNDISCLOSED LOCATION!", "MY SHOTGUN JAMMED!", "WYOMING RECOUNT DEMANDED!" },
+        { "STRAIT OF HORMUZ REOPENED?!", "STOP PLAYING ROCK THE CASBAH!", "MY SEA MINES DRIFTED AWAY!", "THE SHEIK DROVE PAST MY BLOCKADE!" }
     };
 
     int wVar = s_quoteVariant & 3;
     int lVar = s_loserVariant & 3;
+    if (winnerChar == CHAR_AYATOLLAH && s_arabicTaunts[wVar % 3].id > 0) {
+        const Texture2D& arTex = s_arabicTaunts[wVar % 3];
+        int arW = std::max(44, (int)(arTex.width * 0.50f));
+        int arH = 14;
+        int pillX = boxX + boxW - arW - 12;
+        int pillY = boxY + 3;
+        DrawRectangle(pillX - 3, pillY, arW + 6, arH, Color{ 255, 248, 228, 245 });
+        DrawRectangleLines(pillX - 3, pillY, arW + 6, arH, Color{ 225, 180, 45, 255 });
+        DrawTexturePro(
+            arTex,
+            Rectangle{ 0.0f, 0.0f, (float)arTex.width, (float)arTex.height },
+            Rectangle{ (float)pillX, (float)pillY, (float)arW, (float)arH },
+            Vector2{ 0.0f, 0.0f },
+            0.0f,
+            WHITE
+        );
+    }
     DrawPixelText(winLine1[winnerChar][wVar], boxX + 10, boxY + 18, 8, Color{ 240, 245, 255, 255 });
     DrawPixelText(winLine2[winnerChar][wVar], boxX + 10, boxY + 30, 8, Color{ 240, 245, 255, 255 });
 
@@ -2587,117 +3519,502 @@ void VisualsEngine::DrawVictorySplash(int winnerChar, int loserChar, float timer
     }
 }
 
-void VisualsEngine::DrawBonusStage(float carHp, float maxCarHp, float timer, const Fighter& player, const std::vector<SparkEffect>& sparks) {
+void VisualsEngine::DrawBonusStage(const BonusStageState& bonus, const Fighter& player, const std::vector<SparkEffect>& sparks) {
+    const int bType = std::clamp((int)bonus.type, 0, (int)BONUS_STAGE_COUNT - 1);
+    const float t = bonus.elapsed;
 
-    if (s_bonusStageBg.id > 0) {
-        Rectangle src = { 0.0f, 0.0f, (float)s_bonusStageBg.width, (float)s_bonusStageBg.height };
+#if defined(GRAPHICS_API_OPENGL_ES2) || defined(__aarch64__)
+    if (s_loaded && s_bonusStageBgs[bType].id == 0) {
+        static const char* const kBonusBgFiles[BONUS_STAGE_COUNT] = {
+            "stage_bonus_tesla.png",
+            "stage_bonus_pool_tar.png",
+            "stage_bonus_book_fire.png",
+            "stage_bonus_berlin_wall.png"
+        };
+        for (int k = 0; k < BONUS_STAGE_COUNT; k++) {
+            if (k != bType && s_bonusStageBgs[k].id > 0) {
+                UnloadTexture(s_bonusStageBgs[k]);
+                s_bonusStageBgs[k] = { 0 };
+            }
+        }
+        std::string full = s_visualsBaseDir + kBonusBgFiles[bType];
+        if (AssetManager::FileExists(full.c_str())) {
+            s_bonusStageBgs[bType] = AssetManager::LoadTexture(full.c_str());
+            if (s_bonusStageBgs[bType].id > 0) SetTextureFilter(s_bonusStageBgs[bType], TEXTURE_FILTER_BILINEAR);
+        }
+    }
+#endif
+
+    if (s_bonusStageBgs[bType].id > 0) {
+        Texture2D bg = s_bonusStageBgs[bType];
+        Rectangle src = { 0.0f, 0.0f, (float)bg.width, (float)bg.height };
         Rectangle dst = { 0.0f, 0.0f, (float)SCREEN_WIDTH, (float)SCREEN_HEIGHT };
-        DrawTexturePro(s_bonusStageBg, src, dst, Vector2{ 0.0f, 0.0f }, 0.0f, WHITE);
+        DrawTexturePro(bg, src, dst, Vector2{ 0.0f, 0.0f }, 0.0f, WHITE);
     } else {
-        DrawRectangle(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT, Color{ 60, 80, 110, 255 });
-        DrawRectangle(0, (int)GROUND_Y, SCREEN_WIDTH, SCREEN_HEIGHT - (int)GROUND_Y, Color{ 40, 45, 50, 255 });
+        DrawRectangle(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT, Color{ 45, 65, 95, 255 });
+        DrawRectangle(0, (int)GROUND_Y, SCREEN_WIDTH, SCREEN_HEIGHT - (int)GROUND_Y, Color{ 38, 42, 48, 255 });
     }
 
-    float carCenterX = (float)SCREEN_WIDTH / 2.0f;
-    DrawEllipse((int)carCenterX, (int)GROUND_Y + 1, 78, 11, Color{ 15, 20, 25, 170 });
-
-    float hpRatio = carHp / maxCarHp;
-    int carStage = 0;
-    if (hpRatio <= 0.0f) carStage = 3;
-    else if (hpRatio <= 0.25f) carStage = 3;
-    else if (hpRatio <= 0.50f) carStage = 2;
-    else if (hpRatio <= 0.75f) carStage = 1;
-    else carStage = 0;
-
-    float carW = 154.0f;
-    float carH = 70.0f;
-    Rectangle carDst = { carCenterX - carW / 2.0f, GROUND_Y - carH + 4.0f, carW, carH };
-
-    if (s_teslaSprites[carStage].id > 0) {
-        Texture2D tTex = s_teslaSprites[carStage];
-        Rectangle tSrc = { 0.0f, 0.0f, (float)tTex.width, (float)tTex.height };
-        DrawTexturePro(tTex, tSrc, carDst, Vector2{ 0.0f, 0.0f }, 0.0f, WHITE);
-    } else {
-        Color carCol = (carStage == 3) ? Color{ 90, 40, 40, 255 } : Color{ 200, 25, 35, 255 };
-        DrawRectangle((int)carDst.x, (int)carDst.y + 20, (int)carW, (int)carH - 20, carCol);
-    }
-
-    if (carStage >= 2) {
-        for (int p = 0; p < 4; p++) {
-            float puffT = fmodf(timer * 2.0f + p * 0.4f, 1.0f);
-            float smokeX = carDst.x + 35.0f + sinf(timer * 4.0f + p) * 10.0f;
-            float smokeY = carDst.y + 15.0f - puffT * 40.0f;
-            float smokeR = 6.0f + puffT * 12.0f;
-            DrawCircle((int)smokeX, (int)smokeY, smokeR, Color{ 60, 65, 70, (unsigned char)(140 * (1.0f - puffT)) });
+    auto drawDebrisLayer = [&](bool foregroundOnly) {
+        for (const auto& d : bonus.debris) {
+            if (!d.alive) continue;
+            bool isFg = (d.kind != 7 && d.kind != 8);
+            if (isFg != foregroundOnly) continue;
+            float alphaRatio = std::clamp(1.0f - (d.life / std::max(0.01f, d.maxLife)) * 0.65f, 0.15f, 1.0f);
+            unsigned char a = (unsigned char)(255.0f * alphaRatio);
+            Color fadeTint{ 255, 255, 255, a };
+            switch (d.kind) {
+            case 0:
+                DrawCenteredSprite(s_worldProps[3], d.pos.x, d.pos.y, 12.0f, 12.0f, d.angle, fadeTint);
+                break;
+            case 1:
+                DrawCenteredSprite(s_worldProps[2], d.pos.x, d.pos.y, 14.0f, 9.0f, d.angle, fadeTint);
+                break;
+            case 2:
+                DrawCenteredSprite(s_worldProps[0], d.pos.x, d.pos.y, 22.0f, 22.0f, d.angle, fadeTint);
+                break;
+            case 3:
+                DrawCenteredSprite(s_worldProps[1], d.pos.x, d.pos.y, 26.0f, 24.0f, d.angle, fadeTint);
+                break;
+            case 4:
+                DrawCenteredSprite(s_worldProps[2], d.pos.x, d.pos.y, 26.0f, 16.0f, d.angle, fadeTint);
+                break;
+            case 5:
+                DrawCenteredSprite(s_worldProps[6], d.pos.x, d.pos.y, 11.0f, 9.0f, d.angle, fadeTint);
+                break;
+            case 6:
+                DrawCenteredSprite(s_vfxSprites[13], d.pos.x, d.pos.y, 11.0f, 11.0f, d.angle, fadeTint);
+                break;
+            case 7: {
+                float sz = 12.0f + (d.life / std::max(0.1f, d.maxLife)) * 18.0f;
+                unsigned char sa = (unsigned char)(185.0f * (1.0f - d.life / std::max(0.1f, d.maxLife)));
+                DrawCenteredSprite(s_vfxSprites[10], d.pos.x, d.pos.y, sz, sz, d.angle * 0.25f, Color{ 255, 255, 255, sa });
+                break;
+            }
+            case 8:
+                DrawCenteredSprite(s_worldProps[7], d.pos.x, d.pos.y, 20.0f, 17.0f, d.angle, fadeTint);
+                break;
+            case 9:
+                DrawCenteredSprite(s_worldProps[9], d.pos.x, d.pos.y, 18.0f, 16.0f, d.angle, fadeTint);
+                break;
+            case 10:
+                DrawCenteredSprite(s_worldProps[9], d.pos.x, d.pos.y, 13.0f, 12.0f, d.angle, Color{ d.col.r, d.col.g, d.col.b, a });
+                break;
+            }
         }
-    }
-    if (carStage == 3) {
-        for (int f = 0; f < 3; f++) {
-            float flX = carDst.x + 28.0f + f * 12.0f;
-            float flH = 8.0f + (rand() % 10);
-            DrawTriangle(Vector2{ flX - 6, carDst.y + 18 }, Vector2{ flX, carDst.y + 18 - flH }, Vector2{ flX + 6, carDst.y + 18 }, Color{ 255, 140, 20, 230 });
-            DrawTriangle(Vector2{ flX - 3, carDst.y + 18 }, Vector2{ flX, carDst.y + 18 - flH * 0.6f }, Vector2{ flX + 3, carDst.y + 18 }, Color{ 255, 240, 50, 255 });
-        }
-        if ((rand() % 4) == 0) {
-            float arcX = carDst.x + 40.0f + (rand() % 70);
-            DrawLineEx(Vector2{ arcX, GROUND_Y - 2 }, Vector2{ arcX + (rand()%14 - 7), GROUND_Y - 8 }, 2.0f, Color{ 0, 220, 255, 255 });
-            DrawLineEx(Vector2{ arcX, GROUND_Y - 2 }, Vector2{ arcX + 6, GROUND_Y }, 1.5f, WHITE);
-        }
-    }
+    };
 
-    DrawDropShadow(player);
-    DrawFighterSprite(player);
-    DrawProjectiles(player);
+    const char* stageBanner = "BONUS STAGE: TESLA BEATDOWN";
+    const char* subLabel = "TESLA MODEL S";
+    float progressRatio = 1.0f;
+    bool invertBar = false;
+    const char* clearLine2 = "+50,000 PTS - TOTAL WRECKAGE!";
+
+    if (bonus.type == BONUS_STAGE_TESLA) {
+
+        if (((int)(t * 9.0f) % 3) == 0) {
+            float flashX = (float)(28 + (((int)(t * 17.0f) * 19) % 52));
+            float flashY = (float)(98 + (((int)(t * 13.0f) * 7) % 14));
+            DrawCenteredSprite(s_vfxSprites[0], flashX, flashY, 12.0f, 12.0f, t * 40.0f);
+        }
+
+        float hpRatio = std::clamp(bonus.hp / std::max(1.0f, bonus.maxHp), 0.0f, 1.0f);
+        progressRatio = hpRatio;
+
+        int carStage = 0;
+        if (hpRatio <= 0.01f)      carStage = 7;
+        else if (hpRatio <= 0.16f) carStage = 6;
+        else if (hpRatio <= 0.31f) carStage = 5;
+        else if (hpRatio <= 0.46f) carStage = 4;
+        else if (hpRatio <= 0.60f) carStage = 3;
+        else if (hpRatio <= 0.74f) carStage = 2;
+        else if (hpRatio <= 0.88f) carStage = 1;
+        else                       carStage = 0;
+
+        int tearCount = 2 + carStage / 2;
+        for (int k = 0; k < tearCount; k++) {
+            float ph = fmodf(t * (2.4f + carStage * 0.25f) + k * 0.31f, 1.0f);
+            float dir = (k % 2 == 0) ? -1.0f : 1.0f;
+            float tx = 319.0f + dir * (8.0f + ph * 22.0f);
+            float ty = 104.0f - sinf(ph * PI_F) * 6.0f + ph * ph * 16.0f;
+            DrawCenteredSprite(s_vfxSprites[13], tx, ty, 9.0f, 9.0f, 0.0f, Color{ 255, 255, 255, (unsigned char)(220 * (1.0f - ph)) }, dir < 0.0f);
+        }
+
+        float shakeX = (bonus.targetShake > 0.0f) ? sinf(t * 95.0f) * bonus.targetShake * 4.5f : 0.0f;
+        float shakeY = (bonus.targetShake > 0.0f) ? cosf(t * 120.0f) * bonus.targetShake * 2.5f : 0.0f;
+
+        float carCenterX = (float)SCREEN_WIDTH * 0.5f + shakeX;
+        DrawEllipse((int)carCenterX, (int)GROUND_Y + 2, 82, 11, Color{ 12, 16, 22, 175 });
+
+        Rectangle carDst;
+        if (carStage >= 4) {
+            float carW = 172.0f;
+            float carH = 106.0f;
+            carDst = { carCenterX - carW * 0.5f, GROUND_Y - carH + 5.0f + shakeY, carW, carH };
+        } else {
+            float carW = 158.0f;
+            float carH = 72.0f;
+            carDst = { carCenterX - carW * 0.5f, GROUND_Y - carH + 4.0f + shakeY, carW, carH };
+        }
+
+        if (s_teslaSprites[carStage].id > 0) {
+            Texture2D tTex = s_teslaSprites[carStage];
+            Rectangle tSrc = { 0.0f, 0.0f, (float)tTex.width, (float)tTex.height };
+            Color tint = (bonus.targetShake > 0.08f) ? Color{ 255, 220, 220, 255 } : WHITE;
+            DrawTexturePro(tTex, tSrc, carDst, Vector2{ 0.0f, 0.0f }, 0.0f, tint);
+        }
+
+        if (carStage >= 2) {
+            int smokePuffs = 2 + carStage / 2;
+            for (int p = 0; p < smokePuffs; p++) {
+                float puffT = fmodf(t * 1.6f + p * 0.31f, 1.0f);
+                float smokeX = carCenterX - 32.0f + (p % 4) * 22.0f + sinf(t * 4.0f + p) * 6.0f;
+                float smokeY = GROUND_Y - 38.0f - puffT * (28.0f + carStage * 3.5f);
+                float smokeSz = 14.0f + puffT * (16.0f + carStage * 2.0f);
+                DrawCenteredSprite(s_vfxSprites[10], smokeX, smokeY, smokeSz, smokeSz, puffT * 25.0f, Color{ 170, 175, 185, (unsigned char)(175 * (1.0f - puffT)) });
+            }
+        }
+        if (carStage >= 4) {
+            int flames = carStage - 2;
+            for (int f = 0; f < flames; f++) {
+                float flX = carCenterX - 40.0f + f * 20.0f;
+                float flSz = 18.0f + 6.0f * fabsf(sinf(t * 16.0f + f * 1.7f));
+                float baseY = GROUND_Y - 28.0f + (carStage >= 6 ? 6.0f : 0.0f);
+                DrawCenteredSprite(s_vfxSprites[11], flX, baseY - flSz * 0.3f, flSz, flSz + 4.0f, 0.0f, WHITE, (f % 2 == 1));
+            }
+            if (((int)(t * 24.0f) % 2) == 0) {
+                float arcX = carCenterX - 36.0f + (((int)(t * 97.0f) * 29) % 72);
+                const Texture2D& bolt = (((int)(t * 24.0f)) % 4 == 0) ? s_vfxSprites[8] : s_vfxSprites[9];
+                DrawCenteredSprite(bolt, arcX, GROUND_Y - 20.0f, 24.0f, 24.0f, 15.0f);
+            }
+        }
+
+        drawDebrisLayer(false);
+        DrawDropShadow(player);
+        DrawFighterSprite(player);
+        DrawProjectiles(player);
+        drawDebrisLayer(true);
+
+    } else if (bonus.type == BONUS_STAGE_POOL_TAR) {
+        stageBanner = "BONUS STAGE: REFLECTING POOL TAR";
+        subLabel = "CRACKS SEALED WITH BLUE TAR";
+        invertBar = true;
+        progressRatio = std::clamp((float)bonus.cracksSealed / (float)std::max(1, bonus.cracksGoal), 0.0f, 1.0f);
+        clearLine2 = "+60,000 PTS - POOL SEALED TIGHT!";
+
+        for (const auto& br : bonus.barrels) {
+            if (!br.alive) continue;
+            DrawEllipse((int)br.x, (int)br.y + 10, 11, 3, Color{ 15, 20, 28, 130 });
+            DrawCenteredSprite(s_worldProps[4], br.x, br.y, 24.0f, 20.0f, br.angle * 57.2958f);
+        }
+
+        for (const auto& c : bonus.cracks) {
+            if (!c.active || c.state != 2) continue;
+            if (s_bonusTarPatch.id > 0) {
+                Rectangle src = { 0.0f, 0.0f, (float)s_bonusTarPatch.width, (float)s_bonusTarPatch.height };
+                Rectangle dst = { c.x - 24.0f, c.y - 11.0f, 48.0f, 22.0f };
+                DrawTexturePro(s_bonusTarPatch, src, dst, Vector2{ 0.0f, 0.0f }, 0.0f, WHITE);
+            }
+        }
+
+        for (const auto& c : bonus.cracks) {
+            if (!c.active || c.state == 2) continue;
+            if (c.state == 0) {
+                float pulse = 1.0f + 0.08f * sinf(t * 18.0f + c.x * 0.1f);
+                if (s_bonusPoolCrack.id > 0) {
+                    Rectangle src = { 0.0f, 0.0f, (float)s_bonusPoolCrack.width, (float)s_bonusPoolCrack.height };
+                    float w = 48.0f, h = 42.0f * pulse;
+                    Rectangle dst = { c.x - w * 0.5f, c.y - h + 9.0f, w, h };
+                    DrawTexturePro(s_bonusPoolCrack, src, dst, Vector2{ 0.0f, 0.0f }, 0.0f, WHITE);
+                }
+                float bob = sinf(t * 10.0f + c.x) * 3.0f;
+                DrawTriangle(
+                    Vector2{ c.x - 4.0f, c.y - 38.0f + bob },
+                    Vector2{ c.x,        c.y - 32.0f + bob },
+                    Vector2{ c.x + 4.0f, c.y - 38.0f + bob },
+                    Color{ 255, 230, 40, 240 });
+            } else if (c.state == 1) {
+                float scale = 0.85f + 0.35f * sinf(std::min(1.0f, c.animTimer / 0.28f) * PI_F);
+                if (s_bonusTarSplat.id > 0) {
+                    Rectangle src = { 0.0f, 0.0f, (float)s_bonusTarSplat.width, (float)s_bonusTarSplat.height };
+                    float w = 54.0f * scale, h = 38.0f * scale;
+                    Rectangle dst = { c.x - w * 0.5f, c.y - h * 0.5f, w, h };
+                    DrawTexturePro(s_bonusTarSplat, src, dst, Vector2{ 0.0f, 0.0f }, 0.0f, WHITE);
+                }
+            }
+        }
+
+        DrawDropShadow(player);
+        Vector2 pPos = player.GetPosition();
+        bool fRight = player.IsFacingRight();
+        float dir = fRight ? 1.0f : -1.0f;
+
+        float tankX = pPos.x - dir * 13.0f;
+        float tankY = pPos.y - 42.0f;
+        DrawCenteredSprite(s_worldProps[5], tankX, tankY, 22.0f, 28.0f, 0.0f, WHITE, !fRight);
+
+        DrawFighterSprite(player);
+
+        float recoilX = -dir * bonus.gunRecoil * 6.0f;
+        float gunCenterX = pPos.x + dir * 18.0f + recoilX;
+        float gunCenterY = pPos.y - 38.0f;
+        if (s_bonusTarGun.id > 0) {
+            Rectangle src = { 0.0f, 0.0f, fRight ? (float)s_bonusTarGun.width : -(float)s_bonusTarGun.width, (float)s_bonusTarGun.height };
+            Rectangle dst = { gunCenterX - 20.0f, gunCenterY - 12.0f, 40.0f, 25.0f };
+            DrawTexturePro(s_bonusTarGun, src, dst, Vector2{ 0.0f, 0.0f }, fRight ? 14.0f : -14.0f, WHITE);
+        }
+
+        for (const auto& shot : bonus.tarShots) {
+            if (!shot.alive) continue;
+            float angDeg = atan2f(shot.vel.y, shot.vel.x) * 57.2958f;
+            DrawCenteredSprite(s_worldProps[6], shot.pos.x, shot.pos.y, 18.0f, 14.0f, angDeg);
+        }
+        drawDebrisLayer(true);
+
+    } else if (bonus.type == BONUS_STAGE_BOOK_FIRE) {
+        stageBanner = "BONUS STAGE: SAVE THE BOOKS!";
+        subLabel = "LIBRARY OF CONGRESS INFERNO";
+        float totalHp = 0.0f, totalMax = 0.0f;
+        for (int i = 0; i < 4; i++) {
+            totalHp += bonus.bookPiles[i].hp;
+            totalMax += bonus.bookPiles[i].maxHp;
+        }
+        progressRatio = std::clamp(totalHp / std::max(1.0f, totalMax), 0.0f, 1.0f);
+        clearLine2 = "+75,000 PTS - LIBRARY SAVED!";
+
+        const float vilXs[3] = { 92.0f, 192.0f, 294.0f };
+        const float vilY = 169.0f;
+        const char* vilNames[3] = { "MILLER", "BARR", "BANNON" };
+        const char* vilQuips[3] = { "BURN HISTORY!", "REDACTED!", "FLOOD THE FIRE!" };
+
+        for (int v = 0; v < 3; v++) {
+            DrawEllipse((int)vilXs[v], (int)vilY + 1, 18, 5, Color{ 20, 15, 12, 135 });
+            if (s_bonusVillainStrips[v].id > 0) {
+                Texture2D vt = s_bonusVillainStrips[v];
+                int frameW = vt.width / 4;
+                int fIdx = 0;
+                if (bonus.villainAnimTimer[v] > 0.0f) {
+                    float prog = 1.0f - std::clamp(bonus.villainAnimTimer[v] / 0.55f, 0.0f, 1.0f);
+                    fIdx = std::clamp((int)(prog * 4.0f), 0, 3);
+                } else {
+                    fIdx = ((int)(t * 4.0f + v) % 2);
+                }
+                bool flipLeft = (v == 2);
+                Rectangle src = { (float)(fIdx * frameW), 0.0f, flipLeft ? -(float)frameW : (float)frameW, (float)vt.height };
+                float bobY = (bonus.villainAnimTimer[v] <= 0.0f) ? sinf(t * 6.0f + v * 2.0f) * 1.5f : 0.0f;
+                Rectangle dst = { vilXs[v] - 29.0f, vilY - 56.0f + bobY, 58.0f, 58.0f };
+                DrawTexturePro(vt, src, dst, Vector2{ 0.0f, 0.0f }, 0.0f, WHITE);
+            }
+            int nw = MeasureText(vilNames[v], 5);
+            DrawRectangle((int)vilXs[v] - nw / 2 - 2, (int)vilY - 63, nw + 4, 7, Color{ 15, 15, 22, 200 });
+            DrawPixelText(vilNames[v], (int)vilXs[v] - nw / 2, (int)vilY - 62, 5, Color{ 255, 205, 70, 240 });
+
+            if (bonus.villainQuipTimer[v] > 0.0f) {
+                int qw = MeasureText(vilQuips[v], 5);
+                int bx = std::clamp((int)vilXs[v] - qw / 2 - 4, 4, SCREEN_WIDTH - qw - 10);
+                int by = (int)vilY - 76;
+                DrawRectangle(bx, by, qw + 8, 10, Color{ 255, 250, 235, 245 });
+                DrawRectangleLines(bx, by, qw + 8, 10, BLACK);
+                DrawPixelText(vilQuips[v], bx + 4, by + 2, 5, Color{ 180, 20, 20, 255 });
+            }
+        }
+
+        drawDebrisLayer(false);
+
+        for (int i = 0; i < 4; i++) {
+            const auto& pile = bonus.bookPiles[i];
+            float pr = std::clamp(pile.hp / std::max(1.0f, pile.maxHp), 0.0f, 1.0f);
+            int pState = 3;
+            if (pr > 0.66f)      pState = 0;
+            else if (pr > 0.30f) pState = 1;
+            else if (pr > 0.0f)  pState = 2;
+            else                 pState = 3;
+
+            DrawEllipse((int)pile.x, (int)GROUND_Y + 4, 28, 7, Color{ 25, 18, 14, 155 });
+            if (s_bonusBookPiles[pState].id > 0) {
+                Texture2D pt = s_bonusBookPiles[pState];
+                Rectangle src = { 0.0f, 0.0f, (float)pt.width, (float)pt.height };
+                float flickerH = (pr > 0.0f) ? (sinf(t * 22.0f + i * 1.9f) * 2.5f) : 0.0f;
+                Rectangle dst = { pile.x - 31.0f, GROUND_Y - 56.0f - flickerH, 62.0f, 62.0f + flickerH };
+                Color tint = (pile.hitFlash > 0.0f) ? Color{ 165, 235, 255, 255 } : WHITE;
+                DrawTexturePro(pt, src, dst, Vector2{ 0.0f, 0.0f }, 0.0f, tint);
+            }
+
+            if (pr > 0.0f) {
+                float flSz = (12.0f + 12.0f * pr) * (0.88f + 0.12f * sinf(t * 20.0f + i));
+                DrawCenteredSprite(s_vfxSprites[11], pile.x, GROUND_Y - 34.0f - pr * 6.0f, flSz, flSz + 4.0f, 0.0f, Color{ 255, 255, 255, 210 }, (i % 2 == 1));
+                DrawRectangle((int)pile.x - 18, (int)GROUND_Y + 6, 36, 4, Color{ 20, 20, 26, 230 });
+                DrawRectangle((int)pile.x - 17, (int)GROUND_Y + 7, (int)(34.0f * pr), 2, Color{ 255, 115, 25, 255 });
+            } else {
+                int sw = MeasureText("SAVED!", 6);
+                DrawPixelText("SAVED!", (int)pile.x - sw / 2, (int)GROUND_Y + 5, 6, Color{ 60, 245, 110, 255 });
+            }
+        }
+
+        DrawDropShadow(player);
+        DrawFighterSprite(player);
+        Vector2 pPos = player.GetPosition();
+        bool fRight = player.IsFacingRight();
+        if (bonus.bucketSwingTimer > 0.0f && s_bonusWaterBucket.id > 0) {
+            float prog = 1.0f - std::clamp(bonus.bucketSwingTimer / 0.24f, 0.0f, 1.0f);
+            float dir = bonus.bucketFacingRight ? 1.0f : -1.0f;
+            Rectangle src = { 0.0f, 0.0f, bonus.bucketFacingRight ? (float)s_bonusWaterBucket.width : -(float)s_bonusWaterBucket.width, (float)s_bonusWaterBucket.height };
+            float w = 68.0f + prog * 14.0f;
+            float h = 44.0f;
+            float bx = pPos.x + (bonus.bucketFacingRight ? 4.0f : -w - 4.0f) + dir * prog * 12.0f;
+            Rectangle dst = { bx, pPos.y - 54.0f + prog * 8.0f, w, h };
+            DrawTexturePro(s_bonusWaterBucket, src, dst, Vector2{ 0.0f, 0.0f }, 0.0f, WHITE);
+        } else {
+            float bx = pPos.x + (fRight ? 14.0f : -14.0f);
+            float by = pPos.y - 24.0f + fabsf(sinf(t * 10.0f)) * 2.0f;
+            DrawCenteredSprite(s_worldProps[8], bx, by, 18.0f, 20.0f, 0.0f, WHITE, !fRight);
+        }
+        drawDebrisLayer(true);
+
+    } else if (bonus.type == BONUS_STAGE_BERLIN_WALL) {
+        stageBanner = "BONUS STAGE: BERLIN WALL 1989";
+        subLabel = "GRAFFITI BERLIN WALL";
+        float hpRatio = std::clamp(bonus.hp / std::max(1.0f, bonus.maxHp), 0.0f, 1.0f);
+        progressRatio = hpRatio;
+        clearLine2 = "+100,000 PTS - FREIHEIT! WALL TORN DOWN!";
+
+        float sweep1 = sinf(t * 1.7f) * 45.0f;
+        float sweep2 = cosf(t * 2.1f) * 45.0f;
+        DrawTriangle(Vector2{ 115.0f, 95.0f }, Vector2{ 75.0f + sweep1, 0.0f }, Vector2{ 105.0f + sweep1, 0.0f }, Color{ 160, 220, 255, 32 });
+        DrawTriangle(Vector2{ 265.0f, 95.0f }, Vector2{ 255.0f + sweep2, 0.0f }, Vector2{ 285.0f + sweep2, 0.0f }, Color{ 255, 140, 240, 32 });
+
+        float notePhase = fmodf(t * 0.9f, 1.0f);
+        DrawPixelText("LOOKING FOR FREEDOM!", 252, (int)(74.0f - notePhase * 10.0f), 5, Color{ 255, 120, 245, (unsigned char)(235 * (1.0f - notePhase * 0.5f)) });
+
+        int waveCycle = ((int)(t * 0.6f)) % 2;
+        if (waveCycle == 0) {
+            DrawRectangle(54, 20, 55, 9, Color{ 15, 22, 38, 225 });
+            DrawRectangleLines(54, 20, 55, 9, Color{ 100, 165, 255, 200 });
+            DrawPixelText("HI GORBY!", 57, 22, 5, Color{ 255, 225, 90, 255 });
+        } else {
+            DrawRectangle(275, 20, 66, 9, Color{ 38, 15, 22, 225 });
+            DrawRectangleLines(275, 20, 66, 9, Color{ 255, 120, 120, 200 });
+            DrawPixelText("DA, RONNIE!", 278, 22, 5, Color{ 255, 195, 95, 255 });
+        }
+
+        float shakeX = (bonus.targetShake > 0.0f) ? sinf(t * 105.0f) * bonus.targetShake * 4.5f : 0.0f;
+        float wallCenterX = (float)SCREEN_WIDTH * 0.5f + 16.0f + shakeX;
+        float wallW = 122.0f;
+        float wallH = 104.0f;
+        Rectangle wallDst = { wallCenterX - wallW * 0.5f, GROUND_Y - wallH + 5.0f, wallW, wallH };
+
+        int wallState = 0;
+        if (hpRatio <= 0.0f)       wallState = 3;
+        else if (hpRatio <= 0.34f) wallState = 2;
+        else if (hpRatio <= 0.68f) wallState = 1;
+        else                       wallState = 0;
+
+        DrawEllipse((int)wallCenterX, (int)GROUND_Y + 3, 62, 9, Color{ 10, 12, 18, 165 });
+        if (s_bonusBerlinWall[wallState].id > 0) {
+            Texture2D wt = s_bonusBerlinWall[wallState];
+            Rectangle src = { 0.0f, 0.0f, (float)wt.width, (float)wt.height };
+            Color tint = (bonus.targetShake > 0.08f) ? Color{ 255, 230, 210, 255 } : WHITE;
+            DrawTexturePro(wt, src, wallDst, Vector2{ 0.0f, 0.0f }, 0.0f, tint);
+        }
+
+        for (const auto& eg : bonus.eastGermans) {
+            if (!eg.active) continue;
+            int v = std::clamp(eg.variant, 0, 3);
+            float hopY = fabsf(sinf(eg.animPhase)) * 6.5f;
+            DrawEllipse((int)eg.x, (int)eg.y + 2, 13, 4, Color{ 10, 12, 18, 150 });
+            if (s_bonusEastGermans[v].id > 0) {
+                Texture2D gt = s_bonusEastGermans[v];
+                Rectangle src = { 0.0f, 0.0f, eg.facingRight ? (float)gt.width : -(float)gt.width, (float)gt.height };
+                Rectangle dst = { eg.x - 24.0f, eg.y - 52.0f - hopY, 48.0f, 54.0f };
+                DrawTexturePro(gt, src, dst, Vector2{ 0.0f, 0.0f }, 0.0f, WHITE);
+            }
+        }
+
+        DrawDropShadow(player);
+        DrawFighterSprite(player);
+        DrawProjectiles(player);
+        drawDebrisLayer(true);
+    }
 
     DrawSparks(sparks);
+    for (const auto& pop : bonus.popups) {
+        if (!pop.alive) continue;
+        int pw = MeasureText(pop.text, 7);
+        int px = std::clamp((int)pop.pos.x - pw / 2, 4, SCREEN_WIDTH - pw - 4);
+        int py = (int)pop.pos.y;
+        DrawPixelText(pop.text, px + 1, py + 1, 7, BLACK);
+        DrawPixelText(pop.text, px, py, 7, pop.col);
+    }
 
-    DrawRectangle(0, 0, SCREEN_WIDTH, 18, Color{ 10, 14, 22, 230 });
-    DrawPixelText("BONUS STAGE: TESLA BEATDOWN", 12, 4, 10, Color{ 255, 220, 60, 255 });
+    DrawRectangle(0, 0, SCREEN_WIDTH, 18, Color{ 10, 14, 22, 232 });
+    DrawPixelText(stageBanner, 8, 4, 9, Color{ 255, 220, 60, 255 });
 
-    int sec = (int)std::max(0.0f, ceilf(timer));
+    int sec = (int)std::max(0.0f, ceilf(bonus.timer));
     char secBuf[16];
     snprintf(secBuf, sizeof(secBuf), "%02d", sec);
     Color timerCol = (sec <= 5) ? Color{ 255, 60, 60, 255 } : Color{ 255, 230, 40, 255 };
-    int tw = MeasureText(secBuf, 22);
-    DrawPixelText(secBuf, (SCREEN_WIDTH - tw) / 2, 2, 22, timerCol);
+    int tw = MeasureText(secBuf, 20);
+    DrawRectangle(SCREEN_WIDTH - tw - 14, 1, tw + 10, 17, Color{ 22, 26, 38, 245 });
+    DrawPixelText(secBuf, SCREEN_WIDTH - tw - 9, 1, 20, timerCol);
 
-    int barW = 140;
+    int barW = 156;
     int barH = 7;
     int barX = (SCREEN_WIDTH - barW) / 2;
-    int barY = 28;
+    int barY = 23;
 
-    DrawRectangle(barX - 2, barY - 2, barW + 4, barH + 4, Color{ 20, 20, 25, 255 });
-    int fillW = (int)(barW * std::clamp(hpRatio, 0.0f, 1.0f));
-    Color barCol = (hpRatio > 0.5f) ? Color{ 230, 40, 40, 255 } : (hpRatio > 0.25f ? Color{ 240, 160, 30, 255 } : Color{ 255, 230, 40, 255 });
+    DrawRectangle(barX - 2, barY - 2, barW + 4, barH + 4, Color{ 18, 18, 24, 245 });
+    int fillW = (int)(barW * std::clamp(progressRatio, 0.0f, 1.0f));
+    Color barCol;
+    if (invertBar) {
+        barCol = (progressRatio >= 0.75f) ? Color{ 50, 240, 120, 255 } : Color{ 30, 155, 255, 255 };
+    } else {
+        barCol = (progressRatio > 0.5f) ? Color{ 230, 45, 45, 255 } : (progressRatio > 0.22f ? Color{ 245, 165, 30, 255 } : Color{ 255, 235, 45, 255 });
+    }
     DrawRectangle(barX, barY, fillW, barH, barCol);
     DrawRectangleLines(barX - 1, barY - 1, barW + 2, barH + 2, Color{ 220, 190, 60, 255 });
 
-    int lblW = MeasureText("TESLA MODEL S", 7);
-    DrawPixelText("TESLA MODEL S", (SCREEN_WIDTH - lblW) / 2, barY + barH + 3, 7, Color{ 0, 220, 255, 240 });
+    char fullLbl[64];
+    if (bonus.type == BONUS_STAGE_POOL_TAR) {
+        snprintf(fullLbl, sizeof(fullLbl), "%s (%d/%d)", subLabel, bonus.cracksSealed, bonus.cracksGoal);
+    } else {
+        snprintf(fullLbl, sizeof(fullLbl), "%s", subLabel);
+    }
+    int lblW = MeasureText(fullLbl, 6);
+    DrawRectangle((SCREEN_WIDTH - lblW) / 2 - 3, barY + barH + 2, lblW + 6, 8, Color{ 10, 14, 22, 190 });
+    DrawPixelText(fullLbl, (SCREEN_WIDTH - lblW) / 2, barY + barH + 3, 6, Color{ 90, 230, 255, 250 });
 
-    if (carHp <= 0.0f) {
-        int cw = MeasureText("BONUS STAGE CLEAR!", 20);
-        DrawPixelText("BONUS STAGE CLEAR!", (SCREEN_WIDTH - cw) / 2, 75, 20, Color{ 255, 225, 40, 255 });
-        int pw = MeasureText("+50,000 PTS - TOTAL WRECKAGE!", 11);
-        DrawPixelText("+50,000 PTS - TOTAL WRECKAGE!", (SCREEN_WIDTH - pw) / 2, 102, 11, Color{ 0, 240, 255, 255 });
-    } else if (timer <= 0.0f) {
+    if (bonus.cleared) {
+        int cw = MeasureText("BONUS STAGE CLEAR!", 19);
+        int pw = MeasureText(clearLine2, 9);
+        int bannerW = std::max(cw, pw) + 20;
+        DrawRectangle((SCREEN_WIDTH - bannerW) / 2, 52, bannerW, 40, Color{ 10, 14, 24, 225 });
+        DrawRectangleLines((SCREEN_WIDTH - bannerW) / 2, 52, bannerW, 40, Color{ 255, 215, 40, 255 });
+        DrawPixelText("BONUS STAGE CLEAR!", (SCREEN_WIDTH - cw) / 2, 56, 19, Color{ 255, 225, 40, 255 });
+        DrawPixelText(clearLine2, (SCREEN_WIDTH - pw) / 2, 78, 9, Color{ 70, 245, 255, 255 });
+    } else if (bonus.timer <= 0.0f) {
         int tuw = MeasureText("TIME UP!", 24);
-        DrawPixelText("TIME UP!", (SCREEN_WIDTH - tuw) / 2, 80, 24, Color{ 255, 60, 60, 255 });
+        DrawPixelText("TIME UP!", (SCREEN_WIDTH - tuw) / 2, 74, 24, Color{ 255, 60, 60, 255 });
     }
 }
 
 void VisualsEngine::DrawEndingCelebration(float timer) {
     DrawRectangle(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT, Color{ 0, 0, 0, 255 });
 
+#if defined(GRAPHICS_API_OPENGL_ES2) || defined(__aarch64__)
+    if (s_loaded && s_endingSavior.id == 0) {
+        std::string endingPath = s_visualsBaseDir + "ending_savior.png";
+        if (AssetManager::FileExists(endingPath.c_str())) {
+            s_endingSavior = AssetManager::LoadTexture(endingPath.c_str());
+            if (s_endingSavior.id > 0) SetTextureFilter(s_endingSavior, TEXTURE_FILTER_BILINEAR);
+        }
+    }
+#endif
+
     if (s_loaded && s_endingSavior.id > 0) {
         Rectangle srcRec = { 0.0f, 0.0f, (float)s_endingSavior.width, (float)s_endingSavior.height };
         Rectangle dstRec = { 0.0f, 0.0f, (float)SCREEN_WIDTH, (float)SCREEN_HEIGHT };
         DrawTexturePro(s_endingSavior, srcRec, dstRec, Vector2{ 0.0f, 0.0f }, 0.0f, WHITE);
     }
-
-    float divinePulse = 0.5f + 0.5f * sinf(timer * 4.0f);
-    DrawCircleLines(SCREEN_WIDTH / 2, 45, 30.0f + divinePulse * 8.0f, Color{ 255, 240, 120, (unsigned char)(140 * divinePulse) });
-    DrawCircleLines(SCREEN_WIDTH / 2, 45, 42.0f + divinePulse * 12.0f, Color{ 255, 215, 0, (unsigned char)(100 * divinePulse) });
 
     for (int i = 0; i < 40; i++) {
         float cx = fmodf((float)(i * 47) + sinf(timer * 2.5f + i) * 15.0f, (float)SCREEN_WIDTH);
@@ -2712,17 +4029,46 @@ void VisualsEngine::DrawEndingCelebration(float timer) {
         DrawRectangle((int)cx, (int)cy, (i % 2 == 0 ? 3 : 2), (i % 3 == 0 ? 5 : 3), cCols[i % 5]);
     }
 
+    int botY = SCREEN_HEIGHT - 18;
+    DrawRectangle(0, botY, SCREEN_WIDTH, 18, Color{ 10, 14, 24, 220 });
+    DrawLine(0, botY, SCREEN_WIDTH, botY, Color{ 255, 215, 70, 220 });
     if (fmodf(timer, 0.9f) < 0.55f) {
-        int botY = SCREEN_HEIGHT - 18;
-        DrawRectangle(0, botY, SCREEN_WIDTH, 18, Color{ 10, 14, 24, 210 });
         const char* msg = "[ PRESS START / ENTER TO RETURN TO TITLE SCREEN ]";
-        int pw = MeasureText(msg, 9);
-        DrawPixelText(msg, (SCREEN_WIDTH - pw) / 2, botY + 5, 9, Color{ 255, 225, 50, 255 });
+        int pw = MeasureText(msg, 8);
+        DrawPixelText(msg, (SCREEN_WIDTH - pw) / 2, botY + 5, 8, Color{ 255, 225, 50, 255 });
+    } else {
+        const char* msg2 = "THANK YOU FOR PLAYING EXECUTIVE VETO II TURBO!";
+        int pw2 = MeasureText(msg2, 8);
+        DrawPixelText(msg2, (SCREEN_WIDTH - pw2) / 2, botY + 5, 8, Color{ 125, 235, 255, 245 });
     }
 }
 
 void VisualsEngine::DrawCthulhuEnding(float timer) {
     DrawRectangle(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT, BLACK);
+
+#if defined(GRAPHICS_API_OPENGL_ES2) || defined(__aarch64__)
+    if (s_loaded) {
+        auto ensureEndingTex = [](const char* rel, Texture2D& dst) {
+            if (dst.id == 0) {
+                std::string full = s_visualsBaseDir + rel;
+                if (AssetManager::FileExists(full.c_str())) {
+                    dst = AssetManager::LoadTexture(full.c_str());
+                    if (dst.id > 0) SetTextureFilter(dst, TEXTURE_FILTER_BILINEAR);
+                }
+            }
+        };
+        if (timer < 5.0f) ensureEndingTex("ending_cthulhu_throw.png", s_endingCthulhuThrow);
+        else if (timer < 10.0f) ensureEndingTex("ending_laser_shark.png", s_endingLaserShark);
+        else ensureEndingTex("ending_cthulhu_nap.png", s_endingCthulhuNap);
+    }
+#endif
+
+    auto drawStoryCaption = [](const char* caption, Color col) {
+        DrawRectangle(0, 0, SCREEN_WIDTH, 15, Color{ 6, 10, 18, 220 });
+        DrawLine(0, 15, SCREEN_WIDTH, 15, col);
+        int cw = MeasureText(caption, 7);
+        DrawPixelText(caption, (SCREEN_WIDTH - cw) / 2, 4, 7, col);
+    };
 
     if (timer < 5.0f) {
         if (s_loaded && s_endingCthulhuThrow.id > 0) {
@@ -2730,6 +4076,7 @@ void VisualsEngine::DrawCthulhuEnding(float timer) {
             Rectangle dst = { 0.0f, 0.0f, (float)SCREEN_WIDTH, (float)SCREEN_HEIGHT };
             DrawTexturePro(s_endingCthulhuThrow, src, dst, Vector2{ 0.0f, 0.0f }, 0.0f, WHITE);
         }
+        drawStoryCaption("ACT I: CTHULHU AWAKENS - HURLING POTUS INTO THE ABYSS!", Color{ 95, 255, 175, 255 });
 
     } else if (timer < 10.0f) {
         if (s_loaded && s_endingLaserShark.id > 0) {
@@ -2737,6 +4084,7 @@ void VisualsEngine::DrawCthulhuEnding(float timer) {
             Rectangle dst = { 0.0f, 0.0f, (float)SCREEN_WIDTH, (float)SCREEN_HEIGHT };
             DrawTexturePro(s_endingLaserShark, src, dst, Vector2{ 0.0f, 0.0f }, 0.0f, WHITE);
         }
+        drawStoryCaption("ACT II: CYBERNETIC LASER SHARKS INTERCEPT AT HIGH TIDE!", Color{ 255, 75, 90, 255 });
 
     } else {
         if (s_loaded && s_endingCthulhuNap.id > 0) {
@@ -2744,6 +4092,7 @@ void VisualsEngine::DrawCthulhuEnding(float timer) {
             Rectangle dst = { 0.0f, 0.0f, (float)SCREEN_WIDTH, (float)SCREEN_HEIGHT };
             DrawTexturePro(s_endingCthulhuNap, src, dst, Vector2{ 0.0f, 0.0f }, 0.0f, WHITE);
         }
+        drawStoryCaption("ACT III: PEACE AT LAST... CTHULHU CLAIMS THE BEACH RESORT!", Color{ 255, 225, 95, 255 });
 
         if (fmodf(timer, 0.8f) < 0.5f) {
             const char* msg = "[ PRESS START / ENTER TO RETURN TO TITLE ]";

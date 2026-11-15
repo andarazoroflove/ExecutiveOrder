@@ -8,10 +8,116 @@
 #include "AudioEngine.h"
 #include <vector>
 
+struct BonusDebris {
+    bool alive = false;
+    int kind = 0;
+    Vector2 pos{ 0.0f, 0.0f };
+    Vector2 vel{ 0.0f, 0.0f };
+    float angle = 0.0f;
+    float angVel = 0.0f;
+    float life = 0.0f;
+    float maxLife = 1.0f;
+    Color col{ 255, 255, 255, 255 };
+    int targetPile = -1;
+};
+
+struct BonusPopup {
+    bool alive = false;
+    char text[48] = {};
+    Vector2 pos{ 0.0f, 0.0f };
+    float life = 0.0f;
+    float maxLife = 0.95f;
+    Color col{ 255, 230, 50, 255 };
+};
+
+struct PoolCrackSlot {
+    bool active = false;
+    int state = 0;
+    float x = 100.0f;
+    float y = 198.0f;
+    float animTimer = 0.0f;
+};
+
+struct TarGlobShot {
+    bool alive = false;
+    Vector2 pos{ 0.0f, 0.0f };
+    Vector2 vel{ 0.0f, 0.0f };
+    float life = 0.0f;
+};
+
+struct RollingBarrel {
+    bool alive = false;
+    float x = 0.0f;
+    float y = 132.0f;
+    float vx = 60.0f;
+    float angle = 0.0f;
+};
+
+struct BookFirePile {
+    float hp = 100.0f;
+    float maxHp = 100.0f;
+    float x = 80.0f;
+    float hitFlash = 0.0f;
+    float steamTimer = 0.0f;
+};
+
+struct EastGermanRunner {
+    bool active = false;
+    int variant = 0;
+    float x = 192.0f;
+    float y = 198.0f;
+    float vx = 0.0f;
+    float animPhase = 0.0f;
+    bool facingRight = true;
+};
+
+struct BonusStageState {
+    BonusStageType type = BONUS_STAGE_TESLA;
+    float timer = 35.0f;
+    float maxTimer = 35.0f;
+    float elapsed = 0.0f;
+    float postTimer = 0.0f;
+    bool cleared = false;
+    bool endVoicePlayed = false;
+
+    float hp = 420.0f;
+    float maxHp = 420.0f;
+    float targetShake = 0.0f;
+    int lastDamageTier = 0;
+    bool carAlarmPlayed = false;
+
+    int cracksSealed = 0;
+    int cracksGoal = 18;
+    float crackSpawnTimer = 0.0f;
+    float gunRecoil = 0.0f;
+    float gunCooldown = 0.0f;
+    float barrelSpawnTimer = 1.0f;
+    std::vector<PoolCrackSlot> cracks;
+    std::vector<TarGlobShot> tarShots;
+    std::vector<RollingBarrel> barrels;
+
+    BookFirePile bookPiles[4];
+    float bucketSwingTimer = 0.0f;
+    float bucketCooldown = 0.0f;
+    bool bucketFacingRight = true;
+    float bucketOriginX = 100.0f;
+    float villainThrowTimer[3] = { 0.7f, 1.4f, 2.1f };
+    float villainAnimTimer[3] = { 0.0f, 0.0f, 0.0f };
+    float villainQuipTimer[3] = { 0.0f, 0.0f, 0.0f };
+
+    float blockHp[9] = {};
+    std::vector<EastGermanRunner> eastGermans;
+    float runnerSpawnTimer = 0.0f;
+
+    std::vector<BonusDebris> debris;
+    std::vector<BonusPopup> popups;
+};
+
 class VisualsEngine {
 public:
     static void Init();
     static void Shutdown();
+    static void PrefetchMatchFighters(int p1Char, int p2Char);
 
     static void DrawDropShadow(const Fighter& f);
     static void DrawFighterSprite(const Fighter& f);
@@ -20,10 +126,11 @@ public:
     static void DrawBattleHUD(const Fighter& p1, const Fighter& p2, int roundTimer, int roundNumber, int fightIntroTimer = 0, bool p1WasKo = false, bool p2WasKo = false);
     static void DrawCinematicIntro(float timer, bool logoDropped, const Shader& flagShader, const Texture2D& flagTex);
     static void DrawStageAndCharSelect(int selectedStage, int p1Char, int p2Char, float timer, const bool defeatedFighters[CHARACTER_COUNT], bool playerLocked = false, bool choosingOpponent = false);
+    static void DrawWorldConflictMap(int worldActIndex, int p1Char, float timer, const bool defeatedFighters[CHARACTER_COUNT]);
     static void DrawSecretSelectScreen(int step, int p1Char, int p2Char, int stage, int difficulty, float timer);
     static void DrawVersusScreen(const Fighter& p1, const Fighter& p2, float timer);
     static void DrawVictorySplash(int winnerChar, int loserChar, float timer);
-    static void DrawBonusStage(float carHp, float maxCarHp, float timer, const Fighter& player, const std::vector<SparkEffect>& sparks);
+    static void DrawBonusStage(const BonusStageState& bonus, const Fighter& player, const std::vector<SparkEffect>& sparks);
     static void DrawMatchOver(const Fighter& winner, float timer);
     static void DrawEndingCelebration(float timer);
     static void DrawCthulhuEnding(float timer);
@@ -31,6 +138,28 @@ public:
 
     static void DrawPixelText(const char* text, int x, int y, int size, Color col);
     static Texture2D CreateProceduralFlagTexture();
+    static const Texture2D& GetArabicTauntTexture(int idx);
+    static const Texture2D& GetVfxSprite(int idx);
+    static const Texture2D& GetWorldProp(int idx);
+    static bool DrawCenteredSprite(const Texture2D& tex, float cx, float cy, float w, float h, float rotDeg = 0.0f, Color tint = WHITE, bool flipX = false);
+    static void DrawFinisherBackdrop(const Fighter& p1, const Fighter& p2, float camX);
+    static void DrawFinisherWorldFX(const Fighter& p1, const Fighter& p2);
+
+    enum StripClipId {
+        STRIP_IDLE = 0,
+        STRIP_WALK,
+        STRIP_JUMP,
+        STRIP_CROUCH,
+        STRIP_BLOCK,
+        STRIP_LP,
+        STRIP_HP,
+        STRIP_LK,
+        STRIP_HK,
+        STRIP_SPEC,
+        STRIP_HIT,
+        STRIP_TAUNT,
+        STRIP_CLIP_COUNT
+    };
 
 private:
     static bool s_loaded;
@@ -39,8 +168,36 @@ private:
     static Texture2D s_portraitsLose[CHARACTER_COUNT];
 
     static Texture2D s_sprites[CHARACTER_COUNT][6];
-    static Texture2D s_teslaSprites[4];
-    static Texture2D s_bonusStageBg;
+    static Texture2D s_strips[CHARACTER_COUNT][STRIP_CLIP_COUNT];
+    static Texture2D s_stripsHillary[STRIP_CLIP_COUNT];
+    static Texture2D s_stripsRoberts[STRIP_CLIP_COUNT];
+    static Texture2D s_stripsSotomayor[STRIP_CLIP_COUNT];
+    static Texture2D s_stripAbdulSpec2;
+    static Texture2D s_stripPaleMothVictory;
+    static Texture2D s_stripWVictory;
+    static Texture2D s_stripDickLaugh;
+    static Texture2D s_stripAyatollahPrayer;
+    static Texture2D s_projSprites[16];
+    static Texture2D s_finisherProps[16];
+    static Texture2D s_vfxSprites[16];
+    static Texture2D s_worldProps[16];
+    static Texture2D s_arabicTaunts[3];
+    static Texture2D s_mapWorldConflict;
+    static Texture2D s_propShawarma;
+    static Texture2D s_propWheelchair;
+    static Texture2D s_propAtmHack;
+    static Texture2D s_propHammerSickle;
+    static Texture2D s_teslaSprites[8];
+    static Texture2D s_bonusStageBgs[BONUS_STAGE_COUNT];
+    static Texture2D s_bonusTarGun;
+    static Texture2D s_bonusPoolCrack;
+    static Texture2D s_bonusTarSplat;
+    static Texture2D s_bonusTarPatch;
+    static Texture2D s_bonusVillainStrips[3];
+    static Texture2D s_bonusWaterBucket;
+    static Texture2D s_bonusBookPiles[4];
+    static Texture2D s_bonusBerlinWall[4];
+    static Texture2D s_bonusEastGermans[4];
     static Texture2D s_mapEastCoast;
     static Texture2D s_endingSavior;
     static Texture2D s_sprBillaryHillary;
@@ -65,7 +222,6 @@ private:
 
 namespace ChampionshipEdition {
 
-inline bool s_debugHitboxes = false;
 inline bool s_forceProceduralRig = false;
 inline int  s_superFlashTimer = 0;
 inline int  s_superFlashPlayer = 0;
@@ -75,6 +231,11 @@ inline float s_p2TrailHp = 100.0f;
 inline int   s_continuesRemaining = 2;
 inline bool  s_isSecretMatch = false;
 inline bool  s_opponentLocked = false;
+inline TurboSpeed s_turboSpeed = TURBO_SPEED_2;
+inline bool  s_finishHimActive = false;
+inline bool  s_vetoedKoActive = false;
+inline float s_crowdExciteTimer = 0.0f;
+inline float s_camRenderX = 208.0f;
 
 struct CEAfterimage {
     Vector2 pos;
@@ -193,6 +354,9 @@ inline void ResetRoundFX() {
     s_prevP2Hits = 0;
     s_p1TrailHp = 100.0f;
     s_p2TrailHp = 100.0f;
+    s_finishHimActive = false;
+    s_vetoedKoActive = false;
+    s_crowdExciteTimer = 0.0f;
 }
 
 inline void PushBanner(int playerIndex, const char* text, const char* sub, Color col) {
@@ -259,14 +423,35 @@ inline void SpawnImpactJuice(Vector2 pos, bool heavy, bool isSpecial, const char
 
 inline void DrawComicThoughtBubble(const char* text, int centerX, int bottomY, int tailTargetX, int tailTargetY, int fontSize, Color textCol, Color cloudCol = Color{ 255, 255, 248, 238 }) {
     if (!text || text[0] == '\0') return;
-    int tw = MeasureText(text, fontSize);
-    int padX = 5;
-    int padY = 3;
+    bool isArabic = (text[0] == '@' && text[1] == 'A' && text[2] == 'R' && text[3] >= '0' && text[3] <= '2');
+    const Texture2D* arTex = isArabic ? &VisualsEngine::GetArabicTauntTexture(text[3] - '0') : nullptr;
+    int arDrawW = 0;
+    int arDrawH = 0;
+    int actualH = std::max(fontSize, 10);
+    int tw = 0;
+    if (isArabic && arTex != nullptr && arTex->id > 0) {
+        arDrawW = std::max(40, (int)(arTex->width * 0.58f));
+        arDrawH = std::max(16, (int)(arTex->height * 0.58f));
+        tw = arDrawW;
+        actualH = arDrawH;
+    } else {
+        tw = MeasureText(text, actualH);
+    }
+    int padX = 6;
+    int padY = 4;
     int halfW = tw / 2 + padX;
-    int halfH = fontSize / 2 + padY;
+    int halfH = actualH / 2 + padY;
 
-    int cx = std::clamp(centerX, (int)STAGE_MIN_X + halfW, (int)STAGE_MAX_X - halfW);
-    int cy = std::clamp(bottomY - halfH, 16 + halfH, (int)GROUND_Y - 24);
+    int minCamX = (int)s_camRenderX + halfW + 5;
+    int maxCamX = (int)s_camRenderX + SCREEN_WIDTH - halfW - 5;
+    int cx = centerX;
+    if (minCamX <= maxCamX) {
+        cx = std::clamp(cx, minCamX, maxCamX);
+    } else {
+        cx = (int)s_camRenderX + SCREEN_WIDTH / 2;
+    }
+    cx = std::clamp(cx, (int)STAGE_MIN_X + halfW, (int)STAGE_MAX_X - halfW);
+    int cy = std::clamp(bottomY - halfH, 34 + halfH, (int)GROUND_Y - 28);
 
     int numTop = std::max(4, (tw + 10) / 8);
     Color outlineCol{ 18, 22, 34, 245 };
@@ -313,7 +498,18 @@ inline void DrawComicThoughtBubble(const char* text, int centerX, int bottomY, i
         DrawCircle((int)px, (int)py, radii[p], cloudCol);
     }
 
-    VisualsEngine::DrawPixelText(text, cx - tw / 2, cy - fontSize / 2, fontSize, textCol);
+    if (isArabic && arTex != nullptr && arTex->id > 0) {
+        DrawTexturePro(
+            *arTex,
+            Rectangle{ 0.0f, 0.0f, (float)arTex->width, (float)arTex->height },
+            Rectangle{ (float)(cx - arDrawW / 2), (float)(cy - arDrawH / 2), (float)arDrawW, (float)arDrawH },
+            Vector2{ 0.0f, 0.0f },
+            0.0f,
+            WHITE
+        );
+    } else {
+        VisualsEngine::DrawPixelText(text, cx - tw / 2, cy - actualH / 2, actualH, textCol);
+    }
 }
 
 inline void DrawBatmanActionBurst(const char* text, int centerX, int centerY, int fontSize, Color burstOuter, Color burstInner, Color textCol, float scale = 1.0f) {
@@ -515,10 +711,7 @@ inline void DrawStageUpgrades(StageId stageId, float camX, float time) {
         if (flashPhase < 0.08f) {
             float fx = fmodf(c * 47.0f - camX * 0.45f + 800.0f, (float)SCREEN_WIDTH);
             float fy = 108.0f + (c % 3) * 12.0f;
-            DrawCircle((int)fx, (int)fy, 9, Color{ 255, 255, 240, 170 });
-            DrawCircle((int)fx, (int)fy, 4, WHITE);
-            DrawLine((int)fx - 12, (int)fy, (int)fx + 12, (int)fy, WHITE);
-            DrawLine((int)fx, (int)fy - 12, (int)fx, (int)fy + 12, WHITE);
+            VisualsEngine::DrawCenteredSprite(VisualsEngine::GetVfxSprite(0), fx, fy, 11.0f, 11.0f, (float)(c * 25));
         }
     }
 
@@ -526,17 +719,14 @@ inline void DrawStageUpgrades(StageId stageId, float camX, float time) {
         float px = fmodf(p * 37.0f + time * (16.0f + (p % 4) * 4.0f) - camX * 0.6f + 1600.0f, (float)SCREEN_WIDTH);
         float py = fmodf(p * 23.0f + time * (18.0f + (p % 3) * 5.0f), GROUND_Y - 8.0f);
         if (stageId == STAGE_REFLECTING_POOL || stageId == STAGE_FLORIDA_KEYS || stageId == STAGE_LINCOLN_MEMORIAL) {
-
-            DrawCircle((int)px, (int)py, 2.0f, Color{ 255, 185, 215, 210 });
+            DrawRectangle((int)px, (int)py, 2, 2, Color{ 255, 185, 215, 210 });
             DrawPixel((int)px + 1, (int)py, WHITE);
         } else if (stageId == STAGE_CONGRESSIONAL_FLOOR || stageId == STAGE_PRESS_BRIEFING || stageId == STAGE_WTC_PLAZA || stageId == STAGE_SMITHSONIAN_AERO || stageId == STAGE_ENN_NEWS_STUDIO) {
-
             float sway = sinf(time * 5.0f + p) * 3.0f;
-            DrawRectangle((int)(px + sway), (int)py, 4, 3, Color{ 250, 245, 220, 195 });
+            DrawRectangle((int)(px + sway), (int)py, 3, 2, Color{ 250, 245, 220, 195 });
         } else {
-
             float ey = GROUND_Y - py;
-            DrawCircle((int)px, (int)ey, 1.5f, (p % 2 == 0) ? Color{ 255, 190, 50, 200 } : Color{ 255, 90, 30, 190 });
+            DrawRectangle((int)px, (int)ey, 2, 2, (p % 2 == 0) ? Color{ 255, 190, 50, 200 } : Color{ 255, 90, 30, 190 });
         }
     }
 
@@ -550,26 +740,13 @@ inline void DrawStageUpgrades(StageId stageId, float camX, float time) {
     auto BgY = [&](float ty) -> float { return ty * ((float)SCREEN_HEIGHT / srcH); };
 
     if (stageId == STAGE_LINCOLN_MEMORIAL) {
-
         float fightProgress = std::clamp((200.0f - (s_p1TrailHp + s_p2TrailHp)) / 160.0f, 0.0f, 1.0f);
         float clapSpeed = 6.5f + fightProgress * 9.5f;
         float clapWave = fabsf(sinf(time * clapSpeed));
-        float clapGap = clapWave * 4.5f;
         int lincX = (int)BgX(564.0f);
         int lincHandsY = (int)BgY(186.0f);
-        int lincHeadY = (int)BgY(115.0f);
-
-        Color marbleBase{ 242, 240, 234, 255 };
-        Color marbleShadow{ 165, 162, 156, 255 };
-        DrawCircle((int)(lincX - 2.0f - clapGap), lincHandsY, 3.2f, marbleShadow);
-        DrawCircle((int)(lincX - 2.0f - clapGap), lincHandsY, 2.4f, marbleBase);
-        DrawCircle((int)(lincX + 2.0f + clapGap), lincHandsY, 3.2f, marbleShadow);
-        DrawCircle((int)(lincX + 2.0f + clapGap), lincHandsY, 2.4f, marbleBase);
-
-        if (clapWave < 0.35f) {
-            DrawCircleLines(lincX, lincHandsY, 6.0f + (0.35f - clapWave) * 22.0f, Color{ 255, 235, 110, 225 });
-            DrawLine(lincX - 8, lincHandsY - 5, lincX - 13, lincHandsY - 9, Color{ 255, 245, 160, 235 });
-            DrawLine(lincX + 8, lincHandsY - 5, lincX + 13, lincHandsY - 9, Color{ 255, 245, 160, 235 });
+        if (clapWave < 0.25f) {
+            VisualsEngine::DrawCenteredSprite(VisualsEngine::GetVfxSprite(0), (float)lincX, (float)lincHandsY, 10.0f, 10.0f, time * 40.0f);
         }
     } else if (stageId == STAGE_SMITHSONIAN_AERO) {
         if (fmodf(time * 2.6f, 1.0f) < 0.45f) {
@@ -577,31 +754,10 @@ inline void DrawStageUpgrades(StageId stageId, float camX, float time) {
             DrawPixel((int)BgX(395.0f), (int)BgY(56.0f), Color{ 45, 255, 90, 225 });
         }
     } else if (stageId == STAGE_TOMB_UNKNOWN) {
-
         float flameX = BgX(992.0f);
         float flameY = BgY(188.0f);
-        float flicker1 = sinf(time * 17.0f) * 2.5f;
-        float flicker2 = cosf(time * 23.0f + 1.1f) * 2.0f;
-        DrawCircle((int)flameX, (int)flameY - 6, 16.0f + sinf(time * 9.0f) * 2.5f, Color{ 255, 145, 25, 55 });
-        DrawTriangle(
-            Vector2{ flameX + flicker1, flameY - 16.0f - fabsf(flicker2) },
-            Vector2{ flameX - 7.0f, flameY + 2.0f },
-            Vector2{ flameX + 7.0f, flameY + 2.0f },
-            Color{ 255, 85, 15, 195 }
-        );
-        DrawTriangle(
-            Vector2{ flameX - flicker2 * 0.6f, flameY - 12.0f - fabsf(flicker1) * 0.5f },
-            Vector2{ flameX - 4.5f, flameY + 2.0f },
-            Vector2{ flameX + 4.5f, flameY + 2.0f },
-            Color{ 255, 205, 45, 220 }
-        );
-        DrawCircle((int)flameX, (int)flameY - 2, 3.2f, Color{ 255, 250, 215, 240 });
-        for (int e = 0; e < 5; e++) {
-            float eLife = fmodf(time * 1.8f + e * 0.17f, 1.0f);
-            float ex = flameX + sinf(time * 8.0f + e * 2.0f) * 4.5f;
-            float ey = flameY - 6.0f - eLife * 18.0f;
-            DrawCircle((int)ex, (int)ey, 1.1f, (e % 2 == 0) ? Color{ 255, 235, 95, 235 } : Color{ 255, 120, 30, 215 });
-        }
+        float flScale = 1.0f + sinf(time * 16.0f) * 0.10f;
+        VisualsEngine::DrawCenteredSprite(VisualsEngine::GetVfxSprite(11), flameX, flameY - 7.0f * flScale, 16.0f * flScale, 20.0f * flScale);
 
         static Texture2D s_sentinelTex = { 0 };
         static bool s_sentinelTexChecked = false;
@@ -660,7 +816,7 @@ inline void DrawStageUpgrades(StageId stageId, float camX, float time) {
 
             DrawEllipse((int)sx, (int)sy, 7.0f, 1.8f, Color{ 0, 0, 0, 135 });
             if (isHalted && haltProg < 0.45f) {
-                DrawEllipseLines((int)sx, (int)sy, 4.0f + haltProg * 18.0f, 1.4f + haltProg * 5.0f, Color{ 255, 225, 110, 205 });
+                VisualsEngine::DrawCenteredSprite(VisualsEngine::GetVfxSprite(14), sx, sy, 14.0f + haltProg * 14.0f, 5.0f);
             }
 
             if (s_sentinelTex.id != 0) {
@@ -671,61 +827,84 @@ inline void DrawStageUpgrades(StageId stageId, float camX, float time) {
                 DrawTexturePro(s_sentinelTex, srcRec, dstRec, Vector2{ 0.0f, 0.0f }, 0.0f, WHITE);
             }
 
-            if (fmodf(time * 2.2f + phaseOffset, 1.0f) < 0.28f) {
+            if (fmodf(time * 2.2f + phaseOffset, 1.0f) < 0.22f) {
                 int bx = (int)(sx - dir * 13.0f);
                 int by = (int)(sy - 46.0f - bobPx);
-                DrawPixel(bx, by, WHITE);
-                DrawLine(bx - 3, by, bx + 3, by, Color{ 220, 240, 255, 230 });
-                DrawLine(bx, by - 3, bx, by + 3, Color{ 220, 240, 255, 230 });
+                VisualsEngine::DrawCenteredSprite(VisualsEngine::GetVfxSprite(0), (float)bx, (float)by, 6.0f, 6.0f);
             }
         };
 
         drawMarchingSentinel(175.0f, 465.0f, 0.0f);
         drawMarchingSentinel(815.0f, 525.0f, 0.45f);
     } else if (stageId == STAGE_ENN_NEWS_STUDIO) {
-
         if (fmodf(time * 2.4f, 1.0f) < 0.65f) {
-            int cam1X = (int)BgX(118.0f);
-            int cam1Y = (int)BgY(276.0f);
-            int cam2X = (int)BgX(298.0f);
-            int cam2Y = (int)BgY(320.0f);
-            DrawCircle(cam1X, cam1Y, 4.0f, Color{ 255, 30, 30, 180 });
-            DrawCircle(cam1X, cam1Y, 2.0f, WHITE);
-            DrawCircle(cam2X, cam2Y, 3.5f, Color{ 255, 30, 30, 180 });
-            DrawCircle(cam2X, cam2Y, 1.8f, WHITE);
+            DrawRectangle((int)BgX(118.0f), (int)BgY(276.0f), 2, 2, Color{ 255, 35, 35, 235 });
+            DrawRectangle((int)BgX(298.0f), (int)BgY(320.0f), 2, 2, Color{ 255, 35, 35, 235 });
         }
-
-        int deskX = (int)BgX(565.0f);
-        int deskY = (int)BgY(418.0f);
-        float deskPulse = 0.5f + 0.5f * sinf(time * 6.0f);
-        DrawCircle(deskX, deskY, 16.0f + deskPulse * 6.0f, Color{ 255, 40, 50, (unsigned char)(28 + deskPulse * 35) });
     } else if (stageId == STAGE_CHICAGO_WRIGLEY) {
-
         for (int b = 0; b < 8; b++) {
             float bx = BgX(370.0f + b * 38.0f);
             float by = BgY(212.0f);
             bool lit = (((int)(time * 8.0f) + b) % 2) == 0;
-            DrawCircle((int)bx, (int)by, lit ? 2.2f : 1.4f, lit ? Color{ 255, 240, 110, 250 } : Color{ 180, 60, 60, 190 });
+            DrawRectangle((int)bx, (int)by, 2, 2, lit ? Color{ 255, 240, 110, 250 } : Color{ 180, 60, 60, 190 });
         }
-
-        for (int s = 0; s < 4; s++) {
-            float phase = fmodf(time * 1.8f + s * 0.45f, 1.8f);
-            float sx = BgX(88.0f + s * 9.0f) + sinf(time * 5.0f + s) * 2.5f;
+        for (int s = 0; s < 3; s++) {
+            float phase = fmodf(time * 1.4f + s * 0.55f, 1.8f);
+            float sx = BgX(88.0f + s * 9.0f) + sinf(time * 5.0f + s) * 2.0f;
             float sy = BgY(355.0f) - phase * 16.0f;
-            unsigned char sa = (unsigned char)std::clamp((int)((1.8f - phase) * 110.0f), 0, 180);
-            DrawCircle((int)sx, (int)sy, 2.5f + phase * 1.5f, Color{ 245, 250, 255, sa });
+            unsigned char sa = (unsigned char)std::clamp((int)((1.8f - phase) * 105.0f), 0, 165);
+            float sz = 6.0f + phase * 4.0f;
+            VisualsEngine::DrawCenteredSprite(VisualsEngine::GetVfxSprite(10), sx, sy, sz, sz, 0.0f, Color{ 255, 255, 255, sa });
+        }
+    }
+
+    float wSrcH = 700.0f;
+    float wSrcW = wSrcH * ((float)SCREEN_WIDTH / (float)SCREEN_HEIGHT);
+    float wSrcX = scrollT * (1376.0f - wSrcW);
+    auto WBgX = [&](float tx) -> float { return (tx - wSrcX) * ((float)SCREEN_WIDTH / wSrcW); };
+    auto WBgY = [&](float ty) -> float { return (ty - 52.0f) * ((float)SCREEN_HEIGHT / wSrcH); };
+
+    float excite = std::clamp(s_crowdExciteTimer, 0.0f, 1.5f);
+
+    if (stageId == STAGE_RYUGYONG_HOTEL) {
+
+        for (int m = 0; m < 14; m++) {
+            if (fmodf(time * 3.5f + m * 0.29f, 1.0f) < 0.16f) {
+                float mx = WBgX(615.0f + (m % 7) * 112.0f + (m * 11 % 24));
+                float my = WBgY(435.0f + (m % 3) * 16.0f);
+                DrawPixel((int)mx, (int)my, Color{ 255, 240, 110, 245 });
+            }
+        }
+    } else if (stageId == STAGE_WESTERN_WALL) {
+        for (int m = 0; m < 12; m++) {
+            float mx = fmodf(m * 39.0f + time * 9.0f - camX * 0.35f + 900.0f, (float)SCREEN_WIDTH);
+            float my = 24.0f + fmodf(m * 19.0f + sinf(time * 2.0f + m) * 8.0f + 200.0f, 128.0f);
+            DrawPixel((int)mx, (int)my, Color{ 255, 245, 190, 200 });
+        }
+    } else if (stageId == STAGE_SOVIET_FOUNDRY) {
+        for (int s = 0; s < 18; s++) {
+            float life = fmodf(time * (1.4f + (s % 4) * 0.35f) + s * 0.19f, 1.0f);
+            float originX = (s % 2 == 0) ? WBgX(480.0f) : WBgX(895.0f);
+            float sx = originX + sinf(time * 6.0f + s * 1.7f) * (12.0f + life * 24.0f);
+            float sy = WBgY(345.0f) - life * 95.0f;
+            Color spCol = (s % 3 == 0) ? Color{ 255, 245, 130, 240 } : Color{ 255, 115, 25, 220 };
+            DrawRectangle((int)sx, (int)sy, 2, 2, spCol);
+        }
+    }
+
+    if (excite > 0.05f) {
+        int flashCount = 3 + (int)(excite * 4.0f);
+        for (int f = 0; f < flashCount; f++) {
+            if (fmodf(time * 9.0f + f * 0.63f, 1.0f) < 0.12f) {
+                float fx = fmodf(f * 67.0f - camX * 0.5f + 600.0f, (float)SCREEN_WIDTH);
+                float fy = 96.0f + (f % 4) * 14.0f;
+                VisualsEngine::DrawCenteredSprite(VisualsEngine::GetVfxSprite(0), fx, fy, 10.0f, 10.0f, (float)(f * 35));
+            }
         }
     }
 }
 
 inline void UpdateAndTrackFighters(Fighter& p1, Fighter& p2) {
-    if (IsKeyPressed(KEY_F1)) {
-        s_debugHitboxes = !s_debugHitboxes;
-    }
-    if (IsKeyPressed(KEY_F3)) {
-        s_forceProceduralRig = !s_forceProceduralRig;
-    }
-
     if (s_p1TrailHp > (float)p1.GetHealth()) {
         s_p1TrailHp = std::max((float)p1.GetHealth(), s_p1TrailHp - 0.35f);
     } else {
@@ -753,32 +932,62 @@ inline void UpdateAndTrackFighters(Fighter& p1, Fighter& p2) {
         }
         for (auto& ai : s_afterimages[i]) ai.life--;
         s_afterimages[i].erase(std::remove_if(s_afterimages[i].begin(), s_afterimages[i].end(), [](const CEAfterimage& a) { return a.life <= 0; }), s_afterimages[i].end());
-        if ((st == FSTATE_SPECIAL || st == FSTATE_JUMP || (st == FSTATE_ATTACK && f.GetCurrentAttack().isHeavy)) && (f.GetStateFrame() % 3 == 0)) {
+        if ((st == FSTATE_SPECIAL || st == FSTATE_DASH_FWD || st == FSTATE_DASH_BACK || st == FSTATE_JUMP || (st == FSTATE_ATTACK && f.GetCurrentAttack().isHeavy)) && (f.GetStateFrame() % 3 == 0)) {
             CEAfterimage ghost{};
             ghost.pos = f.GetPosition();
             ghost.facingRight = f.IsFacingRight();
             ghost.state = st;
             ghost.frame = f.GetStateFrame();
-            ghost.life = 9;
+            ghost.life = f.IsSuperMoveActive() ? 14 : 9;
             s_afterimages[i].push_back(ghost);
+        }
+        if ((st == FSTATE_DASH_FWD || st == FSTATE_DASH_BACK) && (f.GetStateFrame() % 2 == 0)) {
+            CEParticle dust{};
+            dust.pos = Vector2{ f.GetPosition().x, GROUND_Y - 2.0f };
+            dust.vel = Vector2{ (st == FSTATE_DASH_FWD ? -1.4f : 1.4f) * (f.IsFacingRight() ? 1.0f : -1.0f), -0.6f - (rand() % 10) * 0.08f };
+            dust.color = Color{ 235, 230, 215, 200 };
+            dust.size = 3.0f;
+            dust.maxFrames = 14;
+            dust.isPaper = false;
+            dust.alive = true;
+            s_particles.push_back(dust);
         }
     }
 
-    if (p1.PopSuperFlashTrigger()) {
-        s_superFlashTimer = 24;
-        s_superFlashPlayer = 0;
-        s_superFlashMove = "TOTAL VETO FLURRY!";
-        PushBanner(0, "SUPER COMBO!", p1.GetName().c_str(), Color{ 255, 215, 40, 255 });
-    }
-    if (p2.PopSuperFlashTrigger()) {
-        s_superFlashTimer = 24;
-        s_superFlashPlayer = 1;
-        s_superFlashMove = "TOTAL VETO FLURRY!";
-        PushBanner(1, "SUPER COMBO!", p2.GetName().c_str(), Color{ 255, 215, 40, 255 });
+    if (s_crowdExciteTimer > 0.0f) {
+        s_crowdExciteTimer = std::max(0.0f, s_crowdExciteTimer - (1.0f / 60.0f));
     }
 
-    if (p1.PopCancelCallout()) PushBanner(0, "2-IN-1 CANCEL!", "SPECIAL BUFFER", Color{ 90, 230, 255, 255 });
-    if (p2.PopCancelCallout()) PushBanner(1, "2-IN-1 CANCEL!", "SPECIAL BUFFER", Color{ 90, 230, 255, 255 });
+    if (p1.PopSuperFlashTrigger()) {
+        s_superFlashTimer = 28;
+        s_superFlashPlayer = 0;
+        s_superFlashMove = (p1.GetCurrentAttack().moveType == MOVE_SUPER && !p1.GetCurrentAttack().name.empty())
+            ? p1.GetCurrentAttack().name : "SUPER VETO COMBO!";
+        s_crowdExciteTimer = 2.4f;
+        PushBanner(0, "SUPER VETO!", p1.GetName().c_str(), Color{ 255, 215, 40, 255 });
+    }
+    if (p2.PopSuperFlashTrigger()) {
+        s_superFlashTimer = 28;
+        s_superFlashPlayer = 1;
+        s_superFlashMove = (p2.GetCurrentAttack().moveType == MOVE_SUPER && !p2.GetCurrentAttack().name.empty())
+            ? p2.GetCurrentAttack().name : "SUPER VETO COMBO!";
+        s_crowdExciteTimer = 2.4f;
+        PushBanner(1, "SUPER VETO!", p2.GetName().c_str(), Color{ 255, 215, 40, 255 });
+    }
+
+    if (p1.PopAlphaCounterCallout()) {
+        PushBanner(0, "ALPHA COUNTER!", "GUARD REVERSAL", Color{ 80, 255, 160, 255 });
+        s_crowdExciteTimer = 1.6f;
+    }
+    if (p2.PopAlphaCounterCallout()) {
+        PushBanner(1, "ALPHA COUNTER!", "GUARD REVERSAL", Color{ 80, 255, 160, 255 });
+        s_crowdExciteTimer = 1.6f;
+    }
+    if (p1.PopThrowTechCallout()) PushBanner(0, "THROW TECH!", "GRAB ESCAPED", Color{ 130, 230, 255, 255 });
+    if (p2.PopThrowTechCallout()) PushBanner(1, "THROW TECH!", "GRAB ESCAPED", Color{ 130, 230, 255, 255 });
+
+    if (p1.PopCancelCallout()) PushBanner(0, "2-IN-1 CANCEL!", "TURBO LINK", Color{ 90, 230, 255, 255 });
+    if (p2.PopCancelCallout()) PushBanner(1, "2-IN-1 CANCEL!", "TURBO LINK", Color{ 90, 230, 255, 255 });
     if (p1.PopReversalCallout()) {
         PushBanner(0, "REVERSAL!", "TOTAL VETO", Color{ 255, 110, 50, 255 });
         SpawnImpactJuice(Vector2{ p1.GetPosition().x, p1.GetPosition().y - 44.0f }, true, true, "VETO!");
@@ -799,8 +1008,9 @@ inline void UpdateAndTrackFighters(Fighter& p1, Fighter& p2) {
         }
         if (c1 >= 2) {
             char buf[48];
-            snprintf(buf, sizeof(buf), "%d HIT FILIBUSTER!", c1);
+            snprintf(buf, sizeof(buf), "%d HIT COMBO!", c1);
             PushBanner(0, buf, p1.GetCurrentAttack().name.c_str(), Color{ 255, 190, 40, 255 });
+            s_crowdExciteTimer = std::max(s_crowdExciteTimer, 0.9f + c1 * 0.2f);
         }
         bool isSpec = (p1.GetState() == FSTATE_SPECIAL);
         const char* word1 = isSpec ? "VETO!" : (p1.GetCurrentAttack().isHeavy ? s_batmanHeavyWords[(c1 + rand()) % 4] : s_batmanLightWords[(c1 + rand()) % 6]);
@@ -815,8 +1025,9 @@ inline void UpdateAndTrackFighters(Fighter& p1, Fighter& p2) {
         }
         if (c2 >= 2) {
             char buf[48];
-            snprintf(buf, sizeof(buf), "%d HIT FILIBUSTER!", c2);
+            snprintf(buf, sizeof(buf), "%d HIT COMBO!", c2);
             PushBanner(1, buf, p2.GetCurrentAttack().name.c_str(), Color{ 255, 120, 60, 255 });
+            s_crowdExciteTimer = std::max(s_crowdExciteTimer, 0.9f + c2 * 0.2f);
         }
         bool isSpec = (p2.GetState() == FSTATE_SPECIAL);
         const char* word2 = isSpec ? "REDACTED!" : (p2.GetCurrentAttack().isHeavy ? "OBJECTION!" : s_batmanLightWords[(c2 + rand()) % 6]);
@@ -853,62 +1064,138 @@ inline void UpdateAndTrackFighters(Fighter& p1, Fighter& p2) {
 }
 
 inline void DrawFighterWorldOverlays(const Fighter& f) {
-
     if (f.GetCharacterId() == CHAR_THE_PUNDIT && f.GetState() == FSTATE_SPECIAL && f.GetSpecialIndex() == 1) {
         int fr = f.GetStateFrame();
         float dir = f.IsFacingRight() ? 1.0f : -1.0f;
-        int wbCenterX = (int)(f.GetPosition().x + dir * 39.0f);
-        int wbW = 76;
-        int wbX = wbCenterX - wbW / 2;
-        int wbY = (int)(f.GetPosition().y - 80.0f);
-
-        DrawRectangle(wbX - 1, wbY - 1, wbW + 2, 13, Color{ 220, 30, 40, 255 });
-        DrawRectangle(wbX, wbY, wbW, 11, Color{ 16, 38, 105, 255 });
-        VisualsEngine::DrawPixelText("DECISION 2028", wbX + 3, wbY + 1, 10, Color{ 255, 235, 80, 255 });
-
-        int mapX = wbCenterX - 28;
-        int mapY = wbY + 14;
-        if (fr >= 2) {
-
-            DrawRectangleLines(mapX + 2, mapY + 2, 12, 14, Color{ 35, 115, 255, 255 });
-            DrawRectangleLines(mapX + 15, mapY + 2, 14, 11, Color{ 255, 45, 55, 255 });
+        float wbCenterX = f.GetPosition().x + dir * 42.0f;
+        float wbCenterY = f.GetPosition().y - 54.0f;
+        float popScale = std::min(1.0f, 0.55f + fr * 0.08f);
+        VisualsEngine::DrawCenteredSprite(VisualsEngine::GetWorldProp(14), wbCenterX, wbCenterY, 64.0f * popScale, 52.0f * popScale);
+        if (fr >= 6) {
+            VisualsEngine::DrawPixelText("270 TO WIN!", (int)wbCenterX - 24, (int)(wbCenterY - 34.0f), 6, Color{ 255, 235, 80, 255 });
         }
-        if (fr >= 5) {
-
-            DrawRectangleLines(mapX + 18, mapY + 14, 14, 10, Color{ 255, 45, 55, 255 });
-            DrawLine(mapX + 12, mapY + 10, mapX + 46, mapY + 6, Color{ 255, 230, 60, 255 });
-            DrawLine(mapX + 20, mapY + 18, mapX + 48, mapY + 20, Color{ 40, 220, 255, 255 });
-        }
-        if (fr >= 7) {
-
-            int badgeX = wbCenterX + (f.IsFacingRight() ? 8 : -32);
-            int badgeY = wbY + 25;
-            DrawRectangle(badgeX - 2, badgeY - 1, 28, 12, Color{ 255, 250, 240, 245 });
-            DrawRectangleLines(badgeX - 2, badgeY - 1, 28, 12, Color{ 225, 30, 40, 255 });
-            VisualsEngine::DrawPixelText("270!", badgeX, badgeY, 10, Color{ 220, 20, 30, 255 });
-        }
-
-        int penX = mapX + 8 + ((fr * 7) % 40);
-        int penY = mapY + 5 + ((fr * 5) % 18);
-        DrawCircle(penX, penY, 2.5f, (fr % 2 == 0) ? Color{ 255, 45, 55, 255 } : Color{ 45, 130, 255, 255 });
     }
 
-    if (f.GetState() == FSTATE_HITSTUN && f.GetHealth() > 0) {
-        float t = (float)GetTime() * 10.5f;
-        int numStars = 5;
-        float orbitRx = 18.0f;
-        float orbitRy = 6.0f;
-        DrawEllipseLines((int)f.GetPosition().x, (int)(f.GetPosition().y - 72.0f), orbitRx, orbitRy, Color{ 255, 230, 80, 140 });
-        for (int s = 0; s < numStars; s++) {
-            float ang = t + s * (2.0f * PI_F / (float)numStars);
+    if (f.GetCharacterId() == CHAR_SI) {
+        FighterState st = f.GetState();
+        float t = (float)GetTime();
+        if (st == FSTATE_IDLE || st == FSTATE_WALK_FWD || st == FSTATE_WALK_BACK || st == FSTATE_CROUCH) {
+            for (int d = 0; d < 7; d++) {
+                float dx = f.GetPosition().x - 16.0f + ((d * 9 + (int)(t * 14.0f)) % 32);
+                float dy = f.GetPosition().y - 68.0f + fmodf(d * 11.0f + t * 38.0f, 58.0f);
+                const char* bit = (((int)(t * 12.0f) + d) % 2 == 0) ? "1" : "0";
+                VisualsEngine::DrawPixelText(bit, (int)dx, (int)dy, 6, Color{ 45, 255, 95, 215 });
+            }
+        }
+    }
+
+    if (f.GetCharacterId() == CHAR_COUCHIE && f.GetState() == FSTATE_SPECIAL) {
+        int fr = f.GetStateFrame();
+        float pulse = fabsf(sinf(fr * 0.45f));
+        VisualsEngine::DrawCenteredSprite(VisualsEngine::GetVfxSprite(14), f.GetPosition().x, GROUND_Y - 3.0f, 68.0f + pulse * 8.0f, 16.0f, 0.0f, Color{ 165, 240, 255, 235 });
+    }
+
+    if (f.GetCharacterId() == CHAR_THE_DICTATOR && f.GetState() == FSTATE_SPECIAL) {
+        float cx = f.GetPosition().x;
+        VisualsEngine::DrawCenteredSprite(VisualsEngine::GetWorldProp(12), cx, GROUND_Y - 12.0f, 56.0f, 38.0f);
+        if (f.IsSpiderHoleHidden()) {
+            VisualsEngine::DrawPixelText("SPIDER HOLE!", (int)cx - 26, (int)GROUND_Y - 34, 6, Color{ 255, 225, 80, 235 });
+        }
+    }
+
+    if (f.GetStarBurstTimer() > 0) {
+        float prog = (float)f.GetStarBurstTimer() / 65.0f;
+        float t = (float)GetTime() * 12.0f;
+        for (int s = 0; s < 6; s++) {
+            float ang = t + s * (2.0f * PI_F / 6.0f);
+            float rad = 14.0f + (1.0f - prog) * 22.0f;
+            float sx = f.GetPosition().x + cosf(ang) * rad;
+            float sy = (f.GetPosition().y - 46.0f) + sinf(ang * 1.3f) * (rad * 0.65f);
+            const Texture2D& stTex = (s % 2 == 0) ? VisualsEngine::GetVfxSprite(6) : VisualsEngine::GetVfxSprite(0);
+            VisualsEngine::DrawCenteredSprite(stTex, sx, sy, 14.0f, 14.0f, (t * 45.0f) + s * 30.0f);
+        }
+    }
+
+    if (f.GetElectroShockTimer() > 0) {
+        int et = f.GetElectroShockTimer();
+        float cx = f.GetPosition().x;
+        float cy = f.GetPosition().y - 42.0f;
+        for (int b = 0; b < 4; b++) {
+            float ang = (float)b * (PI_F * 0.5f) + (float)et * 0.65f;
+            float ax = cx + cosf(ang) * 15.0f;
+            float ay = cy + sinf(ang) * 20.0f;
+            const Texture2D& bolt = ((b + et) % 2 == 0) ? VisualsEngine::GetVfxSprite(8) : VisualsEngine::GetVfxSprite(9);
+            VisualsEngine::DrawCenteredSprite(bolt, ax, ay, 34.0f, 34.0f, ang * 57.2958f, WHITE, (b % 2 == 1));
+        }
+        if ((et % 3) == 0) {
+            VisualsEngine::DrawPixelText("BZZZT!", (int)cx - 18, (int)(f.GetPosition().y - 84.0f), 7, Color{ 110, 250, 255, 255 });
+        }
+    }
+
+    if (f.GetCharacterId() == CHAR_W && f.GetState() == FSTATE_VICTORY) {
+        int vfr = f.GetStateFrame();
+        float dir = f.IsFacingRight() ? 1.0f : -1.0f;
+        float teeX = f.GetPosition().x + dir * 22.0f;
+        float teeY = GROUND_Y - 2.0f;
+        if (vfr < 18) {
+            VisualsEngine::DrawCenteredSprite(VisualsEngine::GetWorldProp(13), teeX, teeY - 6.0f, 12.0f, 16.0f);
+        } else {
+            float tb = (float)(vfr - 18);
+            for (int k = 1; k <= 6; k++) {
+                float u = std::max(0.0f, tb - k * 1.8f);
+                float tx = teeX + dir * (u * 6.8f);
+                float ty = (teeY - 6.0f) - u * 4.1f + u * u * 0.025f;
+                unsigned char ta = (unsigned char)std::max(35, 210 - k * 28);
+                VisualsEngine::DrawCenteredSprite(VisualsEngine::GetVfxSprite(0), tx, ty, 7.0f, 7.0f, u * 15.0f, Color{ 255, 245, 175, ta });
+            }
+            float bx = teeX + dir * (tb * 6.8f);
+            float by = (teeY - 6.0f) - tb * 4.1f + tb * tb * 0.025f;
+            VisualsEngine::DrawCenteredSprite(VisualsEngine::GetWorldProp(13), bx, by, 10.0f, 12.0f, tb * 24.0f);
+            if (vfr < 28) {
+                VisualsEngine::DrawCenteredSprite(VisualsEngine::GetVfxSprite(1), teeX, teeY - 5.0f, 18.0f, 18.0f);
+            }
+        }
+    }
+
+    if (f.GetCharacterId() == CHAR_AYATOLLAH && f.GetState() == FSTATE_CALL_TO_PRAYER) {
+        int fr = f.GetStateFrame();
+        float cx = f.GetPosition().x;
+        float gy = GROUND_Y;
+        float pulse = 0.5f + 0.5f * sinf(fr * 0.35f);
+
+        VisualsEngine::DrawCenteredSprite(VisualsEngine::GetVfxSprite(14), cx, gy - 3.0f, 72.0f + pulse * 10.0f, 16.0f);
+        float mcX = cx + (f.IsFacingRight() ? 24.0f : -24.0f);
+        float mcY = gy - 80.0f - sinf(fr * 0.18f) * 4.0f;
+        VisualsEngine::DrawCenteredSprite(VisualsEngine::GetVfxSprite(15), mcX, mcY, 26.0f, 26.0f);
+        for (int k = 0; k < 5; k++) {
+            float sx = cx - 22.0f + ((k * 13 + fr * 2) % 44);
+            float sy = gy - 14.0f - fmodf((float)(fr * 2.4f + k * 18.0f), 92.0f);
+            VisualsEngine::DrawCenteredSprite(VisualsEngine::GetVfxSprite(0), sx, sy, 8.0f, 8.0f, (float)(fr * 6 + k * 30));
+        }
+        char prayTag[48];
+        snprintf(prayTag, sizeof(prayTag), "CALL TO PRAYER! (%d/7)", f.GetRefillCount());
+        int ptw = MeasureText(prayTag, 7);
+        DrawRectangle((int)cx - ptw / 2 - 4, (int)gy - 150, ptw + 8, 10, Color{ 8, 28, 22, 235 });
+        DrawRectangleLines((int)cx - ptw / 2 - 4, (int)gy - 150, ptw + 8, 10, Color{ 255, 220, 65, 255 });
+        VisualsEngine::DrawPixelText(prayTag, (int)cx - ptw / 2, (int)gy - 148, 7, Color{ 255, 240, 95, 255 });
+    }
+
+    if ((f.GetState() == FSTATE_HITSTUN && f.GetHealth() > 0) ||
+        f.GetState() == FSTATE_FINISH_HIM_DIZZY ||
+        f.GetState() == FSTATE_FINISHER_VICTIM) {
+        bool isDizzy = (f.GetState() == FSTATE_FINISH_HIM_DIZZY || f.GetState() == FSTATE_FINISHER_VICTIM);
+        float t = (float)GetTime() * (isDizzy ? 8.5f : 7.5f);
+        int numOrbit = isDizzy ? 6 : 4;
+        float orbitRx = isDizzy ? 22.0f : 18.0f;
+        float orbitRy = isDizzy ? 7.0f : 5.5f;
+        for (int s = 0; s < numOrbit; s++) {
+            float ang = t + s * (2.0f * PI_F / (float)numOrbit);
             float sx = f.GetPosition().x + cosf(ang) * orbitRx;
-            float sy = f.GetPosition().y - 72.0f + sinf(ang) * orbitRy;
-            Color starCol = (s % 2 == 0) ? Color{ 255, 235, 40, 255 } : Color{ 255, 185, 30, 255 };
-            DrawLineEx(Vector2{ sx - 4.0f, sy }, Vector2{ sx + 4.0f, sy }, 2.0f, starCol);
-            DrawLineEx(Vector2{ sx, sy - 4.0f }, Vector2{ sx, sy + 4.0f }, 2.0f, starCol);
-            DrawLine(sx - 2.5f, sy - 2.5f, sx + 2.5f, sy + 2.5f, WHITE);
-            DrawLine(sx - 2.5f, sy + 2.5f, sx + 2.5f, sy - 2.5f, WHITE);
-            DrawCircle((int)sx, (int)sy, 2.2f, WHITE);
+            float sy = f.GetPosition().y - 74.0f + sinf(ang) * orbitRy;
+            bool useBird = isDizzy && (s % 2 == 1);
+            const Texture2D& orbTex = useBird ? VisualsEngine::GetVfxSprite(7) : VisualsEngine::GetVfxSprite(6);
+            float sz = useBird ? 14.0f : 12.0f;
+            VisualsEngine::DrawCenteredSprite(orbTex, sx, sy, sz, sz, useBird ? 0.0f : (t * 25.0f), WHITE, cosf(ang) < 0.0f);
         }
     }
 }
@@ -917,9 +1204,12 @@ inline void DrawWorldParticlesAndDebug(const Fighter& p1, const Fighter& p2) {
     for (const auto& p : s_particles) {
         if (!p.alive) continue;
         if (p.isPaper) {
-            DrawRectanglePro(Rectangle{ p.pos.x, p.pos.y, p.size, p.size * 0.65f }, Vector2{ p.size * 0.5f, p.size * 0.32f }, p.rot, p.color);
+            float pw = std::max(8.0f, p.size * 2.2f);
+            float ph = std::max(5.0f, p.size * 1.3f);
+            VisualsEngine::DrawCenteredSprite(VisualsEngine::GetWorldProp(10), p.pos.x, p.pos.y, pw, ph, p.rot, Color{ 255, 255, 255, p.color.a });
         } else {
-            DrawCircleV(p.pos, p.size, p.color);
+            float sw = std::max(7.0f, p.size * 2.8f);
+            VisualsEngine::DrawCenteredSprite(VisualsEngine::GetVfxSprite(13), p.pos.x, p.pos.y, sw, sw, 0.0f, Color{ 255, 255, 255, p.color.a });
         }
     }
 
@@ -932,35 +1222,87 @@ inline void DrawWorldParticlesAndDebug(const Fighter& p1, const Fighter& p2) {
         Color txtCol   = isCrimson ? Color{ 255, 255, 255, 255 } : Color{ 220, 22, 28, 255 };
         DrawBatmanActionBurst(st.text.c_str(), (int)st.pos.x, (int)st.pos.y, 7, outerCol, innerCol, txtCol, popScale);
     }
-
-    if (s_debugHitboxes) {
-        const Fighter* fighters[2] = { &p1, &p2 };
-        for (int i = 0; i < 2; i++) {
-            const Fighter& f = *fighters[i];
-            Rectangle pb = f.GetPushbox();
-            DrawRectangleRec(pb, Color{ 255, 235, 40, 50 });
-            DrawRectangleLinesEx(pb, 1.0f, Color{ 255, 235, 40, 230 });
-
-            auto hbs = f.GetHurtboxes();
-            for (const auto& hb : hbs) {
-                DrawRectangleRec(hb, Color{ 40, 240, 80, 55 });
-                DrawRectangleLinesEx(hb, 1.0f, Color{ 40, 240, 80, 230 });
-            }
-
-            Rectangle atkBox{};
-            AttackData atkData{};
-            if (f.GetActiveHitbox(atkBox, atkData)) {
-                DrawRectangleRec(atkBox, Color{ 255, 40, 40, 95 });
-                DrawRectangleLinesEx(atkBox, 1.0f, Color{ 255, 40, 40, 255 });
-            }
-        }
-    }
+    (void)p1;
+    (void)p2;
 }
 
 inline void DrawScreenHUDAndSuperFlash(const Fighter& p1, const Fighter& p2, const InputManager& in1) {
 
-    int ceTw = MeasureText("CHAMPIONSHIP EDITION", 6);
-    VisualsEngine::DrawPixelText("CHAMPIONSHIP EDITION", (SCREEN_WIDTH - ceTw) / 2, 35, 6, Color{ 255, 215, 60, 220 });
+    const char* turboBadge = (s_turboSpeed == TURBO_SPEED_1) ? "TURBO 1" : ((s_turboSpeed == TURBO_SPEED_3) ? "TURBO 3 MAX" : "TURBO 2");
+    int ceTw = MeasureText(turboBadge, 6);
+    VisualsEngine::DrawPixelText(turboBadge, (SCREEN_WIDTH - ceTw) / 2, 36, 6, Color{ 95, 235, 255, 235 });
+
+    auto drawSuperGauge = [](int x, int y, int meter, bool flipRight) {
+        constexpr int SEG_W = 36;
+        constexpr int SEG_H = 6;
+        constexpr int GAP = 2;
+        int totalW = SEG_W * 3 + GAP * 2;
+        int lvl = meter / 100;
+        bool isMax = (meter >= 300);
+        float pulse = 0.5f + 0.5f * sinf((float)GetTime() * 14.0f);
+
+        DrawRectangle(x - 2, y - 2, totalW + 4, SEG_H + 4, Color{ 8, 12, 22, 230 });
+        DrawRectangleLines(x - 2, y - 2, totalW + 4, SEG_H + 4, isMax ? Color{ 255, 235, 65, 255 } : Color{ 70, 130, 195, 235 });
+
+        for (int s = 0; s < 3; s++) {
+            int segIdx = flipRight ? (2 - s) : s;
+            int sx = x + s * (SEG_W + GAP);
+            DrawRectangle(sx, y, SEG_W, SEG_H, Color{ 20, 28, 46, 240 });
+            int segFill = std::clamp(meter - segIdx * 100, 0, 100);
+            if (segFill > 0) {
+                int fw = (segFill * SEG_W) / 100;
+                int fx = flipRight ? (sx + SEG_W - fw) : sx;
+                Color cTop = (segIdx == 0) ? Color{ 65, 210, 255, 255 }
+                           : ((segIdx == 1) ? Color{ 255, 210, 45, 255 } : Color{ 255, 75, 55, 255 });
+                if (isMax && ((int)(GetTime() * 18.0f) % 2 == 0)) cTop = Color{ 255, 255, 160, 255 };
+                DrawRectangle(fx, y, fw, SEG_H, cTop);
+                DrawLine(fx, y, fx + fw, y, Color{ 255, 255, 255, (unsigned char)(140 + pulse * 100) });
+            }
+            DrawRectangleLines(sx, y, SEG_W, SEG_H, Color{ 45, 75, 115, 220 });
+        }
+
+        const char* lbl = isMax ? "MAX SUPER!" : ((lvl == 2) ? "SUPER LV.2" : ((lvl == 1) ? "SUPER LV.1" : "SUPER"));
+        Color lblCol = isMax ? Color{ 255, 240, 75, 255 } : ((lvl >= 1) ? Color{ 110, 235, 255, 255 } : Color{ 165, 185, 210, 220 });
+        int lw = MeasureText(lbl, 6);
+        int lx = flipRight ? (x + totalW - lw) : x;
+        VisualsEngine::DrawPixelText(lbl, lx, y - 8, 6, lblCol);
+    };
+
+    drawSuperGauge(10, SCREEN_HEIGHT - 10, p1.GetSuperMeter(), false);
+    drawSuperGauge(SCREEN_WIDTH - 10 - (36 * 3 + 4), SCREEN_HEIGHT - 10, p2.GetSuperMeter(), true);
+
+    if (p1.IsPerformingFinisher() || p2.IsPerformingFinisher()) {
+        const Fighter& atk = p1.IsPerformingFinisher() ? p1 : p2;
+        float pulse = 0.5f + 0.5f * sinf((float)GetTime() * 22.0f);
+        const char* fName = Fighter::GetFinisherName(atk.GetCharacterId());
+        int fnw = MeasureText(fName, 12);
+        int bx = std::max(6, (SCREEN_WIDTH - fnw) / 2 - 8);
+        int bw = std::min(SCREEN_WIDTH - 12, fnw + 16);
+        DrawRectangle(bx, 42, bw, 24, Color{ 16, 6, 18, 235 });
+        DrawRectangleLines(bx, 42, bw, 24, Color{ 255, 215, 55, 255 });
+        DrawRectangleLines(bx + 1, 43, bw - 2, 22, Color{ 235, 35, 55, 240 });
+        const char* subHdr = "SPECIAL FINISHING MOVE!";
+        int shw = MeasureText(subHdr, 6);
+        VisualsEngine::DrawPixelText(subHdr, (SCREEN_WIDTH - shw) / 2, 44, 6, Color{ 110, 240, 255, 255 });
+        Color fTop = (pulse > 0.5f) ? Color{ 255, 245, 95, 255 } : Color{ 255, 145, 55, 255 };
+        DrawArcade3DText(fName, (SCREEN_WIDTH - fnw) / 2, 52, 12, fTop, Color{ 205, 20, 35, 255 });
+    } else if (s_finishHimActive) {
+        float pulse = 0.5f + 0.5f * sinf((float)GetTime() * 18.0f);
+        const char* fh = "FINISH HIM!";
+        int fhw = MeasureText(fh, 24);
+        int fhx = (SCREEN_WIDTH - fhw) / 2;
+        int fhy = 50;
+        Color topC = (pulse > 0.5f) ? Color{ 255, 245, 90, 255 } : Color{ 255, 90, 50, 255 };
+        DrawArcade3DText(fh, fhx, fhy, 24, topC, Color{ 195, 15, 25, 255 });
+    } else if (s_vetoedKoActive) {
+        float pulse = 0.5f + 0.5f * sinf((float)GetTime() * 20.0f);
+        const char* vt = "VETOED!";
+        int vtw = MeasureText(vt, 28);
+        int vtx = (SCREEN_WIDTH - vtw) / 2;
+        int vty = 56;
+        Color topC = (pulse > 0.5f) ? Color{ 255, 248, 110, 255 } : Color{ 255, 215, 45, 255 };
+        DrawArcade3DText(vt, vtx, vty, 28, topC, Color{ 215, 20, 30, 255 });
+    }
 
     for (const auto& b : s_banners) {
         float slide = std::min(1.0f, (float)(b.maxTimer - b.timer) / 5.0f);
@@ -1013,32 +1355,7 @@ inline void DrawScreenHUDAndSuperFlash(const Fighter& p1, const Fighter& p2, con
         VisualsEngine::DrawPixelText(sf.GetName().c_str(), 28, bandY + 8, 12, Color{ 255, 230, 70, 255 });
         VisualsEngine::DrawPixelText(s_superFlashMove.c_str(), 28, bandY + 24, 14, WHITE);
     }
-
-    if (s_debugHitboxes) {
-        DrawRectangle(6, SCREEN_HEIGHT - 42, SCREEN_WIDTH - 12, 36, Color{ 8, 10, 16, 225 });
-        DrawRectangleLines(6, SCREEN_HEIGHT - 42, SCREEN_WIDTH - 12, 36, Color{ 80, 240, 120, 220 });
-        char p1Info[128];
-        snprintf(p1Info, sizeof(p1Info), "P1 F:%d ADV:%+d ST:%d %s",
-                 p1.GetStateFrame(), p1.GetLastFrameAdvantage(), (int)p1.GetState(), p1.GetCurrentAttack().name.c_str());
-        char p2Info[128];
-        snprintf(p2Info, sizeof(p2Info), "P2 F:%d ADV:%+d ST:%d %s",
-                 p2.GetStateFrame(), p2.GetLastFrameAdvantage(), (int)p2.GetState(), p2.GetCurrentAttack().name.c_str());
-        VisualsEngine::DrawPixelText(p1Info, 10, SCREEN_HEIGHT - 39, 6, Color{ 110, 255, 140, 255 });
-        VisualsEngine::DrawPixelText(p2Info, 10, SCREEN_HEIGHT - 29, 6, Color{ 255, 190, 100, 255 });
-
-        std::string hist = "BUF: ";
-        for (int a = 11; a >= 0; a--) {
-            const auto& hf = in1.GetHistoryFrame(a);
-            char c = '0' + (int)hf.relDir;
-            hist.push_back(c);
-            if (hf.buttonsPressed & BTN_LP) hist += "P";
-            else if (hf.buttonsPressed & BTN_HP) hist += "H";
-            else if (hf.buttonsPressed & BTN_LK) hist += "K";
-            else if (hf.buttonsPressed & BTN_HK) hist += "S";
-            hist.push_back(' ');
-        }
-        VisualsEngine::DrawPixelText(hist.c_str(), 10, SCREEN_HEIGHT - 18, 6, Color{ 140, 220, 255, 255 });
-    }
+    (void)in1;
 }
 
 }

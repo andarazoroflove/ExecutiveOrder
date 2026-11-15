@@ -8,8 +8,19 @@
 
 constexpr int SCREEN_WIDTH = 384;
 constexpr int SCREEN_HEIGHT = 224;
+#if defined(GRAPHICS_API_OPENGL_ES2) || defined(__aarch64__)
+constexpr int RENDER_SCALE = 2;
+constexpr int INTERNAL_WIDTH = SCREEN_WIDTH * RENDER_SCALE;
+constexpr int INTERNAL_HEIGHT = SCREEN_HEIGHT * RENDER_SCALE;
+constexpr int WINDOW_WIDTH = 640;
+constexpr int WINDOW_HEIGHT = 480;
+#else
+constexpr int RENDER_SCALE = 5;
+constexpr int INTERNAL_WIDTH = SCREEN_WIDTH * RENDER_SCALE;
+constexpr int INTERNAL_HEIGHT = SCREEN_HEIGHT * RENDER_SCALE;
 constexpr int WINDOW_WIDTH = 1280;
 constexpr int WINDOW_HEIGHT = 720;
+#endif
 constexpr int TARGET_FPS = 60;
 constexpr float FIXED_DT = 1.0f / 60.0f;
 constexpr float PI_F = 3.14159265358979323846f;
@@ -38,9 +49,56 @@ enum CharacterId {
     CHAR_PALM_BEACH_PETE = 14,
     CHAR_THE_PUNDIT = 15,
     CHAR_A_NEW_HOPE = 16,
-    CHARACTER_COUNT = 17
+
+    CHAR_DOCTOR_ABDUL = 17,
+    CHAR_COUCHIE = 18,
+    CHAR_BLEXAS = 19,
+    CHAR_SI = 20,
+
+    CHAR_KIM = 21,
+    CHAR_BEBE = 22,
+    CHAR_PALE_MOTH = 23,
+    CHAR_THE_DICTATOR = 24,
+    CHAR_FLOTUS = 25,
+    CHAR_W = 26,
+    CHAR_DICK = 27,
+    CHAR_AYATOLLAH = 28,
+    CHARACTER_COUNT = 29
 };
-constexpr int PLAYABLE_CHARACTER_COUNT = 10;
+
+constexpr int PLAYABLE_CHARACTER_COUNT = 16;
+constexpr int PLAYABLE_ROSTER[PLAYABLE_CHARACTER_COUNT] = {
+    CHAR_COMMANDER,
+    CHAR_HIGH_BENCH,
+    CHAR_REDCAP,
+    CHAR_COASTAL_GOV,
+    CHAR_TECH_VISIONARY,
+    CHAR_FILIBUSTER,
+    CHAR_MASCOT,
+    CHAR_POPULIST,
+    CHAR_SLEEPY_JOE,
+    CHAR_MTG,
+    CHAR_DOCTOR_ABDUL,
+    CHAR_COUCHIE,
+    CHAR_BLEXAS,
+    CHAR_SI,
+    CHAR_FLOTUS,
+    CHAR_W
+};
+
+inline bool IsPlayableCharacter(int charId) {
+    for (int i = 0; i < PLAYABLE_CHARACTER_COUNT; i++) {
+        if (PLAYABLE_ROSTER[i] == charId) return true;
+    }
+    return false;
+}
+
+inline int GetPlayableSlotForChar(int charId) {
+    for (int i = 0; i < PLAYABLE_CHARACTER_COUNT; i++) {
+        if (PLAYABLE_ROSTER[i] == charId) return i;
+    }
+    return 0;
+}
 
 enum StageId {
     STAGE_DEMOLISHED_EAST_WING = 0,
@@ -57,13 +115,26 @@ enum StageId {
     STAGE_TOMB_UNKNOWN = 11,
     STAGE_ENN_NEWS_STUDIO = 12,
     STAGE_CHICAGO_WRIGLEY = 13,
-    STAGE_COUNT = 14
+
+    STAGE_RYUGYONG_HOTEL = 14,
+    STAGE_WESTERN_WALL = 15,
+    STAGE_SOVIET_FOUNDRY = 16,
+    STAGE_PALACE_COURTYARD = 17,
+
+    STAGE_PERFORMING_ARTS = 18,
+    STAGE_THE_HOOD = 19,
+    STAGE_PROGRESS_AVENUE = 20,
+    STAGE_LINCOLN_BEDROOM = 21,
+    STAGE_WYOMING_RODEO = 22,
+    STAGE_TEHRAN_CASBAH = 23,
+    STAGE_COUNT = 24
 };
 
 enum GameState {
     STATE_SPLASH,
     STATE_SELECT_MAP,
     STATE_SECRET_SELECT,
+    STATE_WORLD_MAP,
     STATE_VERSUS,
     STATE_FIGHT,
     STATE_VICTORY_SPLASH,
@@ -71,6 +142,20 @@ enum GameState {
     STATE_MATCH_OVER,
     STATE_ENDING_CELEBRATION,
     STATE_CTHULHU_ENDING
+};
+
+enum BonusStageType {
+    BONUS_STAGE_TESLA = 0,
+    BONUS_STAGE_POOL_TAR = 1,
+    BONUS_STAGE_BOOK_FIRE = 2,
+    BONUS_STAGE_BERLIN_WALL = 3,
+    BONUS_STAGE_COUNT = 4
+};
+
+enum TurboSpeed {
+    TURBO_SPEED_1 = 0,
+    TURBO_SPEED_2 = 1,
+    TURBO_SPEED_3 = 2
 };
 
 enum AttackType {
@@ -87,7 +172,9 @@ enum AttackMoveType {
     MOVE_HEAVY_PUNCH = 1,
     MOVE_LIGHT_KICK = 2,
     MOVE_HEAVY_KICK = 3,
-    MOVE_SPECIAL = 4
+    MOVE_SPECIAL = 4,
+    MOVE_SUPER = 5,
+    MOVE_THROW = 6
 };
 
 enum InputButtons : uint16_t {
@@ -104,7 +191,9 @@ enum InputButtons : uint16_t {
     BTN_COIN = (1 << 9),
     BTN_SPECIAL = (1 << 10),
     BTN_TAUNT = (1 << 11),
-    BTN_SELECT = (1 << 12)
+    BTN_SELECT = (1 << 12),
+    BTN_BLOCK = (1 << 13),
+    BTN_FINISHER = (1 << 14)
 };
 
 enum AIDifficulty {

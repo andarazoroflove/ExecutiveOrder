@@ -11,6 +11,7 @@
 #include "rlgl.h"
 #include <memory>
 #include <vector>
+#include <string>
 #include <cstdlib>
 #include <cstring>
 #include <csignal>
@@ -44,6 +45,23 @@ static void CrashSignalHandler(int sig) {
     _Exit(sig);
 }
 
+static int MoveSecretCharCursor(int cur, int dx, int dy) {
+    if (dx != 0) {
+        return (cur + dx + CHARACTER_COUNT) % CHARACTER_COUNT;
+    }
+    if (dy != 0) {
+        int row = (cur < 10) ? 0 : ((cur < 20) ? 1 : 2);
+        int col = (cur < 10) ? cur : ((cur < 20) ? (cur - 10) : (cur - 20));
+        int nextRow = (row + dy + 3) % 3;
+        int maxCol = (nextRow < 2) ? 9 : 8;
+        if (col > maxCol) col = maxCol;
+        if (nextRow == 0) return col;
+        if (nextRow == 1) return 10 + col;
+        return 20 + col;
+    }
+    return cur;
+}
+
 int main(int argc, char* argv[]) {
     std::srand((unsigned int)std::time(nullptr));
     std::signal(SIGTERM, CleanExitSignalHandler);
@@ -55,26 +73,36 @@ int main(int argc, char* argv[]) {
 
     bool windowedMode = false;
     for (int i = 1; i < argc; i++) {
-        if (strcmp(argv[i], "--windowed") == 0) windowedMode = true;
+        if (strcmp(argv[i], "--windowed") == 0) {
+            windowedMode = true;
+        }
     }
 
     ChangeDirectory(GetApplicationDirectory());
 
-    SetConfigFlags(FLAG_VSYNC_HINT | FLAG_WINDOW_HIGHDPI);
-    InitWindow(WINDOW_WIDTH, WINDOW_HEIGHT, "Executive Order II: Total Veto - Championship Edition");
+#if defined(GRAPHICS_API_OPENGL_ES2) || defined(__aarch64__)
+    SetConfigFlags(FLAG_VSYNC_HINT);
+#else
+    SetConfigFlags(FLAG_VSYNC_HINT | FLAG_WINDOW_RESIZABLE);
+#endif
+    InitWindow(WINDOW_WIDTH, WINDOW_HEIGHT, "Executive Veto II Turbo: Global Conflict");
     if (!IsWindowReady()) {
-        TraceLog(LOG_FATAL, "ExecutiveOrder: Failed to initialize window / graphics context.");
+        TraceLog(LOG_FATAL, "ExecutiveVetoTurbo: Failed to initialize window / graphics context.");
         return 1;
     }
     SetTargetFPS(TARGET_FPS);
+#if !defined(GRAPHICS_API_OPENGL_ES2) && !defined(__aarch64__)
+    SetWindowMinSize(1280, 720);
+#endif
 
     static const char* s_gamepadDb =
-        "19000000010000000100000001000000,ANBERNIC-keys,a:b0,b:b1,x:b2,y:b3,back:b8,start:b9,guide:b6,leftshoulder:b4,rightshoulder:b5,lefttrigger:b6,righttrigger:b7,dpup:h0.1,dpdown:h0.4,dpleft:h0.8,dpright:h0.2,leftx:a0,lefty:a1,platform:Linux,\n"
+        "19000000010000000100000001000000,ANBERNIC-keys,a:b0,b:b1,x:b2,y:b3,back:b8,start:b9,guide:b10,leftshoulder:b4,rightshoulder:b5,lefttrigger:b6,righttrigger:b7,leftstick:b11,rightstick:b12,dpup:h0.1,dpdown:h0.4,dpleft:h0.8,dpright:h0.2,leftx:a0,lefty:a1,rightx:a2,righty:a3,platform:Linux,\n"
+        "19000000010000000001000000010000,ANBERNIC-keys,a:b0,b:b1,x:b3,y:b2,back:b8,guide:b6,start:b7,leftshoulder:b4,rightshoulder:b5,dpup:h0.1,dpleft:h0.8,dpdown:h0.4,dpright:h0.2,leftx:a0,lefty:a1,lefttrigger:b9,righttrigger:b10,platform:Linux,\n"
         "19000000010000000100000001010000,Anbernic RG353V,platform:Linux,a:b1,b:b0,x:b2,y:b3,back:b8,start:b9,guide:b10,leftshoulder:b4,rightshoulder:b5,lefttrigger:b6,righttrigger:b7,leftstick:b11,rightstick:b12,dpup:h0.1,dpdown:h0.4,dpleft:h0.8,dpright:h0.2,leftx:a0,lefty:a1,rightx:a2,righty:a3,\n"
         "19000000010000000100000002010000,retrogame_joypad,platform:Linux,a:b1,b:b0,x:b2,y:b3,back:b8,start:b9,guide:b10,leftshoulder:b4,rightshoulder:b5,lefttrigger:b6,righttrigger:b7,leftstick:b11,rightstick:b12,dpup:h0.1,dpdown:h0.4,dpleft:h0.8,dpright:h0.2,leftx:a0,lefty:a1,rightx:a2,righty:a3,\n"
-        "19000000010000000200000002000000,retrogame_joypad,platform:Linux,a:b0,b:b1,x:b2,y:b3,back:b8,start:b9,leftshoulder:b4,rightshoulder:b5,dpup:b10,dpdown:b11,dpleft:b12,dpright:b13,leftx:a0,lefty:a1,\n"
-        "19000000010000000100000000010000,retrogame_joypad,platform:Linux,a:b0,b:b1,x:b2,y:b3,back:b8,start:b9,leftshoulder:b4,rightshoulder:b5,dpup:h0.1,dpdown:h0.4,dpleft:h0.8,dpright:h0.2,leftx:a0,lefty:a1,\n"
-        "03000000091200000031000000010000,OpenSimHardware OSH PB Controller,platform:Linux,a:b0,b:b1,x:b2,y:b3,back:b8,start:b9,leftshoulder:b4,rightshoulder:b5,dpup:h0.1,dpdown:h0.4,dpleft:h0.8,dpright:h0.2,leftx:a0,lefty:a1,\n"
+        "19000000010000000200000002000000,retrogame_joypad,platform:Linux,a:b0,b:b1,x:b2,y:b3,back:b8,start:b9,leftshoulder:b4,rightshoulder:b5,lefttrigger:b6,righttrigger:b7,dpup:b10,dpdown:b11,dpleft:b12,dpright:b13,leftx:a0,lefty:a1,\n"
+        "19000000010000000100000000010000,retrogame_joypad,platform:Linux,a:b0,b:b1,x:b2,y:b3,back:b8,start:b9,leftshoulder:b4,rightshoulder:b5,lefttrigger:b6,righttrigger:b7,dpup:h0.1,dpdown:h0.4,dpleft:h0.8,dpright:h0.2,leftx:a0,lefty:a1,\n"
+        "03000000091200000031000000010000,OpenSimHardware OSH PB Controller,platform:Linux,a:b0,b:b1,x:b2,y:b3,back:b8,start:b9,leftshoulder:b4,rightshoulder:b5,lefttrigger:b6,righttrigger:b7,dpup:h0.1,dpdown:h0.4,dpleft:h0.8,dpright:h0.2,leftx:a0,lefty:a1,\n"
         "19000000010000000100000000000000,GO-Advance Gamepad,platform:Linux,a:b0,b:b1,x:b2,y:b3,back:b8,start:b9,leftshoulder:b4,rightshoulder:b5,lefttrigger:b6,righttrigger:b7,dpup:h0.1,dpdown:h0.4,dpleft:h0.8,dpright:h0.2,leftx:a0,lefty:a1,\n"
         "19000000010000000100000002000000,GO-Advance Gamepad (rev 1.1),platform:Linux,a:b0,b:b1,x:b2,y:b3,back:b8,start:b9,leftshoulder:b4,rightshoulder:b5,lefttrigger:b6,righttrigger:b7,dpup:b10,dpdown:b11,dpleft:b12,dpright:b13,leftx:a0,lefty:a1,\n"
         "030000005e0400008e02000010010000,Microsoft X-Box 360 pad,platform:Linux,a:b0,b:b1,x:b2,y:b3,back:b6,start:b7,guide:b8,leftshoulder:b4,rightshoulder:b5,leftstick:b9,rightstick:b10,leftx:a0,lefty:a1,rightx:a3,righty:a4,lefttrigger:a2,righttrigger:a5,dpup:h0.1,dpright:h0.2,dpdown:h0.4,dpleft:h0.8,\n";
@@ -87,9 +115,77 @@ int main(int argc, char* argv[]) {
         }
     }
 
-    if (!windowedMode) {
+#if defined(GRAPHICS_API_OPENGL_ES2) || defined(__aarch64__)
+    auto ToggleAppFullscreen = [&]() {
         ToggleBorderlessWindowed();
+    };
+    if (!windowedMode) {
+        ToggleAppFullscreen();
     }
+#else
+    int initMon = GetCurrentMonitor();
+    int initMonW = GetMonitorWidth(initMon);
+    int initMonH = GetMonitorHeight(initMon);
+    Vector2 initMonPos = GetMonitorPosition(initMon);
+    if (initMonW <= 0) initMonW = 1920;
+    if (initMonH <= 0) initMonH = 1080;
+
+    int savedWinH = std::clamp((int)(initMonH * 0.75f), 720, std::max(720, initMonH - 96));
+    int savedWinW = std::clamp((savedWinH * 16) / 9, 1280, std::max(1280, initMonW - 96));
+    int savedWinX = (int)initMonPos.x + std::max(0, (initMonW - savedWinW) / 2);
+    int savedWinY = (int)initMonPos.y + std::max(24, (initMonH - savedWinH) / 2);
+
+    SetWindowSize(savedWinW, savedWinH);
+    SetWindowPosition(savedWinX, savedWinY);
+
+    bool isDesktopFullscreen = false;
+    bool mainLoopStarted = false;
+    auto SetDesktopFullscreen = [&](bool wantFull) {
+        if (wantFull && !isDesktopFullscreen) {
+            if (IsWindowMaximized()) {
+                RestoreWindow();
+            } else if (mainLoopStarted) {
+                Vector2 wp = GetWindowPosition();
+                int cw = GetRenderWidth();
+                int ch = GetRenderHeight();
+                if (cw >= 1280 && ch >= 720) {
+                    savedWinW = cw;
+                    savedWinH = ch;
+                    savedWinX = (int)wp.x;
+                    savedWinY = (int)wp.y;
+                }
+            }
+            int mon = GetCurrentMonitor();
+            int mw = GetMonitorWidth(mon);
+            int mh = GetMonitorHeight(mon);
+            Vector2 mp = GetMonitorPosition(mon);
+            if (mw <= 0) mw = initMonW;
+            if (mh <= 0) mh = initMonH;
+
+            SetWindowMinSize(0, 0);
+            SetWindowState(FLAG_WINDOW_UNDECORATED | FLAG_WINDOW_TOPMOST);
+            SetWindowSize(mw, mh);
+            SetWindowPosition((int)mp.x, (int)mp.y);
+            SetWindowFocused();
+            HideCursor();
+            isDesktopFullscreen = true;
+        } else if (!wantFull && isDesktopFullscreen) {
+            ShowCursor();
+            ClearWindowState(FLAG_WINDOW_UNDECORATED | FLAG_WINDOW_TOPMOST);
+            SetWindowMinSize(1280, 720);
+            SetWindowSize(std::max(1280, savedWinW), std::max(720, savedWinH));
+            SetWindowPosition(savedWinX, savedWinY);
+            SetWindowFocused();
+            isDesktopFullscreen = false;
+        }
+    };
+    auto ToggleAppFullscreen = [&]() {
+        SetDesktopFullscreen(!isDesktopFullscreen);
+    };
+    if (!windowedMode) {
+        SetDesktopFullscreen(true);
+    }
+#endif
 
     AssetManager::Init();
     const char* iconPath = AssetManager::FileExists("assets/app_icon.png") ? "assets/app_icon.png" : "../assets/app_icon.png";
@@ -101,17 +197,17 @@ int main(int argc, char* argv[]) {
         }
     }
 
-    RenderTexture2D screenTarget = LoadRenderTexture(SCREEN_WIDTH, SCREEN_HEIGHT);
-    SetTextureFilter(screenTarget.texture, TEXTURE_FILTER_POINT);
+    RenderTexture2D screenTarget = LoadRenderTexture(INTERNAL_WIDTH, INTERNAL_HEIGHT);
+    SetTextureFilter(screenTarget.texture, TEXTURE_FILTER_BILINEAR);
 
     Shader crtShader = LoadShaderFromMemory(nullptr, CRT_FRAGMENT_SHADER);
     int scanlineLoc = (crtShader.id > 0) ? GetShaderLocation(crtShader, "scanlineIntensity") : -1;
     int curvatureLoc = (crtShader.id > 0) ? GetShaderLocation(crtShader, "curvature") : -1;
     int bloomLoc = (crtShader.id > 0) ? GetShaderLocation(crtShader, "bloom") : -1;
 
-    float scanlineVal = 0.35f;
-    float curvatureVal = 0.015f;
-    float bloomVal = 0.15f;
+    float scanlineVal = 0.12f;
+    float curvatureVal = 0.0f;
+    float bloomVal = 0.05f;
     if (crtShader.id > 0) {
         if (scanlineLoc >= 0) SetShaderValue(crtShader, scanlineLoc, &scanlineVal, SHADER_UNIFORM_FLOAT);
         if (curvatureLoc >= 0) SetShaderValue(crtShader, curvatureLoc, &curvatureVal, SHADER_UNIFORM_FLOAT);
@@ -124,8 +220,8 @@ int main(int argc, char* argv[]) {
     Texture2D flagTexture = VisualsEngine::CreateProceduralFlagTexture();
 
     VisualsEngine::Init();
-
     AudioEngine::Instance().Init();
+    AudioEngine::Instance().SetBgmTrack(BGM_MENU_SPLASH);
 
     InputManager inputP1;
     InputManager inputP2;
@@ -140,28 +236,50 @@ int main(int argc, char* argv[]) {
     bool defeatedFighters[CHARACTER_COUNT] = { false };
     int matchesWon = 0;
     int continuesRemaining = 2;
-    bool bonusStagePlayed = false;
+    bool bonusStagesPlayed[BONUS_STAGE_COUNT] = { false };
+    int easterEggBonusCursor = 0;
     bool playerLocked = false;
     bool choosingOpponent = false;
     bool opponentLocked = false;
+    int worldActIndex = 0;
 
-    static const StageId homeStages[PLAYABLE_CHARACTER_COUNT] = {
+    static const StageId homeStages[CHARACTER_COUNT] = {
         STAGE_WHITE_HOUSE_MMA,
         STAGE_CONGRESSIONAL_FLOOR,
         STAGE_DEMOLISHED_EAST_WING,
         STAGE_REFLECTING_POOL,
         STAGE_SMITHSONIAN_AERO,
-        STAGE_CONGRESSIONAL_FLOOR,
         STAGE_LINCOLN_MEMORIAL,
-        STAGE_LINCOLN_MEMORIAL,
+        STAGE_PROGRESS_AVENUE,
+        STAGE_THE_HOOD,
         STAGE_TOMB_UNKNOWN,
-        STAGE_DEMOLISHED_EAST_WING
+        STAGE_DEMOLISHED_EAST_WING,
+        STAGE_PRESS_BRIEFING,
+        STAGE_PENTAGON_ALTAR,
+        STAGE_WTC_PLAZA,
+        STAGE_COMET_PING_PONG,
+        STAGE_FLORIDA_KEYS,
+        STAGE_ENN_NEWS_STUDIO,
+        STAGE_CHICAGO_WRIGLEY,
+        STAGE_CHICAGO_WRIGLEY,
+        STAGE_CONGRESSIONAL_FLOOR,
+        STAGE_WHITE_HOUSE_MMA,
+        STAGE_SMITHSONIAN_AERO,
+        STAGE_RYUGYONG_HOTEL,
+        STAGE_WESTERN_WALL,
+        STAGE_SOVIET_FOUNDRY,
+        STAGE_PALACE_COURTYARD,
+        STAGE_LINCOLN_BEDROOM,
+        STAGE_PERFORMING_ARTS,
+        STAGE_WYOMING_RODEO,
+        STAGE_TEHRAN_CASBAH
     };
 
     auto CountDefeatedOriginals = [&]() -> int {
         int count = 0;
-        for (int i = 0; i < PLAYABLE_CHARACTER_COUNT; i++) {
-            if (i != (int)p1CharId && defeatedFighters[i]) {
+        for (int s = 0; s < PLAYABLE_CHARACTER_COUNT; s++) {
+            int cid = PLAYABLE_ROSTER[s];
+            if (cid != (int)p1CharId && defeatedFighters[cid]) {
                 count++;
             }
         }
@@ -169,48 +287,63 @@ int main(int argc, char* argv[]) {
     };
 
     auto GetStageForOpponent = [&](CharacterId opp) -> StageId {
-        if (opp == CHAR_SUCKRATERY_RKF) return STAGE_PRESS_BRIEFING;
-        if (opp == CHAR_THE_PUNDIT) return STAGE_ENN_NEWS_STUDIO;
-        if (opp == CHAR_WAR_PIG) return STAGE_PENTAGON_ALTAR;
-        if (opp == CHAR_SOCIALIST) return STAGE_WTC_PLAZA;
-        if (opp == CHAR_A_NEW_HOPE) return STAGE_CHICAGO_WRIGLEY;
-        if (opp == CHAR_BILLARY) return STAGE_COMET_PING_PONG;
-        if (opp == CHAR_PALM_BEACH_PETE) return STAGE_FLORIDA_KEYS;
-        if ((int)opp >= 0 && (int)opp < PLAYABLE_CHARACTER_COUNT) return homeStages[(int)opp];
+        if ((int)opp >= 0 && (int)opp < CHARACTER_COUNT) {
+            return homeStages[(int)opp];
+        }
         return STAGE_DEMOLISHED_EAST_WING;
     };
 
-    auto PickNextAvailableOpponent = [&](int startIdx) -> CharacterId {
+    auto GetCurrentWorldAct = [&]() -> int {
+        if (!defeatedFighters[CHAR_KIM]) return 0;
+        if (!defeatedFighters[CHAR_BEBE]) return 1;
+        if (!defeatedFighters[CHAR_PALE_MOTH]) return 2;
+        if (!defeatedFighters[CHAR_THE_DICTATOR]) return 3;
+        if (!defeatedFighters[CHAR_AYATOLLAH]) return 4;
+        return 5;
+    };
+
+    auto PickNextAvailableOpponent = [&](int startSlot) -> CharacterId {
         int origDefeated = CountDefeatedOriginals();
+        if (defeatedFighters[CHAR_PALM_BEACH_PETE]) {
+            int act = GetCurrentWorldAct();
+            if (act == 0) return CHAR_KIM;
+            if (act == 1) return CHAR_BEBE;
+            if (act == 2) return CHAR_PALE_MOTH;
+            if (act == 3) return CHAR_THE_DICTATOR;
+            return CHAR_AYATOLLAH;
+        }
         if (defeatedFighters[CHAR_WAR_PIG]) {
             if (!defeatedFighters[CHAR_SOCIALIST]) return CHAR_SOCIALIST;
-            if (!defeatedFighters[CHAR_A_NEW_HOPE]) return CHAR_A_NEW_HOPE;
+            if (!defeatedFighters[CHAR_DICK]) return CHAR_DICK;
             if (!defeatedFighters[CHAR_BILLARY]) return CHAR_BILLARY;
-            if (!defeatedFighters[CHAR_PALM_BEACH_PETE]) return CHAR_PALM_BEACH_PETE;
+            if (!defeatedFighters[CHAR_A_NEW_HOPE]) return CHAR_A_NEW_HOPE;
             return CHAR_PALM_BEACH_PETE;
         }
-        if (origDefeated >= 9) {
+        if (origDefeated >= (PLAYABLE_CHARACTER_COUNT - 1)) {
             if (!defeatedFighters[CHAR_SUCKRATERY_RKF]) return CHAR_SUCKRATERY_RKF;
             if (!defeatedFighters[CHAR_THE_PUNDIT]) return CHAR_THE_PUNDIT;
-            if (!defeatedFighters[CHAR_WAR_PIG]) return CHAR_WAR_PIG;
             return CHAR_WAR_PIG;
         }
         for (int step = 0; step < PLAYABLE_CHARACTER_COUNT; step++) {
-            int idx = (startIdx + step) % PLAYABLE_CHARACTER_COUNT;
-            if (idx != (int)p1CharId && !defeatedFighters[idx]) {
-                return (CharacterId)idx;
+            int slot = (startSlot + step + PLAYABLE_CHARACTER_COUNT) % PLAYABLE_CHARACTER_COUNT;
+            int cid = PLAYABLE_ROSTER[slot];
+            if (cid != (int)p1CharId && !defeatedFighters[cid]) {
+                return (CharacterId)cid;
             }
         }
         return CHAR_COASTAL_GOV;
     };
 
-    const float BONUS_CAR_MAX_HP = 1200.0f;
-    float bonusCarHp = BONUS_CAR_MAX_HP;
-    float bonusTimer = 30.0f;
-    bool bonusCarAlarmPlayed = false;
-    int bonusLastStage = 0;
-    float bonusPostTimer = 0.0f;
-    bool bonusBooYaaPlayed = false;
+    auto IsHardBossOpponent = [](CharacterId opp) -> bool {
+        return opp == CHAR_WAR_PIG || opp == CHAR_PALM_BEACH_PETE ||
+               opp == CHAR_KIM || opp == CHAR_BEBE ||
+               opp == CHAR_PALE_MOTH || opp == CHAR_THE_DICTATOR ||
+               opp == CHAR_AYATOLLAH;
+    };
+
+    BonusStageState bonusState{};
+    bool bonusFreeFacingRight = true;
+    InputManager bonusMoveInput;
 
     p2CharId = PickNextAvailableOpponent(1);
     currentStage = GetStageForOpponent(p2CharId);
@@ -218,17 +351,19 @@ int main(int argc, char* argv[]) {
 
     std::unique_ptr<Fighter> p1 = std::make_unique<Fighter>(0, p1CharId, 320.0f);
     std::unique_ptr<Fighter> p2 = std::make_unique<Fighter>(1, p2CharId, 480.0f);
+    VisualsEngine::PrefetchMatchFighters((int)p1CharId, (int)p2CharId);
 
     std::vector<SparkEffect> sparks;
 
     GameState gameState = STATE_SPLASH;
     float stateTimer = 0.0f;
     bool logoSlammed = false;
-    bool enableCrt = true;
+    bool enableCrt = false;
 
     int roundNumber = 1;
     int roundSeconds = 99;
     float roundTickAccum = 0.0f;
+    float simAccum = 0.0f;
     int fightIntroTimer = 100;
     bool fightActive = false;
     bool roundOver = false;
@@ -237,6 +372,12 @@ int main(int argc, char* argv[]) {
     bool p2WasKo = false;
     bool bonusFromEasterEgg = false;
     bool isGamePaused = false;
+
+    bool finishHimTriggeredThisRound = false;
+    int finishHimTimer = 0;
+    int finishHimTargetPlayer = -1;
+    float youWinVoiceTimer = -1.0f;
+    float perfectVoiceTimer = -1.0f;
 
     bool isSecretMode = false;
     int secretStep = 0;
@@ -248,113 +389,844 @@ int main(int argc, char* argv[]) {
     float cameraX = 400.0f;
     float cameraShake = 0.0f;
 
-    while (!WindowShouldClose() && !s_quitRequested) {
-        float dt = GetFrameTime();
-        if (IsKeyPressed(KEY_F2)) enableCrt = !enableCrt;
-        stateTimer += dt;
-        AudioEngine::Instance().Update();
+    auto ResetFightRoundState = [&](bool resetRoundOne) {
+        if (resetRoundOne) {
+            roundNumber = 1;
+        }
+        roundSeconds = 99;
+        roundTickAccum = 0.0f;
+        simAccum = 0.0f;
+        fightIntroTimer = 110;
+        fightActive = false;
+        roundOver = false;
+        matchEndTimer = 0.0f;
+        finishHimTriggeredThisRound = false;
+        finishHimTimer = 0;
+        finishHimTargetPlayer = -1;
+        youWinVoiceTimer = -1.0f;
+        perfectVoiceTimer = -1.0f;
+        ChampionshipEdition::ResetRoundFX();
+        AudioEngine::SetCriticalTempo(false);
+    };
 
-            bool killRequested = WindowShouldClose() || (s_quitRequested != 0);
+    auto AddBonusPopup = [&](const char* txt, float x, float y, Color col) {
+        BonusPopup pop{};
+        pop.alive = true;
+        snprintf(pop.text, sizeof(pop.text), "%s", txt);
+        pop.pos = Vector2{ x, y };
+        pop.life = 0.0f;
+        pop.maxLife = 0.95f;
+        pop.col = col;
+        bonusState.popups.push_back(pop);
+    };
 
-            if (IsKeyPressed(KEY_ESCAPE) || IsKeyDown(KEY_ESCAPE) ||
-                IsKeyPressed(KEY_BACKSPACE) || IsKeyDown(KEY_BACKSPACE) ||
-                IsKeyPressed(KEY_TAB) || IsKeyDown(KEY_TAB)) {
-                killRequested = true;
+    auto SpawnBonusDebris = [&](int kind, float x, float y, float vx, float vy, Color col = WHITE, float maxLife = 1.4f, int targetPile = -1) {
+        BonusDebris d{};
+        d.alive = true;
+        d.kind = kind;
+        d.pos = Vector2{ x, y };
+        d.vel = Vector2{ vx, vy };
+        d.angle = (float)(rand() % 360);
+        d.angVel = (float)((rand() % 380) - 190);
+        d.life = 0.0f;
+        d.maxLife = maxLife;
+        d.col = col;
+        d.targetPile = targetPile;
+        bonusState.debris.push_back(d);
+    };
+
+    auto StartBonusStage = [&](BonusStageType bType, bool fromEasterEgg) {
+        bonusFromEasterEgg = fromEasterEgg;
+        bonusState = BonusStageState{};
+        bonusState.type = bType;
+        bonusState.timer = 30.0f;
+        bonusState.maxTimer = 30.0f;
+        bonusFreeFacingRight = true;
+        bonusMoveInput.Reset();
+        sparks.clear();
+        gameState = STATE_BONUS_CAR;
+        stateTimer = 0.0f;
+
+        float startX = 92.0f;
+        int bgmTrack = BGM_BONUS_CAR;
+
+        if (bType == BONUS_STAGE_TESLA) {
+            bonusState.maxHp = 1350.0f;
+            bonusState.hp = bonusState.maxHp;
+            startX = 96.0f;
+            bgmTrack = BGM_BONUS_CAR;
+        } else if (bType == BONUS_STAGE_POOL_TAR) {
+            bonusState.cracksGoal = 18;
+            bonusState.cracksSealed = 0;
+            bonusState.crackSpawnTimer = 1.38f;
+
+            const float initXs[3] = { 142.0f, 228.0f, 316.0f };
+            for (int i = 0; i < 3; i++) {
+                PoolCrackSlot c{};
+                c.active = true;
+                c.state = 0;
+                c.x = initXs[i];
+                c.y = GROUND_Y + 3.0f + (i % 2) * 5.0f;
+                bonusState.cracks.push_back(c);
             }
+            startX = 72.0f;
+            bgmTrack = BGM_BONUS_POOL;
+        } else if (bType == BONUS_STAGE_BOOK_FIRE) {
+            const float pileXs[4] = { 66.0f, 150.0f, 234.0f, 318.0f };
+            for (int i = 0; i < 4; i++) {
+                bonusState.bookPiles[i].x = pileXs[i];
+                bonusState.bookPiles[i].maxHp = 210.0f;
+                bonusState.bookPiles[i].hp = 210.0f;
+                bonusState.bookPiles[i].hitFlash = 0.0f;
+            }
+            bonusState.villainThrowTimer[0] = 0.45f;
+            bonusState.villainThrowTimer[1] = 1.15f;
+            bonusState.villainThrowTimer[2] = 1.85f;
+            startX = 36.0f;
+            bgmTrack = BGM_BONUS_BOOKS;
+        } else if (bType == BONUS_STAGE_BERLIN_WALL) {
+            bonusState.maxHp = 1620.0f;
+            bonusState.hp = bonusState.maxHp;
+            for (int i = 0; i < 9; i++) bonusState.blockHp[i] = 180.0f;
+            startX = 114.0f;
+            bgmTrack = BGM_BONUS_BERLIN;
+        }
 
-            for (int pad = 0; pad < 4; pad++) {
-                if (IsGamepadAvailable(pad)) {
-                    if (IsGamepadButtonPressed(pad, GAMEPAD_BUTTON_MIDDLE_LEFT) ||
-                        IsGamepadButtonDown(pad, GAMEPAD_BUTTON_MIDDLE_LEFT) ||
-                        IsGamepadButtonPressed(pad, GAMEPAD_BUTTON_MIDDLE) ||
-                        IsGamepadButtonDown(pad, GAMEPAD_BUTTON_MIDDLE)) {
-                        killRequested = true;
-                        break;
+        if (!p1 || p1->GetCharacterId() != p1CharId) {
+            p1 = std::make_unique<Fighter>(0, p1CharId, startX);
+        } else {
+            p1->ResetRound(startX, true);
+        }
+        p1->SetActiveTaunt("", 0);
+        VisualsEngine::PrefetchMatchFighters((int)p1CharId, (int)p1CharId);
+
+        AudioEngine::Instance().SetBgmTrack(bgmTrack);
+        AudioEngine::Instance().PlaySfx(SFX_TITLE_SLAM);
+        AudioEngine::Instance().PlaySfx(SFX_VOICE_FIGHT);
+    };
+
+    auto StepBonusStage = [&](float dt) -> bool {
+        bonusState.elapsed += dt;
+        if (bonusState.targetShake > 0.0f) {
+            bonusState.targetShake = std::max(0.0f, bonusState.targetShake - dt * 3.5f);
+        }
+
+        const RawInputState& raw = inputP1.GetCurrentState();
+        if (raw.right && !raw.left) bonusFreeFacingRight = true;
+        else if (raw.left && !raw.right) bonusFreeFacingRight = false;
+
+        bool anyAttackPressed =
+            inputP1.IsButtonPressed(BTN_LP) || inputP1.IsButtonPressed(BTN_HP) ||
+            inputP1.IsButtonPressed(BTN_LK) || inputP1.IsButtonPressed(BTN_HK) ||
+            inputP1.IsButtonPressed(BTN_SPECIAL);
+        bool anyAttackHeld =
+            raw.lp || raw.hp || raw.lk || raw.hk || raw.special;
+
+        bool activePlay = (!bonusState.cleared && bonusState.timer > 0.0f);
+
+        if (activePlay) {
+            bonusState.timer = std::max(0.0f, bonusState.timer - dt);
+
+            if (bonusState.type == BONUS_STAGE_TESLA) {
+                if (bonusState.gunCooldown > 0.0f) {
+                    bonusState.gunCooldown = std::max(0.0f, bonusState.gunCooldown - dt);
+                }
+                Rectangle carHurtbox = { (float)SCREEN_WIDTH * 0.5f - 88.0f, GROUND_Y - 72.0f, 176.0f, 72.0f };
+                Fighter carDummy(1, CHAR_TECH_VISIONARY, SCREEN_WIDTH * 0.5f);
+                p1->UpdatePhysics(inputP1, carDummy);
+                p1->SetPositionX(std::clamp(p1->GetPosition().x, 26.0f, (float)SCREEN_WIDTH - 26.0f));
+
+                auto applyCarDamage = [&](float dmg, float hitX, float hitY, bool heavy) {
+                    bonusState.hp = std::max(0.0f, bonusState.hp - dmg);
+                    bonusState.targetShake = 1.0f;
+                    cameraShake = heavy ? 5.0f : 2.5f;
+
+                    SparkEffect sp{};
+                    sp.pos = Vector2{ hitX, hitY };
+                    sp.isBlock = false;
+                    sp.alive = true;
+                    sp.frame = 0;
+                    sp.maxFrames = 8;
+                    sparks.push_back(sp);
+
+                    for (int g = 0; g < 4; g++) {
+                        SpawnBonusDebris(0, hitX, hitY, (float)((rand() % 180) - 90), -(float)(70 + (rand() % 110)));
+                    }
+
+                    AudioEngine::Instance().PlaySfx(heavy ? SFX_HIT_HEAVY : SFX_HIT_LIGHT);
+                    AudioEngine::Instance().PlaySfx(SFX_METAL_CRUNCH, (float)(88 + (rand() % 24)) / 100.0f);
+
+                    float hpRatio = bonusState.hp / bonusState.maxHp;
+                    int curTier = 0;
+                    if (hpRatio <= 0.01f)      curTier = 7;
+                    else if (hpRatio <= 0.16f) curTier = 6;
+                    else if (hpRatio <= 0.31f) curTier = 5;
+                    else if (hpRatio <= 0.46f) curTier = 4;
+                    else if (hpRatio <= 0.60f) curTier = 3;
+                    else if (hpRatio <= 0.74f) curTier = 2;
+                    else if (hpRatio <= 0.88f) curTier = 1;
+
+                    if (curTier > bonusState.lastDamageTier) {
+                        bonusState.lastDamageTier = curTier;
+                        AudioEngine::Instance().PlaySfx(SFX_GLASS_BREAK);
+                        if (!bonusState.carAlarmPlayed) {
+                            bonusState.carAlarmPlayed = true;
+                            AudioEngine::Instance().PlaySfx(SFX_CAR_ALARM);
+                        }
+                        float cx = SCREEN_WIDTH * 0.5f;
+                        if (curTier == 2) {
+                            SpawnBonusDebris(1, cx + 10.0f, GROUND_Y - 42.0f, 85.0f, -135.0f, WHITE, 2.2f);
+                            AddBonusPopup("MIRROR SMASHED!", cx, GROUND_Y - 76.0f, Color{ 255, 230, 60, 255 });
+                        } else if (curTier == 4) {
+                            SpawnBonusDebris(4, cx + 45.0f, GROUND_Y - 22.0f, 110.0f, -120.0f, WHITE, 2.4f);
+                            AddBonusPopup("BUMPER RIPPED OFF!", cx, GROUND_Y - 80.0f, Color{ 255, 185, 45, 255 });
+                        } else if (curTier == 5) {
+                            SpawnBonusDebris(2, cx + 28.0f, GROUND_Y - 24.0f, 95.0f, -145.0f, WHITE, 2.8f);
+                            AddBonusPopup("WHEEL POPPED OFF!", cx, GROUND_Y - 82.0f, Color{ 255, 145, 40, 255 });
+                        } else if (curTier == 6) {
+                            AudioEngine::Instance().PlaySfx(SFX_ELEC_SPARK);
+                            SpawnBonusDebris(3, cx - 12.0f, GROUND_Y - 40.0f, -105.0f, -165.0f, WHITE, 2.8f);
+                            SpawnBonusDebris(2, cx - 42.0f, GROUND_Y - 24.0f, -88.0f, -135.0f, WHITE, 2.8f);
+                            AddBonusPopup("DOORS & AXLES GONE!", cx, GROUND_Y - 86.0f, Color{ 80, 235, 255, 255 });
+                        }
+                    }
+
+                    if (bonusState.hp <= 0.0f && !bonusState.cleared) {
+                        bonusState.cleared = true;
+                        SpawnBonusDebris(3, SCREEN_WIDTH * 0.5f, GROUND_Y - 44.0f, 75.0f, -185.0f, WHITE, 3.0f);
+                        SpawnBonusDebris(2, SCREEN_WIDTH * 0.5f - 20.0f, GROUND_Y - 26.0f, -115.0f, -155.0f, WHITE, 3.0f);
+                        AudioEngine::Instance().PlaySfx(SFX_TITLE_SLAM);
+                        AudioEngine::Instance().PlaySfx(SFX_FIREBALL_IMPACT);
+                        AudioEngine::Instance().PlaySfx(SFX_VOICE_PERFECT);
+                        cameraShake = 8.5f;
+                    }
+                };
+
+                Rectangle hitbox{};
+                AttackData atkData{};
+                if (bonusState.gunCooldown <= 0.0f && p1->GetActiveHitbox(hitbox, atkData) && !p1->HasHitConnected()) {
+                    if (CheckCollisionRecs(hitbox, carHurtbox)) {
+                        p1->SetHitConnected(true);
+                        p1->SetHitstop(std::min(4, atkData.hitstopFrames));
+                        bonusState.gunCooldown = 0.22f;
+                        float dmg = atkData.isSpecial ? 35.0f : (atkData.isHeavy ? 27.0f : 23.0f);
+                        applyCarDamage(dmg, hitbox.x + hitbox.width * 0.5f, hitbox.y + hitbox.height * 0.5f, atkData.isHeavy);
+                    }
+                }
+                for (auto& proj : p1->GetProjectiles()) {
+                    if (!proj.active) continue;
+                    Rectangle pBox = { proj.pos.x - proj.width * 0.5f, proj.pos.y - proj.height * 0.5f, proj.width, proj.height };
+                    if (CheckCollisionRecs(pBox, carHurtbox)) {
+                        proj.active = false;
+                        applyCarDamage(35.0f, proj.pos.x, proj.pos.y, true);
+                    }
+                }
+
+            } else if (bonusState.type == BONUS_STAGE_POOL_TAR) {
+
+                RawInputState moveOnly{};
+                moveOnly.up = raw.up;
+                moveOnly.down = raw.down;
+                moveOnly.left = raw.left;
+                moveOnly.right = raw.right;
+                bonusMoveInput.UpdateSimulated(moveOnly, bonusFreeFacingRight);
+                Fighter freeDummy(1, CHAR_TECH_VISIONARY, p1->GetPosition().x + (bonusFreeFacingRight ? 140.0f : -140.0f));
+                p1->UpdatePhysics(bonusMoveInput, freeDummy);
+                if (raw.right && !raw.left) p1->SetPositionX(p1->GetPosition().x + 58.0f * dt);
+                if (raw.left && !raw.right) p1->SetPositionX(p1->GetPosition().x - 58.0f * dt);
+                p1->SetPositionX(std::clamp(p1->GetPosition().x, 26.0f, (float)SCREEN_WIDTH - 26.0f));
+                p1->SetFacingRight(bonusFreeFacingRight);
+                p1->SetActiveTaunt("", 0);
+
+                if (bonusState.gunRecoil > 0.0f) bonusState.gunRecoil = std::max(0.0f, bonusState.gunRecoil - dt * 6.0f);
+                if (bonusState.gunCooldown > 0.0f) bonusState.gunCooldown = std::max(0.0f, bonusState.gunCooldown - dt);
+
+                bonusState.barrelSpawnTimer -= dt;
+                if (bonusState.barrelSpawnTimer <= 0.0f) {
+                    bonusState.barrelSpawnTimer = 2.4f;
+                    RollingBarrel br{};
+                    br.alive = true;
+                    bool fromLeft = ((rand() % 2) == 0);
+                    br.x = fromLeft ? -12.0f : (float)SCREEN_WIDTH + 12.0f;
+                    br.y = 148.0f;
+                    br.vx = fromLeft ? 78.0f : -78.0f;
+                    bonusState.barrels.push_back(br);
+                }
+                for (auto& br : bonusState.barrels) {
+                    if (!br.alive) continue;
+                    br.x += br.vx * dt;
+                    br.angle += (br.vx * dt) * 0.12f;
+                    if (br.x < -24.0f || br.x > SCREEN_WIDTH + 24.0f) br.alive = false;
+                }
+
+                int activeLeaks = 0;
+                for (const auto& c : bonusState.cracks) {
+                    if (c.active && c.state == 0) activeLeaks++;
+                }
+                bool canSpawnMore = ((int)bonusState.cracks.size() < bonusState.cracksGoal);
+                if (activeLeaks == 0 && canSpawnMore && bonusState.crackSpawnTimer > 1.02f) {
+                    bonusState.crackSpawnTimer = 1.02f;
+                }
+                bonusState.crackSpawnTimer -= dt;
+                if (activeLeaks < 3 && canSpawnMore && bonusState.crackSpawnTimer <= 0.0f) {
+                    bonusState.crackSpawnTimer = 1.38f;
+                    float bestX = 56.0f + (float)(rand() % 272);
+                    for (int tries = 0; tries < 10; tries++) {
+                        float cand = 44.0f + (float)(rand() % 296);
+                        bool ok = (fabsf(cand - p1->GetPosition().x) > 36.0f);
+                        for (const auto& c : bonusState.cracks) {
+                            if (c.active && c.state == 0 && fabsf(c.x - cand) < 46.0f) { ok = false; break; }
+                        }
+                        if (ok) { bestX = cand; break; }
+                    }
+                    PoolCrackSlot nc{};
+                    nc.active = true;
+                    nc.state = 0;
+                    nc.x = bestX;
+                    nc.y = GROUND_Y + 2.0f + (float)(rand() % 9);
+                    bonusState.cracks.push_back(nc);
+                }
+
+                auto sealCrack = [&](PoolCrackSlot& c) {
+                    c.state = 1;
+                    c.animTimer = 0.0f;
+                    bonusState.cracksSealed++;
+                    AudioEngine::Instance().PlaySfx(SFX_TAR_SPLAT, (float)(92 + (rand() % 18)) / 100.0f);
+                    for (int k = 0; k < 8; k++) {
+                        SpawnBonusDebris(5, c.x, c.y - 6.0f, (float)((rand() % 150) - 75), -(float)(55 + (rand() % 95)), WHITE, 0.8f);
+                    }
+                    AddBonusPopup("TAR SEALED!", c.x, c.y - 30.0f, Color{ 80, 225, 255, 255 });
+                    if (bonusState.cracksSealed >= bonusState.cracksGoal && !bonusState.cleared) {
+                        bonusState.cleared = true;
+                        AudioEngine::Instance().PlaySfx(SFX_TITLE_SLAM);
+                        AudioEngine::Instance().PlaySfx(SFX_CROWD_CHEER);
+                        AudioEngine::Instance().PlaySfx(SFX_VOICE_PERFECT);
+                        cameraShake = 6.0f;
+                    }
+                };
+
+                if ((anyAttackPressed || anyAttackHeld) && bonusState.gunCooldown <= 0.0f) {
+                    bonusState.gunCooldown = 0.25f;
+                    bonusState.gunRecoil = 1.0f;
+                    float dir = bonusFreeFacingRight ? 1.0f : -1.0f;
+                    Vector2 pPos = p1->GetPosition();
+
+                    for (auto& c : bonusState.cracks) {
+                        if (c.active && c.state == 0) {
+                            float dx = c.x - pPos.x;
+                            if ((dir > 0.0f && dx >= -18.0f && dx <= 52.0f) ||
+                                (dir < 0.0f && dx <= 18.0f && dx >= -52.0f)) {
+                                sealCrack(c);
+                                break;
+                            }
+                        }
+                    }
+
+                    TarGlobShot shot{};
+                    shot.alive = true;
+                    shot.pos = Vector2{ pPos.x + dir * 28.0f, pPos.y - 34.0f };
+                    shot.vel = Vector2{ dir * 255.0f, 95.0f };
+                    bonusState.tarShots.push_back(shot);
+                    AudioEngine::Instance().PlaySfx(SFX_WHOOSH_LIGHT, 1.25f, 0.55f);
+                }
+
+                for (auto& shot : bonusState.tarShots) {
+                    if (!shot.alive) continue;
+                    shot.life += dt;
+                    shot.vel.y += 280.0f * dt;
+                    shot.pos.x += shot.vel.x * dt;
+                    shot.pos.y += shot.vel.y * dt;
+
+                    for (auto& c : bonusState.cracks) {
+                        if (c.active && c.state == 0 && fabsf(shot.pos.x - c.x) <= 34.0f && shot.pos.y >= c.y - 26.0f) {
+                            sealCrack(c);
+                            shot.alive = false;
+                            break;
+                        }
+                    }
+                    if (shot.alive && (shot.pos.y >= GROUND_Y + 12.0f || shot.pos.x < 0.0f || shot.pos.x > SCREEN_WIDTH)) {
+                        for (int k = 0; k < 4; k++) {
+                            SpawnBonusDebris(5, shot.pos.x, GROUND_Y + 4.0f, (float)((rand() % 90) - 45), -(float)(40 + (rand() % 55)), WHITE, 0.55f);
+                        }
+                        shot.alive = false;
+                    }
+                }
+
+                for (auto& c : bonusState.cracks) {
+                    if (!c.active) continue;
+                    c.animTimer += dt;
+                    if (c.state == 1 && c.animTimer >= 0.28f) {
+                        c.state = 2;
+                    }
+                }
+
+            } else if (bonusState.type == BONUS_STAGE_BOOK_FIRE) {
+
+                RawInputState moveOnly{};
+                moveOnly.up = raw.up;
+                moveOnly.down = raw.down;
+                moveOnly.left = raw.left;
+                moveOnly.right = raw.right;
+                bonusMoveInput.UpdateSimulated(moveOnly, bonusFreeFacingRight);
+                Fighter freeDummy(1, CHAR_TECH_VISIONARY, p1->GetPosition().x + (bonusFreeFacingRight ? 140.0f : -140.0f));
+                p1->UpdatePhysics(bonusMoveInput, freeDummy);
+                if (raw.right && !raw.left) p1->SetPositionX(p1->GetPosition().x + 58.0f * dt);
+                if (raw.left && !raw.right) p1->SetPositionX(p1->GetPosition().x - 58.0f * dt);
+                p1->SetPositionX(std::clamp(p1->GetPosition().x, 24.0f, (float)SCREEN_WIDTH - 24.0f));
+                p1->SetFacingRight(bonusFreeFacingRight);
+                p1->SetActiveTaunt("", 0);
+
+                if (bonusState.bucketSwingTimer > 0.0f) bonusState.bucketSwingTimer = std::max(0.0f, bonusState.bucketSwingTimer - dt);
+                if (bonusState.bucketCooldown > 0.0f) bonusState.bucketCooldown = std::max(0.0f, bonusState.bucketCooldown - dt);
+                for (int i = 0; i < 4; i++) {
+                    if (bonusState.bookPiles[i].hitFlash > 0.0f) {
+                        bonusState.bookPiles[i].hitFlash = std::max(0.0f, bonusState.bookPiles[i].hitFlash - dt * 5.0f);
+                    }
+                }
+
+                const float vilXs[3] = { 92.0f, 192.0f, 294.0f };
+                const Color bookCols[4] = {
+                    Color{ 185, 35, 35, 255 }, Color{ 35, 90, 185, 255 },
+                    Color{ 40, 140, 65, 255 }, Color{ 155, 95, 35, 255 }
+                };
+                for (int v = 0; v < 3; v++) {
+                    if (bonusState.villainAnimTimer[v] > 0.0f) bonusState.villainAnimTimer[v] = std::max(0.0f, bonusState.villainAnimTimer[v] - dt);
+                    if (bonusState.villainQuipTimer[v] > 0.0f) bonusState.villainQuipTimer[v] = std::max(0.0f, bonusState.villainQuipTimer[v] - dt);
+
+                    bonusState.villainThrowTimer[v] -= dt;
+                    if (bonusState.villainThrowTimer[v] <= 0.0f) {
+                        bonusState.villainThrowTimer[v] = 2.15f + (float)(rand() % 45) * 0.01f;
+                        bonusState.villainAnimTimer[v] = 0.55f;
+                        bonusState.villainQuipTimer[v] = 0.85f;
+
+                        int bestPile = (v == 0) ? 0 : (v == 1 ? 1 + (rand() % 2) : 3);
+                        for (int k = 0; k < 4; k++) {
+                            int cand = (bestPile + k) % 4;
+                            if (bonusState.bookPiles[cand].hp > 0.0f) { bestPile = cand; break; }
+                        }
+                        float tx = bonusState.bookPiles[bestPile].x;
+                        float flightT = 0.65f;
+                        float vx = (tx - vilXs[v]) / flightT;
+                        float vy = -115.0f;
+                        SpawnBonusDebris(8, vilXs[v], 132.0f, vx, vy, bookCols[rand() % 4], flightT + 0.15f, bestPile);
+                    }
+                }
+
+                if ((anyAttackPressed || anyAttackHeld) && bonusState.bucketCooldown <= 0.0f) {
+                    bonusState.bucketCooldown = 0.44f;
+                    bonusState.bucketSwingTimer = 0.26f;
+                    bonusState.bucketFacingRight = bonusFreeFacingRight;
+                    float dir = bonusFreeFacingRight ? 1.0f : -1.0f;
+                    Vector2 pPos = p1->GetPosition();
+
+                    AudioEngine::Instance().PlaySfx(SFX_WATER_SPLASH, (float)(94 + (rand() % 14)) / 100.0f);
+
+                    for (int w = 0; w < 14; w++) {
+                        float wx = pPos.x + dir * (14.0f + (rand() % 38));
+                        float wy = pPos.y - 40.0f + (rand() % 16);
+                        SpawnBonusDebris(6, wx, wy, dir * (float)(85 + (rand() % 130)), -(float)(35 + (rand() % 80)), WHITE, 0.65f);
+                    }
+
+                    for (auto& d : bonusState.debris) {
+                        if (d.alive && d.kind == 8) {
+                            float dx = d.pos.x - pPos.x;
+                            if ((dir > 0.0f && dx >= -12.0f && dx <= 86.0f) || (dir < 0.0f && dx <= 12.0f && dx >= -86.0f)) {
+                                d.alive = false;
+                                AddBonusPopup("BOOK SAVED!", d.pos.x, d.pos.y - 10.0f, Color{ 90, 245, 130, 255 });
+                            }
+                        }
+                    }
+
+                    bool hitAnyFire = false;
+                    for (int i = 0; i < 4; i++) {
+                        auto& pile = bonusState.bookPiles[i];
+                        if (pile.hp <= 0.0f) continue;
+                        float dx = pile.x - pPos.x;
+                        if ((dir > 0.0f && dx >= -16.0f && dx <= 72.0f) ||
+                            (dir < 0.0f && dx <= 16.0f && dx >= -72.0f)) {
+                            pile.hp = std::max(0.0f, pile.hp - 22.5f);
+                            pile.hitFlash = 1.0f;
+                            hitAnyFire = true;
+                            for (int s = 0; s < 5; s++) {
+                                SpawnBonusDebris(7, pile.x + (rand() % 28 - 14), GROUND_Y - 26.0f, (float)(rand() % 26 - 13), -(float)(38 + rand() % 36), WHITE, 0.85f);
+                            }
+                            if (pile.hp <= 0.0f) {
+                                AddBonusPopup("PILE EXTINGUISHED!", pile.x, GROUND_Y - 68.0f, Color{ 80, 250, 130, 255 });
+                            } else {
+                                AddBonusPopup("DOUSED!", pile.x, GROUND_Y - 60.0f, Color{ 95, 220, 255, 255 });
+                            }
+                        }
+                    }
+                    if (hitAnyFire) {
+                        AudioEngine::Instance().PlaySfx(SFX_STEAM_HISS, (float)(92 + (rand() % 18)) / 100.0f);
+                    }
+
+                    bool allOut = true;
+                    for (int i = 0; i < 4; i++) {
+                        if (bonusState.bookPiles[i].hp > 0.0f) { allOut = false; break; }
+                    }
+                    if (allOut && !bonusState.cleared) {
+                        bonusState.cleared = true;
+                        AudioEngine::Instance().PlaySfx(SFX_TITLE_SLAM);
+                        AudioEngine::Instance().PlaySfx(SFX_CROWD_CHEER);
+                        AudioEngine::Instance().PlaySfx(SFX_VOICE_PERFECT);
+                        cameraShake = 6.5f;
+                    }
+                }
+
+            } else if (bonusState.type == BONUS_STAGE_BERLIN_WALL) {
+                if (bonusState.gunCooldown > 0.0f) {
+                    bonusState.gunCooldown = std::max(0.0f, bonusState.gunCooldown - dt);
+                }
+                float wallCenterX = (float)SCREEN_WIDTH * 0.5f + 16.0f;
+                Rectangle wallHurtbox = { wallCenterX - 74.0f, GROUND_Y - 102.0f, 148.0f, 102.0f };
+                Fighter wallDummy(1, CHAR_TECH_VISIONARY, wallCenterX);
+                p1->UpdatePhysics(inputP1, wallDummy);
+                p1->SetPositionX(std::clamp(p1->GetPosition().x, 26.0f, (float)SCREEN_WIDTH - 26.0f));
+
+                auto spawnEastGermanWave = [&](int count) {
+                    for (int k = 0; k < count; k++) {
+                        EastGermanRunner eg{};
+                        eg.active = true;
+                        eg.variant = (int)(bonusState.eastGermans.size() + k) % 4;
+                        eg.x = wallCenterX + (float)((k - count / 2) * 14);
+                        eg.y = GROUND_Y - 2.0f + (float)((k % 3) * 3 - 3);
+                        bool goLeft = ((bonusState.eastGermans.size() % 2) == 0);
+                        eg.facingRight = !goLeft;
+                        eg.vx = (goLeft ? -1.0f : 1.0f) * (46.0f + (float)(rand() % 42));
+                        eg.animPhase = (float)(rand() % 100) * 0.06f;
+                        bonusState.eastGermans.push_back(eg);
+                    }
+                };
+
+                auto applyWallDamage = [&](float dmg, float hitX, float hitY, bool isKick) {
+                    bonusState.hp = std::max(0.0f, bonusState.hp - dmg);
+                    bonusState.targetShake = 1.0f;
+                    cameraShake = isKick ? 5.5f : 3.0f;
+
+                    for (int b = 0; b < 9; b++) {
+                        int order = (b * 5 + 2) % 9;
+                        if (bonusState.blockHp[order] > 0.0f) {
+                            bonusState.blockHp[order] = std::max(0.0f, bonusState.blockHp[order] - dmg);
+                            break;
+                        }
+                    }
+
+                    SparkEffect sp{};
+                    sp.pos = Vector2{ hitX, hitY };
+                    sp.isBlock = false;
+                    sp.alive = true;
+                    sp.frame = 0;
+                    sp.maxFrames = 8;
+                    sparks.push_back(sp);
+
+                    const Color grafCols[4] = {
+                        Color{ 255, 65, 195, 255 }, Color{ 50, 235, 255, 255 },
+                        Color{ 255, 230, 45, 255 }, Color{ 120, 255, 90, 255 }
+                    };
+                    for (int c = 0; c < 4; c++) {
+                        SpawnBonusDebris(9, hitX, hitY, (float)((rand() % 190) - 95), -(float)(75 + (rand() % 120)), WHITE, 1.8f);
+                        SpawnBonusDebris(10, hitX, hitY, (float)((rand() % 210) - 105), -(float)(85 + (rand() % 130)), grafCols[c % 4], 1.6f);
+                    }
+
+                    AudioEngine::Instance().PlaySfx(isKick ? SFX_HIT_HEAVY : SFX_HIT_LIGHT);
+                    AudioEngine::Instance().PlaySfx(SFX_WALL_CRUMBLE, (float)(90 + (rand() % 22)) / 100.0f);
+
+                    float hpRatio = bonusState.hp / bonusState.maxHp;
+                    int tier = (hpRatio <= 0.0f) ? 3 : (hpRatio <= 0.34f ? 2 : (hpRatio <= 0.68f ? 1 : 0));
+                    if (tier > bonusState.lastDamageTier) {
+                        bonusState.lastDamageTier = tier;
+                        if (tier == 1) AddBonusPopup("WALL CRACKING!", wallCenterX, GROUND_Y - 88.0f, Color{ 255, 230, 60, 255 });
+                        else if (tier == 2) AddBonusPopup("ALMOST THROUGH!", wallCenterX, GROUND_Y - 92.0f, Color{ 90, 240, 255, 255 });
+                    }
+
+                    if (bonusState.hp <= 0.0f && !bonusState.cleared) {
+                        bonusState.cleared = true;
+                        for (int b = 0; b < 9; b++) bonusState.blockHp[b] = 0.0f;
+                        for (int c = 0; c < 14; c++) {
+                            SpawnBonusDebris(9, wallCenterX + (rand() % 50 - 25), GROUND_Y - 45.0f, (float)((rand() % 240) - 120), -(float)(90 + (rand() % 150)), WHITE, 2.6f);
+                            SpawnBonusDebris(10, wallCenterX + (rand() % 50 - 25), GROUND_Y - 45.0f, (float)((rand() % 240) - 120), -(float)(90 + (rand() % 150)), grafCols[c % 4], 2.4f);
+                        }
+                        spawnEastGermanWave(6);
+                        AddBonusPopup("FREIHEIT!! EAST GERMANS FREE!", wallCenterX, GROUND_Y - 96.0f, Color{ 255, 235, 55, 255 });
+                        AudioEngine::Instance().PlaySfx(SFX_TITLE_SLAM);
+                        AudioEngine::Instance().PlaySfx(SFX_WALL_CRUMBLE, 0.82f);
+                        AudioEngine::Instance().PlaySfx(SFX_CROWD_CHEER);
+                        AudioEngine::Instance().PlaySfx(SFX_VOICE_PERFECT);
+                        cameraShake = 9.0f;
+                    }
+                };
+
+                Rectangle hitbox{};
+                AttackData atkData{};
+                if (bonusState.gunCooldown <= 0.0f && p1->GetActiveHitbox(hitbox, atkData) && !p1->HasHitConnected()) {
+                    if (CheckCollisionRecs(hitbox, wallHurtbox)) {
+                        p1->SetHitConnected(true);
+                        p1->SetHitstop(std::min(4, atkData.hitstopFrames));
+                        bonusState.gunCooldown = 0.22f;
+                        bool isKick = (atkData.moveType == MOVE_LIGHT_KICK || atkData.moveType == MOVE_HEAVY_KICK);
+                        float dmg = atkData.isSpecial ? 35.0f : (isKick ? (atkData.isHeavy ? 28.5f : 25.5f) : (atkData.isHeavy ? 26.0f : 22.5f));
+                        applyWallDamage(dmg, hitbox.x + hitbox.width * 0.5f, hitbox.y + hitbox.height * 0.5f, isKick || atkData.isHeavy);
+                    }
+                }
+                for (auto& proj : p1->GetProjectiles()) {
+                    if (!proj.active) continue;
+                    Rectangle pBox = { proj.pos.x - proj.width * 0.5f, proj.pos.y - proj.height * 0.5f, proj.width, proj.height };
+                    if (CheckCollisionRecs(pBox, wallHurtbox)) {
+                        proj.active = false;
+                        applyWallDamage(35.0f, proj.pos.x, proj.pos.y, true);
                     }
                 }
             }
+        } else {
 
-            if (inputP1.IsButtonPressed(BTN_SELECT) || inputP1.IsButtonHeld(BTN_SELECT)) {
-                killRequested = true;
+            if (!bonusState.endVoicePlayed) {
+                bonusState.endVoicePlayed = true;
+                if (bonusState.cleared) {
+                    AudioEngine::Instance().PlaySfx(SFX_VOICE_YOU_WIN);
+                } else {
+                    AudioEngine::Instance().PlaySfx(SFX_VOICE_VETOED);
+                }
             }
 
-            if (killRequested) {
-                break;
+            bonusState.postTimer += dt;
+            RawInputState idleRaw{};
+            bonusMoveInput.UpdateSimulated(idleRaw, bonusFreeFacingRight);
+            Fighter idleDummy(1, CHAR_TECH_VISIONARY, SCREEN_WIDTH * 0.5f);
+            p1->UpdatePhysics(bonusMoveInput, idleDummy);
+            p1->SetPositionX(std::clamp(p1->GetPosition().x, 26.0f, (float)SCREEN_WIDTH - 26.0f));
+
+            if (bonusState.type == BONUS_STAGE_BERLIN_WALL && bonusState.cleared) {
+                bonusState.runnerSpawnTimer -= dt;
+                if (bonusState.runnerSpawnTimer <= 0.0f && bonusState.eastGermans.size() < 14) {
+                    bonusState.runnerSpawnTimer = 0.28f;
+                    float wallCenterX = (float)SCREEN_WIDTH * 0.5f + 16.0f;
+                    int idx = (int)bonusState.eastGermans.size();
+                    EastGermanRunner eg{};
+                    eg.active = true;
+                    eg.variant = idx % 4;
+                    eg.x = wallCenterX + (float)((rand() % 18) - 9);
+                    eg.y = GROUND_Y - 1.0f + (float)((rand() % 8) - 3);
+                    bool goLeft = ((idx % 2) == 0);
+                    eg.facingRight = !goLeft;
+                    eg.vx = (goLeft ? -1.0f : 1.0f) * (50.0f + (float)(rand() % 38));
+                    bonusState.eastGermans.push_back(eg);
+                    const char* joyQuips[3] = { "BANANAS!!", "PRETZELS!!", "FREIHEIT!!" };
+                    float popX = wallCenterX + (goLeft ? -48.0f : 48.0f) + (float)((idx % 3) * 14 - 14);
+                    float popY = GROUND_Y - 56.0f - (float)((idx % 3) * 11);
+                    AddBonusPopup(joyQuips[idx % 3], popX, popY, Color{ 110, 255, 140, 255 });
+                }
             }
 
-        if (IsKeyPressed(KEY_F11) || ((IsKeyDown(KEY_LEFT_ALT) || IsKeyDown(KEY_RIGHT_ALT)) && IsKeyPressed(KEY_ENTER))) {
-            ToggleBorderlessWindowed();
+            float outroLen = (bonusState.type == BONUS_STAGE_BERLIN_WALL && bonusState.cleared) ? 3.6f : 2.3f;
+            if (bonusState.postTimer >= outroLen) {
+                return true;
+            }
         }
 
-        if (IsKeyPressed(KEY_F1)) {
-            enableCrt = !enableCrt;
+        for (auto& eg : bonusState.eastGermans) {
+            if (!eg.active) continue;
+            eg.x += eg.vx * dt;
+            eg.animPhase += dt * 15.0f;
+            if (eg.x < -30.0f || eg.x > SCREEN_WIDTH + 30.0f) eg.active = false;
+        }
+
+        for (auto& d : bonusState.debris) {
+            if (!d.alive) continue;
+            d.life += dt;
+            if (d.life >= d.maxLife) {
+                d.alive = false;
+                continue;
+            }
+            if (d.kind == 7) {
+                d.pos.x += d.vel.x * dt;
+                d.pos.y += d.vel.y * dt;
+            } else {
+                d.vel.y += 320.0f * dt;
+                d.pos.x += d.vel.x * dt;
+                d.pos.y += d.vel.y * dt;
+                d.angle += d.angVel * dt;
+                if (d.kind == 8 && d.pos.y >= GROUND_Y - 14.0f) {
+
+                    if (d.targetPile >= 0 && d.targetPile < 4) {
+                        auto& pile = bonusState.bookPiles[d.targetPile];
+                        if (pile.hp > 0.0f) {
+                            pile.hp = std::min(pile.maxHp, pile.hp + 2.5f);
+                        }
+                    }
+                    d.alive = false;
+                } else if (d.pos.y >= GROUND_Y + 2.0f) {
+                    d.pos.y = GROUND_Y + 2.0f;
+                    d.vel.y = -fabsf(d.vel.y) * 0.42f;
+                    d.vel.x *= 0.78f;
+                }
+            }
+        }
+
+        for (auto& pop : bonusState.popups) {
+            if (!pop.alive) continue;
+            pop.life += dt;
+            pop.pos.y -= 22.0f * dt;
+            if (pop.life >= pop.maxLife) pop.alive = false;
+        }
+
+        for (auto& sp : sparks) {
+            if (!sp.alive) continue;
+            sp.frame++;
+            if (sp.frame >= sp.maxFrames) sp.alive = false;
+        }
+        if (cameraShake > 0.01f) cameraShake *= 0.88f;
+        else cameraShake = 0.0f;
+        return false;
+    };
+
+    while (!WindowShouldClose() && !s_quitRequested) {
+        float dt = GetFrameTime();
+        bool crtTogglePressed = IsKeyPressed(KEY_F1) || IsKeyPressed(KEY_F2);
+        for (int pad = 0; pad < 4; pad++) {
+            if (IsGamepadAvailable(pad) && IsGamepadButtonPressed(pad, GAMEPAD_BUTTON_RIGHT_THUMB)) {
+                crtTogglePressed = true;
+            }
+        }
+        if (crtTogglePressed) enableCrt = !enableCrt;
+        stateTimer += dt;
+        AudioEngine::Instance().Update();
+
+        bool killRequested = WindowShouldClose() || (s_quitRequested != 0);
+        if (IsKeyPressed(KEY_ESCAPE) && gameState != STATE_SECRET_SELECT) {
+            killRequested = true;
+        }
+        if (IsKeyDown(KEY_BACKSPACE) && IsKeyDown(KEY_ENTER)) {
+            killRequested = true;
+        }
+        for (int pad = 0; pad < 4; pad++) {
+            if (!IsGamepadAvailable(pad)) continue;
+            if (IsGamepadButtonDown(pad, GAMEPAD_BUTTON_MIDDLE_LEFT) &&
+                IsGamepadButtonDown(pad, GAMEPAD_BUTTON_MIDDLE_RIGHT)) {
+                killRequested = true;
+                break;
+            }
+        }
+        if (killRequested) {
+            break;
+        }
+
+#if !defined(GRAPHICS_API_OPENGL_ES2) && !defined(__aarch64__)
+        mainLoopStarted = true;
+#endif
+        if (IsKeyPressed(KEY_F11) || ((IsKeyDown(KEY_LEFT_ALT) || IsKeyDown(KEY_RIGHT_ALT)) && IsKeyPressed(KEY_ENTER))) {
+            ToggleAppFullscreen();
         }
 
         if (IsKeyPressed(KEY_F12)) {
             TakeScreenshot("screenshot.png");
         }
 
+        static bool s_selectTapPending = false;
+        bool anySelectPressed = IsKeyPressed(KEY_BACKSPACE);
+        bool anySelectDown = IsKeyDown(KEY_BACKSPACE);
+        bool anySelectChordModifier = IsKeyDown(KEY_ENTER) || IsKeyDown(KEY_Q) || IsKeyDown(KEY_R);
+        for (int pad = 0; pad < 4; pad++) {
+            if (!IsGamepadAvailable(pad)) continue;
+            if (IsGamepadButtonPressed(pad, GAMEPAD_BUTTON_MIDDLE_LEFT)) anySelectPressed = true;
+            if (IsGamepadButtonDown(pad, GAMEPAD_BUTTON_MIDDLE_LEFT)) anySelectDown = true;
+            if (IsGamepadButtonDown(pad, GAMEPAD_BUTTON_MIDDLE_RIGHT) ||
+                IsGamepadButtonDown(pad, GAMEPAD_BUTTON_LEFT_TRIGGER_1) ||
+                IsGamepadButtonDown(pad, GAMEPAD_BUTTON_RIGHT_TRIGGER_1)) {
+                anySelectChordModifier = true;
+            }
+        }
+        if (anySelectPressed && (gameState == STATE_SPLASH || gameState == STATE_SELECT_MAP)) {
+            s_selectTapPending = true;
+        }
+        if (anySelectDown && anySelectChordModifier) {
+            s_selectTapPending = false;
+        }
+        bool cycleTurbo = IsKeyPressed(KEY_TAB);
+        if (!anySelectDown && s_selectTapPending) {
+            s_selectTapPending = false;
+            cycleTurbo = true;
+        }
+        if ((gameState == STATE_SPLASH || gameState == STATE_SELECT_MAP) && cycleTurbo) {
+            ChampionshipEdition::s_turboSpeed = (TurboSpeed)(((int)ChampionshipEdition::s_turboSpeed + 1) % 3);
+            AudioEngine::Instance().PlaySfx(SFX_SELECT_CURSOR, 1.15f, 1.0f);
+        }
+
+        if ((gameState == STATE_SPLASH || gameState == STATE_SELECT_MAP || gameState == STATE_WORLD_MAP ||
+             gameState == STATE_BONUS_CAR) && inputP1.IsSecretMenuComboPressed()) {
+            s_selectTapPending = false;
+            isGamePaused = false;
+            bonusFromEasterEgg = false;
+            AudioEngine::Instance().PlaySfx(SFX_COIN);
+            AudioEngine::Instance().PlaySfx(SFX_SUPER_FREEZE, 1.0f, 0.9f);
+            AudioEngine::Instance().SetBgmTrack(BGM_CHAR_SELECT);
+            gameState = STATE_SECRET_SELECT;
+            isSecretMode = true;
+            secretStep = 0;
+            secretP1 = (int)p1CharId;
+            secretP2 = (int)p2CharId;
+            stateTimer = 0.0f;
+        }
+
+        if ((gameState == STATE_SPLASH || gameState == STATE_SELECT_MAP || gameState == STATE_WORLD_MAP ||
+             gameState == STATE_SECRET_SELECT || gameState == STATE_BONUS_CAR) && inputP1.IsTriggerEasterEggPressed()) {
+            s_selectTapPending = false;
+            isGamePaused = false;
+            BonusStageType chosen = (BonusStageType)(easterEggBonusCursor % BONUS_STAGE_COUNT);
+            easterEggBonusCursor = (easterEggBonusCursor + 1) % BONUS_STAGE_COUNT;
+            StartBonusStage(chosen, true);
+        }
+
         switch (gameState) {
         case STATE_SPLASH: {
             if (!logoSlammed && stateTimer >= 0.8f) {
                 logoSlammed = true;
-                cameraShake = 4.0f;
+                cameraShake = 4.5f;
                 AudioEngine::Instance().PlaySfx(SFX_TITLE_SLAM);
+                AudioEngine::Instance().PlaySfx(SFX_VOICE_TITLE);
             }
 
-                inputP1.Update(0, true);
+            inputP1.Update(0, true);
 
-                if (inputP1.IsSecretMenuComboPressed()) {
-                    AudioEngine::Instance().PlaySfx(SFX_COIN);
-                    AudioEngine::Instance().PlaySfx(SFX_VOICE_HADOUKEN, 0.8f);
-                    gameState = STATE_SECRET_SELECT;
-                    isSecretMode = true;
-                    secretStep = 0;
-                    secretP1 = (int)p1CharId;
-                    secretP2 = (int)p2CharId;
-                    stateTimer = 0.0f;
+            bool startPressed = false;
+            if (IsKeyPressed(KEY_ENTER) || IsKeyPressed(KEY_SPACE) || IsKeyPressed(KEY_ONE) || IsKeyPressed(KEY_FIVE) ||
+                IsKeyPressed(KEY_U) || IsKeyPressed(KEY_I) || IsKeyPressed(KEY_C) || IsKeyPressed(KEY_V)) {
+                startPressed = true;
+            }
+            for (int pad = 0; pad < 4; pad++) {
+                if (!IsGamepadAvailable(pad)) continue;
+                if (IsGamepadButtonPressed(pad, GAMEPAD_BUTTON_MIDDLE_RIGHT) ||
+                    IsGamepadButtonPressed(pad, GAMEPAD_BUTTON_RIGHT_FACE_DOWN) ||
+                    IsGamepadButtonPressed(pad, GAMEPAD_BUTTON_RIGHT_FACE_RIGHT) ||
+                    IsGamepadButtonPressed(pad, GAMEPAD_BUTTON_RIGHT_FACE_LEFT) ||
+                    IsGamepadButtonPressed(pad, GAMEPAD_BUTTON_RIGHT_FACE_UP)) {
+                    startPressed = true;
                     break;
                 }
+            }
+            if (inputP1.IsButtonPressed(BTN_START) ||
+                inputP1.IsButtonPressed(BTN_LP) || inputP1.IsButtonPressed(BTN_HP) ||
+                inputP1.IsButtonPressed(BTN_LK) || inputP1.IsButtonPressed(BTN_HK)) {
+                startPressed = true;
+            }
 
-                bool startPressed = false;
-                if (IsKeyPressed(KEY_ENTER) || IsKeyPressed(KEY_SPACE) || IsKeyPressed(KEY_ONE) ||
-                    IsKeyPressed(KEY_U) || IsKeyPressed(KEY_I) || IsKeyPressed(KEY_C) || IsKeyPressed(KEY_V)) {
-                    startPressed = true;
-                }
-                for (int pad = 0; pad < 4; pad++) {
-                    if (!IsGamepadAvailable(pad)) continue;
-                    if (IsGamepadButtonPressed(pad, GAMEPAD_BUTTON_MIDDLE_RIGHT) ||
-                        IsGamepadButtonPressed(pad, GAMEPAD_BUTTON_RIGHT_FACE_DOWN) ||
-                        IsGamepadButtonPressed(pad, GAMEPAD_BUTTON_RIGHT_FACE_RIGHT) ||
-                        IsGamepadButtonPressed(pad, GAMEPAD_BUTTON_RIGHT_FACE_LEFT) ||
-                        IsGamepadButtonPressed(pad, GAMEPAD_BUTTON_RIGHT_FACE_UP)) {
-                        startPressed = true;
-                        break;
-                    }
-                }
-                if (inputP1.IsButtonPressed(BTN_START) || inputP1.IsButtonPressed(BTN_COIN) ||
-                    inputP1.IsButtonPressed(BTN_LP) || inputP1.IsButtonPressed(BTN_HP) ||
-                    inputP1.IsButtonPressed(BTN_LK) || inputP1.IsButtonPressed(BTN_HK)) {
-                    startPressed = true;
-                }
-
-                if (startPressed) {
-                    AudioEngine::Instance().PlaySfx(SFX_COIN);
-                    gameState = STATE_SELECT_MAP;
-                    isSecretMode = false;
-                    continuesRemaining = 2;
-                    ChampionshipEdition::s_continuesRemaining = 2;
-                    playerLocked = false;
-                    opponentLocked = false;
-                    ChampionshipEdition::s_opponentLocked = false;
-                    choosingOpponent = false;
-                    p1CharId = CHAR_COMMANDER;
-                    p2CharId = PickNextAvailableOpponent(1);
-                    currentStage = homeStages[(int)p1CharId];
-                    stageMgr.SetStage(currentStage);
-                    stateTimer = 0.0f;
-                }
-
+            if (startPressed) {
+                AudioEngine::Instance().PlaySfx(SFX_COIN);
+                AudioEngine::Instance().SetBgmTrack(BGM_CHAR_SELECT);
+                gameState = STATE_SELECT_MAP;
+                isSecretMode = false;
+                continuesRemaining = 2;
+                ChampionshipEdition::s_continuesRemaining = 2;
+                playerLocked = false;
+                opponentLocked = false;
+                ChampionshipEdition::s_opponentLocked = false;
+                choosingOpponent = false;
+                p1CharId = CHAR_COMMANDER;
+                p2CharId = PickNextAvailableOpponent(1);
+                currentStage = homeStages[(int)p1CharId];
+                stageMgr.SetStage(currentStage);
+                stateTimer = 0.0f;
+            }
             break;
         }
 
@@ -364,22 +1236,9 @@ int main(int argc, char* argv[]) {
 
             int origDefeated = CountDefeatedOriginals();
 
-            if (defeatedFighters[CHAR_WAR_PIG]) {
-                opponentLocked = true;
-                ChampionshipEdition::s_opponentLocked = true;
-                if (!defeatedFighters[CHAR_SOCIALIST]) {
-                    p2CharId = CHAR_SOCIALIST;
-                    currentStage = STAGE_WTC_PLAZA;
-                } else if (!defeatedFighters[CHAR_A_NEW_HOPE]) {
-                    p2CharId = CHAR_A_NEW_HOPE;
-                    currentStage = STAGE_CHICAGO_WRIGLEY;
-                } else if (!defeatedFighters[CHAR_BILLARY]) {
-                    p2CharId = CHAR_BILLARY;
-                    currentStage = STAGE_COMET_PING_PONG;
-                } else if (!defeatedFighters[CHAR_PALM_BEACH_PETE]) {
-                    p2CharId = CHAR_PALM_BEACH_PETE;
-                    currentStage = STAGE_FLORIDA_KEYS;
-                } else {
+            if (defeatedFighters[CHAR_PALM_BEACH_PETE]) {
+                worldActIndex = GetCurrentWorldAct();
+                if (worldActIndex >= 5) {
                     if (p1CharId == CHAR_COMMANDER && !isSecretMode) {
                         gameState = STATE_CTHULHU_ENDING;
                         stateTimer = 0.0f;
@@ -391,38 +1250,64 @@ int main(int argc, char* argv[]) {
                         AudioEngine::Instance().StopBgm();
                         AudioEngine::Instance().PlaySfx(SFX_JESUS_FANFARE);
                     }
-                    break;
+                } else {
+                    gameState = STATE_WORLD_MAP;
+                    stateTimer = 0.0f;
+                    AudioEngine::Instance().SetBgmTrack(BGM_WORLD_CONFLICT_MAP);
+                    AudioEngine::Instance().PlaySfx(SFX_VOICE_GLOBAL_CONFLICT);
                 }
-                stageMgr.SetStage(currentStage);
-            } else if (origDefeated >= 9) {
+                break;
+            }
+
+            if (defeatedFighters[CHAR_WAR_PIG]) {
                 opponentLocked = true;
                 ChampionshipEdition::s_opponentLocked = true;
+                AudioEngine::Instance().SetBgmTrack(BGM_US_MAP);
+                if (!defeatedFighters[CHAR_SOCIALIST]) {
+                    p2CharId = CHAR_SOCIALIST;
+                    currentStage = STAGE_WTC_PLAZA;
+                } else if (!defeatedFighters[CHAR_DICK]) {
+                    p2CharId = CHAR_DICK;
+                    currentStage = STAGE_WYOMING_RODEO;
+                } else if (!defeatedFighters[CHAR_BILLARY]) {
+                    p2CharId = CHAR_BILLARY;
+                    currentStage = STAGE_COMET_PING_PONG;
+                } else if (!defeatedFighters[CHAR_A_NEW_HOPE]) {
+                    p2CharId = CHAR_A_NEW_HOPE;
+                    currentStage = STAGE_CHICAGO_WRIGLEY;
+                } else {
+                    p2CharId = CHAR_PALM_BEACH_PETE;
+                    currentStage = STAGE_FLORIDA_KEYS;
+                }
+                stageMgr.SetStage(currentStage);
+            } else if (origDefeated >= (PLAYABLE_CHARACTER_COUNT - 1)) {
+                opponentLocked = true;
+                ChampionshipEdition::s_opponentLocked = true;
+                AudioEngine::Instance().SetBgmTrack(BGM_CHAR_SELECT);
                 if (!defeatedFighters[CHAR_SUCKRATERY_RKF]) {
                     p2CharId = CHAR_SUCKRATERY_RKF;
                     currentStage = STAGE_PRESS_BRIEFING;
                 } else if (!defeatedFighters[CHAR_THE_PUNDIT]) {
                     p2CharId = CHAR_THE_PUNDIT;
                     currentStage = STAGE_ENN_NEWS_STUDIO;
-                } else if (!defeatedFighters[CHAR_WAR_PIG]) {
+                } else {
                     p2CharId = CHAR_WAR_PIG;
                     currentStage = STAGE_PENTAGON_ALTAR;
-                } else {
-                    gameState = STATE_MATCH_OVER;
-                    stateTimer = 0.0f;
-                    break;
                 }
                 stageMgr.SetStage(currentStage);
             } else if (!playerLocked) {
-                int p1Col = (int)p1CharId % 5;
-                int p1Row = (int)p1CharId / 5;
+                AudioEngine::Instance().SetBgmTrack(BGM_CHAR_SELECT);
+                int slot = GetPlayableSlotForChar((int)p1CharId);
+                int p1Col = slot % 8;
+                int p1Row = slot / 8;
                 bool p1Changed = false;
 
                 if (IsKeyPressed(KEY_LEFT) || IsKeyPressed(KEY_A) || inputP1.IsLeftPressed()) {
-                    p1Col = (p1Col + 4) % 5;
+                    p1Col = (p1Col + 7) % 8;
                     p1Changed = true;
                 }
                 if (IsKeyPressed(KEY_RIGHT) || IsKeyPressed(KEY_D) || inputP1.IsRightPressed()) {
-                    p1Col = (p1Col + 1) % 5;
+                    p1Col = (p1Col + 1) % 8;
                     p1Changed = true;
                 }
                 if (IsKeyPressed(KEY_UP) || IsKeyPressed(KEY_W) || inputP1.IsUpPressed() ||
@@ -432,7 +1317,7 @@ int main(int argc, char* argv[]) {
                 }
 
                 if (p1Changed) {
-                    p1CharId = (CharacterId)(p1Row * 5 + p1Col);
+                    p1CharId = (CharacterId)PLAYABLE_ROSTER[p1Row * 8 + p1Col];
                     currentStage = homeStages[(int)p1CharId];
                     stageMgr.SetStage(currentStage);
                     AudioEngine::Instance().PlaySfx(SFX_SELECT_CURSOR);
@@ -440,25 +1325,25 @@ int main(int argc, char* argv[]) {
             } else {
                 opponentLocked = false;
                 ChampionshipEdition::s_opponentLocked = false;
+                AudioEngine::Instance().SetBgmTrack(BGM_CHAR_SELECT);
                 bool p2Changed = false;
+                int curSlot = GetPlayableSlotForChar((int)p2CharId);
 
                 if (IsKeyPressed(KEY_RIGHT) || IsKeyPressed(KEY_D) || inputP1.IsRightPressed()) {
-                    int cur = (int)p2CharId;
                     for (int step = 1; step < PLAYABLE_CHARACTER_COUNT; step++) {
-                        int next = (cur + step) % PLAYABLE_CHARACTER_COUNT;
-                        if (next != (int)p1CharId && !defeatedFighters[next]) {
-                            p2CharId = (CharacterId)next;
+                        int nextCid = PLAYABLE_ROSTER[(curSlot + step) % PLAYABLE_CHARACTER_COUNT];
+                        if (nextCid != (int)p1CharId && !defeatedFighters[nextCid]) {
+                            p2CharId = (CharacterId)nextCid;
                             p2Changed = true;
                             break;
                         }
                     }
                 }
                 if (IsKeyPressed(KEY_LEFT) || IsKeyPressed(KEY_A) || inputP1.IsLeftPressed()) {
-                    int cur = (int)p2CharId;
                     for (int step = 1; step < PLAYABLE_CHARACTER_COUNT; step++) {
-                        int prev = (cur - step + PLAYABLE_CHARACTER_COUNT) % PLAYABLE_CHARACTER_COUNT;
-                        if (prev != (int)p1CharId && !defeatedFighters[prev]) {
-                            p2CharId = (CharacterId)prev;
+                        int prevCid = PLAYABLE_ROSTER[(curSlot - step + PLAYABLE_CHARACTER_COUNT) % PLAYABLE_CHARACTER_COUNT];
+                        if (prevCid != (int)p1CharId && !defeatedFighters[prevCid]) {
+                            p2CharId = (CharacterId)prevCid;
                             p2Changed = true;
                             break;
                         }
@@ -466,11 +1351,11 @@ int main(int argc, char* argv[]) {
                 }
                 if (IsKeyPressed(KEY_UP) || IsKeyPressed(KEY_W) || inputP1.IsUpPressed() ||
                     IsKeyPressed(KEY_DOWN) || IsKeyPressed(KEY_S) || inputP1.IsDownPressed()) {
-                    int target = ((int)p2CharId + 5) % PLAYABLE_CHARACTER_COUNT;
+                    int targetSlot = (curSlot + 8) % PLAYABLE_CHARACTER_COUNT;
                     for (int step = 0; step < PLAYABLE_CHARACTER_COUNT; step++) {
-                        int cand = (target + step) % PLAYABLE_CHARACTER_COUNT;
-                        if (cand != (int)p1CharId && !defeatedFighters[cand]) {
-                            p2CharId = (CharacterId)cand;
+                        int candCid = PLAYABLE_ROSTER[(targetSlot + step) % PLAYABLE_CHARACTER_COUNT];
+                        if (candCid != (int)p1CharId && !defeatedFighters[candCid]) {
+                            p2CharId = (CharacterId)candCid;
                             p2Changed = true;
                             break;
                         }
@@ -482,47 +1367,32 @@ int main(int argc, char* argv[]) {
                     stageMgr.SetStage(currentStage);
                     AudioEngine::Instance().PlaySfx(SFX_SELECT_CURSOR);
                 } else if (inputP1.IsButtonPressed(BTN_TAUNT) || inputP1.IsButtonPressed(BTN_SPECIAL)) {
-                    static const StageId normalStages[7] = {
+                    static const StageId normalStages[12] = {
                         STAGE_DEMOLISHED_EAST_WING,
                         STAGE_REFLECTING_POOL,
                         STAGE_CONGRESSIONAL_FLOOR,
                         STAGE_WHITE_HOUSE_MMA,
                         STAGE_LINCOLN_MEMORIAL,
                         STAGE_SMITHSONIAN_AERO,
-                        STAGE_TOMB_UNKNOWN
+                        STAGE_TOMB_UNKNOWN,
+                        STAGE_CHICAGO_WRIGLEY,
+                        STAGE_PERFORMING_ARTS,
+                        STAGE_THE_HOOD,
+                        STAGE_PROGRESS_AVENUE,
+                        STAGE_LINCOLN_BEDROOM
                     };
                     int curIdx = 0;
-                    for (int k = 0; k < 7; k++) {
+                    for (int k = 0; k < 12; k++) {
                         if (normalStages[k] == currentStage) {
                             curIdx = k;
                             break;
                         }
                     }
-                    curIdx = inputP1.IsButtonPressed(BTN_SPECIAL) ? ((curIdx + 1) % 7) : ((curIdx + 6) % 7);
+                    curIdx = inputP1.IsButtonPressed(BTN_SPECIAL) ? ((curIdx + 1) % 12) : ((curIdx + 11) % 12);
                     currentStage = normalStages[curIdx];
                     stageMgr.SetStage(currentStage);
                     AudioEngine::Instance().PlaySfx(SFX_SELECT_CURSOR);
                 }
-            }
-
-            if (inputP1.IsTriggerEasterEggPressed()) {
-                bonusStagePlayed = true;
-                bonusFromEasterEgg = true;
-                gameState = STATE_BONUS_CAR;
-                stateTimer = 0.0f;
-                bonusCarHp = BONUS_CAR_MAX_HP;
-                bonusTimer = 30.0f;
-                bonusCarAlarmPlayed = false;
-                bonusLastStage = 0;
-                bonusPostTimer = 0.0f;
-                bonusBooYaaPlayed = false;
-                p1 = std::make_unique<Fighter>(0, p1CharId, 100.0f);
-
-                AudioEngine::Instance().StopBgm();
-                AudioEngine::Instance().SetBgmTrack(5);
-                AudioEngine::Instance().PlaySfx(SFX_TITLE_SLAM);
-                AudioEngine::Instance().PlaySfx(SFX_VOICE_FIGHT);
-                break;
             }
 
             bool canConfirm = (stateTimer >= 0.25f);
@@ -548,7 +1418,8 @@ int main(int argc, char* argv[]) {
                     opponentLocked = false;
                     ChampionshipEdition::s_opponentLocked = false;
                     choosingOpponent = true;
-                    p2CharId = PickNextAvailableOpponent((int)p1CharId + 1);
+                    int p1Slot = GetPlayableSlotForChar((int)p1CharId);
+                    p2CharId = PickNextAvailableOpponent(p1Slot + 1);
                     currentStage = GetStageForOpponent(p2CharId);
                     stageMgr.SetStage(currentStage);
                     AudioEngine::Instance().PlaySfx(SFX_SELECT_CONFIRM);
@@ -556,19 +1427,20 @@ int main(int argc, char* argv[]) {
                 } else {
                     AudioEngine::Instance().PlaySfx(SFX_SELECT_CONFIRM);
 
-                    if (defeatedFighters[CHAR_WAR_PIG] || origDefeated >= 9) {
+                    if (defeatedFighters[CHAR_WAR_PIG] || origDefeated >= (PLAYABLE_CHARACTER_COUNT - 1)) {
                         currentStage = GetStageForOpponent(p2CharId);
                     }
                     stageMgr.SetStage(currentStage);
                     opponentLocked = false;
                     ChampionshipEdition::s_opponentLocked = false;
 
-                    cpuAI.SetDifficulty((p2CharId == CHAR_WAR_PIG || p2CharId == CHAR_PALM_BEACH_PETE) ? AI_DIFF_HARD : AI_DIFF_NORMAL);
+                    cpuAI.SetDifficulty(IsHardBossOpponent(p2CharId) ? AI_DIFF_HARD : AI_DIFF_NORMAL);
                     cpuAI.Reset();
                     inputP2.Reset();
 
                     p1 = std::make_unique<Fighter>(0, p1CharId, 320.0f);
                     p2 = std::make_unique<Fighter>(1, p2CharId, 480.0f);
+                    VisualsEngine::PrefetchMatchFighters((int)p1CharId, (int)p2CharId);
 
                     AudioEngine::Instance().StopBgm();
                     AudioEngine::Instance().PlaySfx(SFX_MATCH_START_FANFARE);
@@ -580,57 +1452,85 @@ int main(int argc, char* argv[]) {
             break;
         }
 
+        case STATE_WORLD_MAP: {
+            inputP1.Update(0, true);
+            worldActIndex = GetCurrentWorldAct();
+
+            if (worldActIndex >= 5) {
+                if (p1CharId == CHAR_COMMANDER && !isSecretMode) {
+                    gameState = STATE_CTHULHU_ENDING;
+                    stateTimer = 0.0f;
+                    AudioEngine::Instance().StopBgm();
+                    AudioEngine::Instance().PlaySfx(SFX_CTHULHU_ROAR);
+                } else {
+                    gameState = STATE_ENDING_CELEBRATION;
+                    stateTimer = 0.0f;
+                    AudioEngine::Instance().StopBgm();
+                    AudioEngine::Instance().PlaySfx(SFX_JESUS_FANFARE);
+                }
+                break;
+            }
+
+            static const CharacterId worldBossOrder[5] = {
+                CHAR_KIM, CHAR_BEBE, CHAR_PALE_MOTH, CHAR_THE_DICTATOR, CHAR_AYATOLLAH
+            };
+            static const StageId worldStageOrder[5] = {
+                STAGE_RYUGYONG_HOTEL, STAGE_WESTERN_WALL, STAGE_SOVIET_FOUNDRY, STAGE_PALACE_COURTYARD, STAGE_TEHRAN_CASBAH
+            };
+
+            p2CharId = worldBossOrder[worldActIndex];
+            currentStage = worldStageOrder[worldActIndex];
+            stageMgr.SetStage(currentStage);
+
+            bool confirmPressed = (IsKeyPressed(KEY_ENTER) || IsKeyPressed(KEY_SPACE) ||
+                inputP1.IsButtonPressed(BTN_START) || inputP1.IsButtonPressed(BTN_LP) ||
+                inputP1.IsButtonPressed(BTN_HP) || inputP1.IsButtonPressed(BTN_LK) ||
+                inputP1.IsButtonPressed(BTN_HK));
+
+            if (stateTimer >= 3.8f || (stateTimer >= 0.75f && confirmPressed)) {
+                AudioEngine::Instance().PlaySfx(SFX_SELECT_CONFIRM);
+                AudioEngine::Instance().StopBgm();
+                AudioEngine::Instance().PlaySfx(SFX_MATCH_START_FANFARE);
+
+                cpuAI.SetDifficulty(AI_DIFF_HARD);
+                cpuAI.Reset();
+                inputP2.Reset();
+
+                p1 = std::make_unique<Fighter>(0, p1CharId, 320.0f);
+                p2 = std::make_unique<Fighter>(1, p2CharId, 480.0f);
+                VisualsEngine::PrefetchMatchFighters((int)p1CharId, (int)p2CharId);
+
+                gameState = STATE_VERSUS;
+                stateTimer = 0.0f;
+            }
+            break;
+        }
+
         case STATE_SECRET_SELECT: {
             inputP1.Update(0, true);
 
             if (inputP1.IsButtonPressed(BTN_SELECT) || IsKeyPressed(KEY_ESCAPE) || IsKeyPressed(KEY_BACKSPACE)) {
                 AudioEngine::Instance().PlaySfx(SFX_BLOCK, 1.0f);
+                AudioEngine::Instance().SetBgmTrack(BGM_MENU_SPLASH);
                 gameState = STATE_SPLASH;
                 isSecretMode = false;
                 stateTimer = 0.0f;
                 break;
             }
 
-            if (secretStep == 0) {
-                if (inputP1.IsLeftPressed()) {
-                    secretP1 = (secretP1 - 1 + CHARACTER_COUNT) % CHARACTER_COUNT;
+            if (secretStep == 0 || secretStep == 1) {
+                int& curChar = (secretStep == 0) ? secretP1 : secretP2;
+                if (inputP1.IsLeftPressed() || IsKeyPressed(KEY_LEFT) || IsKeyPressed(KEY_A)) {
+                    curChar = MoveSecretCharCursor(curChar, -1, 0);
                     AudioEngine::Instance().PlaySfx(SFX_SELECT_CURSOR);
-                } else if (inputP1.IsRightPressed()) {
-                    secretP1 = (secretP1 + 1) % CHARACTER_COUNT;
+                } else if (inputP1.IsRightPressed() || IsKeyPressed(KEY_RIGHT) || IsKeyPressed(KEY_D)) {
+                    curChar = MoveSecretCharCursor(curChar, +1, 0);
                     AudioEngine::Instance().PlaySfx(SFX_SELECT_CURSOR);
-                } else if (inputP1.IsUpPressed()) {
-                    if (secretP1 >= 8) secretP1 = std::min(7, secretP1 - 8);
-                    else secretP1 = std::min(16, secretP1 + 8);
+                } else if (inputP1.IsUpPressed() || IsKeyPressed(KEY_UP) || IsKeyPressed(KEY_W)) {
+                    curChar = MoveSecretCharCursor(curChar, 0, -1);
                     AudioEngine::Instance().PlaySfx(SFX_SELECT_CURSOR);
-                } else if (inputP1.IsDownPressed()) {
-                    if (secretP1 < 8) secretP1 = std::min(16, secretP1 + 8);
-                    else secretP1 = secretP1 - 8;
-                    AudioEngine::Instance().PlaySfx(SFX_SELECT_CURSOR);
-                }
-
-                if (inputP1.IsButtonPressed(BTN_START) || inputP1.IsButtonPressed(BTN_LP) ||
-                    inputP1.IsButtonPressed(BTN_HP) || inputP1.IsButtonPressed(BTN_LK) ||
-                    inputP1.IsButtonPressed(BTN_HK) || IsKeyPressed(KEY_ENTER) || IsKeyPressed(KEY_SPACE)) {
-                    AudioEngine::Instance().PlaySfx(SFX_SELECT_CONFIRM);
-                    secretStep = 1;
-                    stateTimer = 0.0f;
-                }
-            }
-
-            else if (secretStep == 1) {
-                if (inputP1.IsLeftPressed()) {
-                    secretP2 = (secretP2 - 1 + CHARACTER_COUNT) % CHARACTER_COUNT;
-                    AudioEngine::Instance().PlaySfx(SFX_SELECT_CURSOR);
-                } else if (inputP1.IsRightPressed()) {
-                    secretP2 = (secretP2 + 1) % CHARACTER_COUNT;
-                    AudioEngine::Instance().PlaySfx(SFX_SELECT_CURSOR);
-                } else if (inputP1.IsUpPressed()) {
-                    if (secretP2 >= 8) secretP2 = std::min(7, secretP2 - 8);
-                    else secretP2 = std::min(16, secretP2 + 8);
-                    AudioEngine::Instance().PlaySfx(SFX_SELECT_CURSOR);
-                } else if (inputP1.IsDownPressed()) {
-                    if (secretP2 < 8) secretP2 = std::min(16, secretP2 + 8);
-                    else secretP2 = secretP2 - 8;
+                } else if (inputP1.IsDownPressed() || IsKeyPressed(KEY_DOWN) || IsKeyPressed(KEY_S)) {
+                    curChar = MoveSecretCharCursor(curChar, 0, +1);
                     AudioEngine::Instance().PlaySfx(SFX_SELECT_CURSOR);
                 }
 
@@ -638,23 +1538,24 @@ int main(int argc, char* argv[]) {
                     inputP1.IsButtonPressed(BTN_HP) || inputP1.IsButtonPressed(BTN_LK) ||
                     inputP1.IsButtonPressed(BTN_HK) || IsKeyPressed(KEY_ENTER) || IsKeyPressed(KEY_SPACE)) {
                     AudioEngine::Instance().PlaySfx(SFX_SELECT_CONFIRM);
-                    secretStep = 2;
+                    if (secretStep == 1) {
+                        secretStage = (int)GetStageForOpponent((CharacterId)secretP2);
+                    }
+                    secretStep++;
                     stateTimer = 0.0f;
                 }
-            }
-
-            else if (secretStep == 2) {
-                if (inputP1.IsLeftPressed()) {
+            } else if (secretStep == 2) {
+                if (inputP1.IsLeftPressed() || IsKeyPressed(KEY_LEFT) || IsKeyPressed(KEY_A)) {
                     secretStage = (secretStage - 1 + STAGE_COUNT) % STAGE_COUNT;
                     AudioEngine::Instance().PlaySfx(SFX_SELECT_CURSOR);
-                } else if (inputP1.IsRightPressed()) {
+                } else if (inputP1.IsRightPressed() || IsKeyPressed(KEY_RIGHT) || IsKeyPressed(KEY_D)) {
                     secretStage = (secretStage + 1) % STAGE_COUNT;
                     AudioEngine::Instance().PlaySfx(SFX_SELECT_CURSOR);
-                } else if (inputP1.IsUpPressed()) {
-                    secretStage = (secretStage - 4 + STAGE_COUNT) % STAGE_COUNT;
+                } else if (inputP1.IsUpPressed() || IsKeyPressed(KEY_UP) || IsKeyPressed(KEY_W)) {
+                    secretStage = (secretStage - 6 + STAGE_COUNT) % STAGE_COUNT;
                     AudioEngine::Instance().PlaySfx(SFX_SELECT_CURSOR);
-                } else if (inputP1.IsDownPressed()) {
-                    secretStage = (secretStage + 4) % STAGE_COUNT;
+                } else if (inputP1.IsDownPressed() || IsKeyPressed(KEY_DOWN) || IsKeyPressed(KEY_S)) {
+                    secretStage = (secretStage + 6) % STAGE_COUNT;
                     AudioEngine::Instance().PlaySfx(SFX_SELECT_CURSOR);
                 }
 
@@ -665,13 +1566,11 @@ int main(int argc, char* argv[]) {
                     secretStep = 3;
                     stateTimer = 0.0f;
                 }
-            }
-
-            else if (secretStep == 3) {
-                if (inputP1.IsUpPressed()) {
+            } else if (secretStep == 3) {
+                if (inputP1.IsUpPressed() || IsKeyPressed(KEY_UP) || IsKeyPressed(KEY_W)) {
                     secretDifficulty = (secretDifficulty - 1 + 3) % 3;
                     AudioEngine::Instance().PlaySfx(SFX_SELECT_CURSOR);
-                } else if (inputP1.IsDownPressed()) {
+                } else if (inputP1.IsDownPressed() || IsKeyPressed(KEY_DOWN) || IsKeyPressed(KEY_S)) {
                     secretDifficulty = (secretDifficulty + 1) % 3;
                     AudioEngine::Instance().PlaySfx(SFX_SELECT_CURSOR);
                 }
@@ -686,26 +1585,22 @@ int main(int argc, char* argv[]) {
                     currentStage = (StageId)secretStage;
                     stageMgr.SetStage(currentStage);
 
-                    cpuAI.SetDifficulty((AIDifficulty)secretDifficulty);
+                    AIDifficulty chosenDiff = (AIDifficulty)secretDifficulty;
+                    cpuAI.SetDifficulty(chosenDiff);
                     cpuAI.Reset();
                     inputP2.Reset();
 
                     p1 = std::make_unique<Fighter>(0, p1CharId, 320.0f);
                     p2 = std::make_unique<Fighter>(1, p2CharId, 480.0f);
+                    VisualsEngine::PrefetchMatchFighters((int)p1CharId, (int)p2CharId);
 
-                    roundNumber = 1;
-                    roundSeconds = 99;
-                    fightIntroTimer = 110;
-                    fightActive = false;
-                    roundOver = false;
-                    matchEndTimer = 0.0f;
                     p1WasKo = false;
                     p2WasKo = false;
+                    ResetFightRoundState(true);
 
                     gameState = STATE_FIGHT;
                     stateTimer = 0.0f;
-                    int bgmTrack = (currentStage == STAGE_LINCOLN_MEMORIAL || currentStage == STAGE_CHICAGO_WRIGLEY) ? 2 : ((currentStage == STAGE_SMITHSONIAN_AERO) ? 1 : ((currentStage == STAGE_TOMB_UNKNOWN || currentStage == STAGE_ENN_NEWS_STUDIO) ? 3 : ((currentStage >= 4) ? ((currentStage == STAGE_PRESS_BRIEFING) ? 3 : 4) : ((int)currentStage + 1))));
-                    AudioEngine::Instance().SetBgmTrack(bgmTrack);
+                    AudioEngine::Instance().SetBgmTrack(AudioEngine::GetStageBgmTrack(currentStage));
                     AudioEngine::Instance().PlaySfx(SFX_VOICE_ROUND1);
                 }
             }
@@ -713,33 +1608,25 @@ int main(int argc, char* argv[]) {
         }
 
         case STATE_VERSUS: {
-
             if (stateTimer >= 1.8f) {
                 gameState = STATE_FIGHT;
                 stateTimer = 0.0f;
-                fightIntroTimer = 110;
-                fightActive = false;
-                roundOver = false;
-                roundSeconds = 99;
-                roundNumber = 1;
                 p1WasKo = false;
                 p2WasKo = false;
-                ChampionshipEdition::ResetRoundFX();
+                ResetFightRoundState(true);
                 p1->ResetRound(320.0f, true);
                 p2->ResetRound(480.0f, false);
                 cpuAI.Reset();
                 inputP2.Reset();
-                int bgmTrack = (currentStage == STAGE_LINCOLN_MEMORIAL || currentStage == STAGE_CHICAGO_WRIGLEY) ? 2 : ((currentStage == STAGE_SMITHSONIAN_AERO) ? 1 : ((currentStage == STAGE_TOMB_UNKNOWN || currentStage == STAGE_ENN_NEWS_STUDIO) ? 3 : ((currentStage >= 4) ? ((currentStage == STAGE_PRESS_BRIEFING) ? 3 : 4) : ((int)currentStage + 1))));
-                AudioEngine::Instance().SetBgmTrack(bgmTrack);
+                AudioEngine::Instance().SetBgmTrack(AudioEngine::GetStageBgmTrack(currentStage));
                 AudioEngine::Instance().PlaySfx(SFX_VOICE_ROUND1);
             }
             break;
         }
 
         case STATE_FIGHT: {
-
             bool pausePressed = false;
-            if (IsKeyPressed(KEY_ENTER) || IsKeyPressed(KEY_P) || inputP1.IsButtonPressed(BTN_START)) {
+            if (IsKeyPressed(KEY_ENTER) || IsKeyPressed(KEY_P)) {
                 pausePressed = true;
             }
             for (int pad = 0; pad < 2; pad++) {
@@ -779,52 +1666,182 @@ int main(int argc, char* argv[]) {
                 }
             }
 
-            inputP1.Update(0, p1->IsFacingRight());
-            cpuAI.Update(inputP2, *p2, *p1, dt);
-
             if (fightActive) {
-
+                bool anyFinisherRunning = (p1->IsPerformingFinisher() || p2->IsPerformingFinisher());
                 roundTickAccum += dt;
                 if (roundTickAccum >= 1.0f) {
                     roundTickAccum -= 1.0f;
-                    if (roundSeconds > 0) roundSeconds--;
+                    if (roundSeconds > 0 && !ChampionshipEdition::s_finishHimActive && !anyFinisherRunning) {
+                        roundSeconds--;
+                    }
                 }
 
-                if (ChampionshipEdition::s_superFlashTimer > 0) {
-                    ChampionshipEdition::s_superFlashTimer--;
-                } else {
-                    p1->UpdatePhysics(inputP1, *p2);
-                    p2->UpdatePhysics(inputP2, *p1);
+                AudioEngine::SetCriticalTempo(
+                    (p1->GetHealth() > 0 && p1->GetHealth() <= 25) ||
+                    (p2->GetHealth() > 0 && p2->GetHealth() <= 25)
+                );
 
-                    CollisionSystem::ResolvePushboxes(*p1, *p2);
-                    CollisionSystem::ResolveCombat(*p1, *p2, sparks, cameraShake);
-                }
-                ChampionshipEdition::UpdateAndTrackFighters(*p1, *p2);
+                float turboMult = 1.0f + 0.15f * (float)std::clamp((int)ChampionshipEdition::s_turboSpeed, 0, 2);
+                simAccum += std::min(dt, 0.05f) * turboMult * 60.0f;
+                int simSteps = std::clamp((int)simAccum, 0, 3);
+                simAccum -= (float)simSteps;
 
-                if (p1->GetHealth() <= 0 || p2->GetHealth() <= 0 || roundSeconds <= 0) {
-                    fightActive = false;
-                    roundOver = true;
-                    isGamePaused = false;
-                    matchEndTimer = 0.0f;
+                int p1RoundsNeeded = (p2CharId == CHAR_WAR_PIG || p2CharId == CHAR_PALM_BEACH_PETE || p2CharId == CHAR_AYATOLLAH) ? 1 : 2;
+                int p2RoundsNeeded = 2;
 
-                    AudioEngine::Instance().PlaySfx(SFX_VOICE_BOO_YAA);
+                for (int stepIdx = 0; stepIdx < simSteps && fightActive; stepIdx++) {
+                    inputP1.Update(0, p1->IsFacingRight());
+                    cpuAI.Update(inputP2, *p2, *p1, FIXED_DT);
 
-                    if (p1->GetHealth() > p2->GetHealth()) {
-                        p1->AddRoundWin();
-                    } else if (p2->GetHealth() > p1->GetHealth()) {
-                        p2->AddRoundWin();
+                    if (ChampionshipEdition::s_finishHimActive) {
+                        bool triggerFinisher = false;
+                        if (finishHimTargetPlayer == 1 && inputP1.IsButtonPressed(BTN_FINISHER)) {
+                            triggerFinisher = true;
+                        } else if (finishHimTargetPlayer == 0 && inputP2.IsButtonPressed(BTN_FINISHER)) {
+                            triggerFinisher = true;
+                        }
+                        if (triggerFinisher) {
+                            ChampionshipEdition::s_finishHimActive = false;
+                            finishHimTimer = 0;
+                            Fighter& atk = (finishHimTargetPlayer == 1) ? *p1 : *p2;
+                            Fighter& vic = (finishHimTargetPlayer == 1) ? *p2 : *p1;
+                            atk.StartFinisher(vic);
+                            ChampionshipEdition::s_superFlashTimer = 12;
+                            ChampionshipEdition::s_crowdExciteTimer = 180;
+                            cameraShake = 4.5f;
+                        }
+                    }
+
+                    if (ChampionshipEdition::s_superFlashTimer > 0) {
+                        ChampionshipEdition::s_superFlashTimer--;
+                    } else {
+                        p1->UpdatePhysics(inputP1, *p2);
+                        p2->UpdatePhysics(inputP2, *p1);
+
+                        if (!p1->IsPerformingFinisher() && !p2->IsPerformingFinisher()) {
+                            CollisionSystem::ResolvePushboxes(*p1, *p2);
+                            CollisionSystem::ResolveCombat(*p1, *p2, sparks, cameraShake);
+                        }
+                    }
+                    ChampionshipEdition::UpdateAndTrackFighters(*p1, *p2);
+
+                    if (p1->IsPerformingFinisher() || p2->IsPerformingFinisher()) {
+                        Fighter& atk = p1->IsPerformingFinisher() ? *p1 : *p2;
+                        Fighter& vic = p1->IsPerformingFinisher() ? *p2 : *p1;
+                        if (atk.GetStateFrame() == 54) {
+                            CharacterId aId = atk.GetCharacterId();
+                            vic.TriggerVetoedKO();
+                            if (aId == CHAR_BEBE) vic.TriggerStarBurst(52);
+                            if (aId == CHAR_FLOTUS || aId == CHAR_MTG || aId == CHAR_POPULIST) vic.TriggerElectroShock(46);
+                            if (aId == CHAR_W) vic.TriggerJengaCollapse(68);
+                            ChampionshipEdition::s_vetoedKoActive = true;
+                            ChampionshipEdition::s_crowdExciteTimer = 180;
+                            AudioEngine::Instance().PlaySfx(SFX_FINISHER_OBLITERATE, 1.0f, 1.0f);
+                            AudioEngine::Instance().PlaySfx(SFX_VOICE_VETOED, 1.0f, 1.0f);
+                            cameraShake = 9.5f;
+                            for (int s = 0; s < 2; s++) {
+                                SparkEffect sp{};
+                                sp.alive = true;
+                                sp.isBlock = false;
+                                sp.pos = Vector2{ vic.GetPosition().x + (s == 0 ? -24.0f : 24.0f), GROUND_Y - 22.0f - s * 8.0f };
+                                sp.frame = s * 2;
+                                sp.maxFrames = 12;
+                                sparks.push_back(sp);
+                            }
+                        } else if (atk.GetStateFrame() >= 90) {
+                            fightActive = false;
+                            roundOver = true;
+                            isGamePaused = false;
+                            matchEndTimer = 0.0f;
+                            ChampionshipEdition::s_vetoedKoActive = true;
+                            AudioEngine::SetCriticalTempo(false);
+                            AudioEngine::Instance().PlaySfx(SFX_CROWD_CHEER, 1.0f, 0.90f);
+                            atk.AddRoundWin();
+                            atk.SetState(FSTATE_VICTORY);
+                            if (&atk == p1.get()) {
+                                youWinVoiceTimer = 0.45f;
+                                perfectVoiceTimer = (p1->GetHealth() >= 100) ? 1.10f : -1.0f;
+                            }
+                        }
+                        continue;
+                    }
+
+                    if (!finishHimTriggeredThisRound) {
+                        if (p2->GetHealth() <= 0 && (p1->GetRoundsWon() + 1 >= p1RoundsNeeded)) {
+                            finishHimTriggeredThisRound = true;
+                            finishHimTimer = 180;
+                            finishHimTargetPlayer = 1;
+                            ChampionshipEdition::s_finishHimActive = true;
+                            p2->EnterFinishHimDizzy();
+                            AudioEngine::Instance().PlaySfx(SFX_VOICE_FINISH_HIM);
+                        } else if (p1->GetHealth() <= 0 && (p2->GetRoundsWon() + 1 >= p2RoundsNeeded)) {
+                            finishHimTriggeredThisRound = true;
+                            finishHimTimer = 180;
+                            finishHimTargetPlayer = 0;
+                            ChampionshipEdition::s_finishHimActive = true;
+                            p1->EnterFinishHimDizzy();
+                            AudioEngine::Instance().PlaySfx(SFX_VOICE_FINISH_HIM);
+                        }
+                    } else if (ChampionshipEdition::s_finishHimActive) {
+                        Fighter* dizzyTarget = (finishHimTargetPlayer == 1) ? p2.get() : p1.get();
+                        finishHimTimer--;
+                        if (dizzyTarget->GetHealth() <= 0 || dizzyTarget->GetState() != FSTATE_FINISH_HIM_DIZZY) {
+                            dizzyTarget->TriggerVetoedKO();
+                            ChampionshipEdition::s_finishHimActive = false;
+                        } else if (finishHimTimer <= 0) {
+                            dizzyTarget->TriggerVetoedKO();
+                            ChampionshipEdition::s_finishHimActive = false;
+                        }
+                    }
+
+                    if (!ChampionshipEdition::s_finishHimActive &&
+                        (p1->GetHealth() <= 0 || p2->GetHealth() <= 0 || roundSeconds <= 0)) {
+                        fightActive = false;
+                        roundOver = true;
+                        isGamePaused = false;
+                        matchEndTimer = 0.0f;
+                        ChampionshipEdition::s_vetoedKoActive = true;
+                        ChampionshipEdition::s_crowdExciteTimer = 150;
+                        AudioEngine::SetCriticalTempo(false);
+
+                        AudioEngine::Instance().PlaySfx(SFX_VOICE_VETOED);
+                        AudioEngine::Instance().PlaySfx(SFX_CROWD_CHEER, 1.0f, 0.90f);
+
+                        if (p1->GetHealth() > p2->GetHealth()) {
+                            p1->AddRoundWin();
+                            p1->SetState(FSTATE_VICTORY);
+                            youWinVoiceTimer = 0.65f;
+                            perfectVoiceTimer = (p1->GetHealth() >= 100) ? 1.30f : -1.0f;
+                        } else if (p2->GetHealth() > p1->GetHealth()) {
+                            p2->AddRoundWin();
+                            p2->SetState(FSTATE_VICTORY);
+                        }
                     }
                 }
             } else if (roundOver) {
-
                 matchEndTimer += dt;
+                if (youWinVoiceTimer > 0.0f) {
+                    youWinVoiceTimer -= dt;
+                    if (youWinVoiceTimer <= 0.0f) {
+                        AudioEngine::Instance().PlaySfx(SFX_VOICE_YOU_WIN);
+                    }
+                }
+                if (perfectVoiceTimer > 0.0f) {
+                    perfectVoiceTimer -= dt;
+                    if (perfectVoiceTimer <= 0.0f) {
+                        AudioEngine::Instance().PlaySfx(SFX_VOICE_PERFECT);
+                    }
+                }
+
+                inputP1.Update(0, p1->IsFacingRight());
                 p1->UpdatePhysics(inputP1, *p2);
                 p2->UpdatePhysics(inputP2, *p1);
                 ChampionshipEdition::UpdateAndTrackFighters(*p1, *p2);
 
-                if (matchEndTimer >= 1.5f) {
-
-                    int p1RoundsNeeded = (p2CharId == CHAR_WAR_PIG || p2CharId == CHAR_PALM_BEACH_PETE) ? 1 : 2;
+                float roundOutroDuration = (p2CharId == CHAR_PALE_MOTH || p1CharId == CHAR_PALE_MOTH ||
+                                            p2CharId == CHAR_W || p1CharId == CHAR_W) ? 2.5f : 2.0f;
+                if (matchEndTimer >= roundOutroDuration) {
+                    int p1RoundsNeeded = (p2CharId == CHAR_WAR_PIG || p2CharId == CHAR_PALM_BEACH_PETE || p2CharId == CHAR_AYATOLLAH) ? 1 : 2;
                     int p2RoundsNeeded = 2;
                     if (p1->GetRoundsWon() >= p1RoundsNeeded || p2->GetRoundsWon() >= p2RoundsNeeded) {
                         stateTimer = 0.0f;
@@ -833,38 +1850,36 @@ int main(int argc, char* argv[]) {
                                 matchesWon++;
                                 defeatedFighters[(int)p2CharId] = true;
                             }
-                            AudioEngine::Instance().StopBgm();
+                            AudioEngine::Instance().SetBgmTrack(BGM_VICTORY_SCREEN);
                             AudioEngine::Instance().PlaySfx(SFX_VICTORY_FANFARE);
                             gameState = STATE_VICTORY_SPLASH;
                         } else {
                             AudioEngine::Instance().PlaySfx(SFX_VOICE_TOTAL_VETO);
                             if (isSecretMode) {
+                                AudioEngine::Instance().SetBgmTrack(BGM_VICTORY_SCREEN);
                                 gameState = STATE_VICTORY_SPLASH;
                             } else {
                                 gameState = STATE_MATCH_OVER;
                             }
                         }
                     } else {
-
                         bool p1Died = (p1->GetHealth() <= 0);
                         bool p2Died = (p2->GetHealth() <= 0);
                         p1WasKo = p1Died;
                         p2WasKo = p2Died;
 
                         roundNumber++;
-                        roundSeconds = 99;
-                        fightIntroTimer = 110;
-                        fightActive = false;
-                        roundOver = false;
-                        ChampionshipEdition::ResetRoundFX();
+                        ResetFightRoundState(false);
                         p1->ResetRound(320.0f, true, p1Died);
                         p2->ResetRound(480.0f, false, p2Died);
                         cpuAI.Reset();
                         inputP2.Reset();
                         if (roundNumber == 2) {
                             AudioEngine::Instance().PlaySfx(SFX_VOICE_ROUND2);
-                        } else {
+                        } else if (p1->GetRoundsWon() > 0 && p2->GetRoundsWon() > 0) {
                             AudioEngine::Instance().PlaySfx(SFX_VOICE_FINAL_ROUND);
+                        } else {
+                            AudioEngine::Instance().PlaySfx(SFX_VOICE_ROUND3);
                         }
                     }
                 }
@@ -902,7 +1917,7 @@ int main(int argc, char* argv[]) {
                     break;
                 }
             }
-            bool wantAdvance = (stateTimer >= 6.0f) ||
+            bool wantAdvance = (stateTimer >= 6.5f) ||
                 (stateTimer >= 0.40f && (padConfirm ||
                  IsKeyPressed(KEY_ENTER) || IsKeyPressed(KEY_SPACE) ||
                  inputP1.IsButtonPressed(BTN_START) || inputP1.IsButtonPressed(BTN_LP) ||
@@ -910,59 +1925,68 @@ int main(int argc, char* argv[]) {
                  inputP1.IsButtonPressed(BTN_HK) || inputP1.IsButtonPressed(BTN_SPECIAL) ||
                  inputP1.IsButtonPressed(BTN_TAUNT)));
             if (wantAdvance) {
-
                 if (isSecretMode) {
                     gameState = STATE_SECRET_SELECT;
                     secretStep = 0;
                     stateTimer = 0.0f;
-                    AudioEngine::Instance().SetBgmTrack(0);
+                    AudioEngine::Instance().SetBgmTrack(BGM_CHAR_SELECT);
                     break;
                 }
 
-                if (matchesWon == 3 && !bonusStagePlayed) {
-                    bonusStagePlayed = true;
-                    gameState = STATE_BONUS_CAR;
-                    stateTimer = 0.0f;
-                    bonusCarHp = BONUS_CAR_MAX_HP;
-                    bonusTimer = 30.0f;
-                    bonusCarAlarmPlayed = false;
-                    bonusLastStage = 0;
-                    bonusPostTimer = 0.0f;
-                    p1->ResetRound(100.0f, true);
-                    AudioEngine::Instance().SetBgmTrack(5);
-                    AudioEngine::Instance().PlaySfx(SFX_VOICE_FIGHT);
+                if (matchesWon == 3 && !bonusStagesPlayed[BONUS_STAGE_TESLA]) {
+                    bonusStagesPlayed[BONUS_STAGE_TESLA] = true;
+                    StartBonusStage(BONUS_STAGE_TESLA, false);
+                } else if (matchesWon == 6 && !bonusStagesPlayed[BONUS_STAGE_POOL_TAR]) {
+                    bonusStagesPlayed[BONUS_STAGE_POOL_TAR] = true;
+                    StartBonusStage(BONUS_STAGE_POOL_TAR, false);
+                } else if (matchesWon == 9 && !bonusStagesPlayed[BONUS_STAGE_BOOK_FIRE]) {
+                    bonusStagesPlayed[BONUS_STAGE_BOOK_FIRE] = true;
+                    StartBonusStage(BONUS_STAGE_BOOK_FIRE, false);
+                } else if (matchesWon == 12 && !bonusStagesPlayed[BONUS_STAGE_BERLIN_WALL]) {
+                    bonusStagesPlayed[BONUS_STAGE_BERLIN_WALL] = true;
+                    StartBonusStage(BONUS_STAGE_BERLIN_WALL, false);
                 } else if (defeatedFighters[CHAR_PALM_BEACH_PETE]) {
 
-                    if (p1CharId == CHAR_COMMANDER && !isSecretMode) {
-                        gameState = STATE_CTHULHU_ENDING;
-                        stateTimer = 0.0f;
-                        AudioEngine::Instance().StopBgm();
-                        AudioEngine::Instance().PlaySfx(SFX_CTHULHU_ROAR);
+                    worldActIndex = GetCurrentWorldAct();
+                    if (worldActIndex >= 5) {
+                        if (p1CharId == CHAR_COMMANDER) {
+                            gameState = STATE_CTHULHU_ENDING;
+                            stateTimer = 0.0f;
+                            AudioEngine::Instance().StopBgm();
+                            AudioEngine::Instance().PlaySfx(SFX_CTHULHU_ROAR);
+                        } else {
+                            gameState = STATE_ENDING_CELEBRATION;
+                            stateTimer = 0.0f;
+                            AudioEngine::Instance().StopBgm();
+                            AudioEngine::Instance().PlaySfx(SFX_JESUS_FANFARE);
+                        }
                     } else {
-                        gameState = STATE_ENDING_CELEBRATION;
+                        gameState = STATE_WORLD_MAP;
                         stateTimer = 0.0f;
-                        AudioEngine::Instance().StopBgm();
-                        AudioEngine::Instance().PlaySfx(SFX_JESUS_FANFARE);
+                        AudioEngine::Instance().SetBgmTrack(BGM_WORLD_CONFLICT_MAP);
+                        AudioEngine::Instance().PlaySfx(SFX_VOICE_GLOBAL_CONFLICT);
                     }
                 } else {
                     opponentLocked = false;
                     ChampionshipEdition::s_opponentLocked = false;
-                    p2CharId = PickNextAvailableOpponent((int)p2CharId + 1);
+                    int curSlot = GetPlayableSlotForChar((int)p2CharId);
+                    p2CharId = PickNextAvailableOpponent(curSlot + 1);
                     currentStage = GetStageForOpponent(p2CharId);
                     stageMgr.SetStage(currentStage);
                     gameState = STATE_SELECT_MAP;
                     stateTimer = 0.0f;
-                    AudioEngine::Instance().SetBgmTrack(0);
+                    AudioEngine::Instance().SetBgmTrack(defeatedFighters[CHAR_WAR_PIG] ? BGM_US_MAP : BGM_CHAR_SELECT);
                 }
             }
             break;
         }
 
         case STATE_BONUS_CAR: {
-            inputP1.Update(0, p1->IsFacingRight());
+            bool useFreeDir = (bonusState.type == BONUS_STAGE_POOL_TAR || bonusState.type == BONUS_STAGE_BOOK_FIRE);
+            inputP1.Update(0, useFreeDir ? bonusFreeFacingRight : p1->IsFacingRight());
 
             bool pausePressed = false;
-            if (IsKeyPressed(KEY_ENTER) || IsKeyPressed(KEY_P) || inputP1.IsButtonPressed(BTN_START)) {
+            if (IsKeyPressed(KEY_ENTER) || IsKeyPressed(KEY_P)) {
                 pausePressed = true;
             }
             for (int pad = 0; pad < 2; pad++) {
@@ -971,7 +1995,7 @@ int main(int argc, char* argv[]) {
                 }
             }
 
-            if (pausePressed && bonusCarHp > 0.0f && bonusTimer > 0.0f) {
+            if (pausePressed && !bonusState.cleared && bonusState.timer > 0.0f) {
                 isGamePaused = !isGamePaused;
                 AudioEngine::Instance().PlaySfx(SFX_SELECT_CONFIRM);
             }
@@ -980,88 +2004,28 @@ int main(int argc, char* argv[]) {
                 break;
             }
 
-            if (bonusCarHp > 0.0f && bonusTimer > 0.0f) {
-                bonusTimer = std::max(0.0f, bonusTimer - dt);
-
-                Rectangle carHurtbox = { (float)SCREEN_WIDTH / 2.0f - 77.0f, GROUND_Y - 60.0f, 154.0f, 60.0f };
-
-                Fighter carDummy(1, CHAR_TECH_VISIONARY, SCREEN_WIDTH / 2.0f);
-                p1->UpdatePhysics(inputP1, carDummy);
-
-                Rectangle hitbox{};
-                AttackData atkData{};
-                if (p1->GetActiveHitbox(hitbox, atkData) && !p1->HasHitConnected()) {
-                    if (CheckCollisionRecs(hitbox, carHurtbox)) {
-                        p1->SetHitConnected(true);
-                        p1->SetHitstop(atkData.hitstopFrames);
-                        cameraShake = atkData.isHeavy ? 5.0f : 2.5f;
-
-                        float dmg = (float)atkData.damage;
-                        bonusCarHp = std::max(0.0f, bonusCarHp - dmg);
-
-                        SparkEffect sp{};
-                        sp.pos = Vector2{ (hitbox.x + hitbox.width * 0.5f), (hitbox.y + hitbox.height * 0.5f) };
-                        sp.isBlock = false;
-                        sp.alive = true;
-                        sp.frame = 0;
-                        sp.maxFrames = 8;
-                        sparks.push_back(sp);
-
-                        AudioEngine::Instance().PlaySfx(atkData.isHeavy ? SFX_HIT_HEAVY : SFX_HIT_LIGHT);
-                        AudioEngine::Instance().PlaySfx(SFX_METAL_CRUNCH, (float)(90 + (rand() % 20)) / 100.0f);
-
-                        float hpRatio = bonusCarHp / BONUS_CAR_MAX_HP;
-                        int curStage = (hpRatio <= 0.0f) ? 3 : ((hpRatio <= 0.25f) ? 3 : ((hpRatio <= 0.50f) ? 2 : ((hpRatio <= 0.75f) ? 1 : 0)));
-                        if (curStage > bonusLastStage) {
-                            bonusLastStage = curStage;
-                            AudioEngine::Instance().PlaySfx(SFX_GLASS_BREAK);
-                            if (!bonusCarAlarmPlayed) {
-                                bonusCarAlarmPlayed = true;
-                                AudioEngine::Instance().PlaySfx(SFX_CAR_ALARM);
-                            }
-                        }
-                        if (curStage == 3 && (rand() % 3 == 0)) {
-                            AudioEngine::Instance().PlaySfx(SFX_ELEC_SPARK);
-                        }
-
-                        if (bonusCarHp <= 0.0f) {
-                            AudioEngine::Instance().PlaySfx(SFX_TITLE_SLAM);
-                            AudioEngine::Instance().PlaySfx(SFX_FIREBALL_IMPACT);
-                            cameraShake = 8.0f;
-                        }
-                    }
-                }
-            } else {
-
-                if (!bonusBooYaaPlayed) {
-                    bonusBooYaaPlayed = true;
-                    AudioEngine::Instance().PlaySfx(SFX_VOICE_BOO_YAA);
-                }
-
-                bonusPostTimer += dt;
-                Fighter carDummy(1, CHAR_TECH_VISIONARY, SCREEN_WIDTH / 2.0f);
-                p1->UpdatePhysics(inputP1, carDummy);
-
-                if (bonusPostTimer >= 2.0f) {
+            if (StepBonusStage(std::min(dt, 0.05f))) {
+                if (defeatedFighters[CHAR_PALM_BEACH_PETE] && !bonusFromEasterEgg) {
+                    worldActIndex = GetCurrentWorldAct();
+                    gameState = STATE_WORLD_MAP;
+                    stateTimer = 0.0f;
+                    AudioEngine::Instance().SetBgmTrack(BGM_WORLD_CONFLICT_MAP);
+                } else {
                     opponentLocked = false;
                     ChampionshipEdition::s_opponentLocked = false;
-                    p2CharId = PickNextAvailableOpponent((int)p2CharId + 1);
-                    currentStage = GetStageForOpponent(p2CharId);
-                    stageMgr.SetStage(currentStage);
+                    if (!bonusFromEasterEgg) {
+                        int curSlot = GetPlayableSlotForChar((int)p2CharId);
+                        p2CharId = PickNextAvailableOpponent(curSlot + 1);
+                        currentStage = GetStageForOpponent(p2CharId);
+                        stageMgr.SetStage(currentStage);
+                    }
+                    bonusFromEasterEgg = false;
                     gameState = STATE_SELECT_MAP;
                     stateTimer = 0.0f;
-                    AudioEngine::Instance().SetBgmTrack(0);
+                    AudioEngine::Instance().SetBgmTrack(defeatedFighters[CHAR_WAR_PIG] ? BGM_US_MAP : BGM_CHAR_SELECT);
                 }
             }
-
-            for (auto& sp : sparks) {
-                if (!sp.alive) continue;
-                sp.frame++;
-                if (sp.frame >= sp.maxFrames) sp.alive = false;
-            }
-
-            if (cameraShake > 0.01f) cameraShake *= 0.88f;
-            else cameraShake = 0.0f;
+            sparks.erase(std::remove_if(sparks.begin(), sparks.end(), [](const SparkEffect& s) { return !s.alive; }), sparks.end());
             break;
         }
 
@@ -1080,7 +2044,7 @@ int main(int argc, char* argv[]) {
                     gameState = STATE_SECRET_SELECT;
                     secretStep = 0;
                     stateTimer = 0.0f;
-                    AudioEngine::Instance().SetBgmTrack(0);
+                    AudioEngine::Instance().SetBgmTrack(BGM_CHAR_SELECT);
                 }
                 break;
             }
@@ -1096,6 +2060,7 @@ int main(int argc, char* argv[]) {
                     inputP2.Reset();
                     p1 = std::make_unique<Fighter>(0, p1CharId, 320.0f);
                     p2 = std::make_unique<Fighter>(1, p2CharId, 480.0f);
+                    VisualsEngine::PrefetchMatchFighters((int)p1CharId, (int)p2CharId);
                     AudioEngine::Instance().StopBgm();
 
                     gameState = STATE_VERSUS;
@@ -1106,7 +2071,7 @@ int main(int argc, char* argv[]) {
                     continuesRemaining = 2;
                     ChampionshipEdition::s_continuesRemaining = 2;
                     matchesWon = 0;
-                    bonusStagePlayed = false;
+                    for (int b = 0; b < BONUS_STAGE_COUNT; b++) bonusStagesPlayed[b] = false;
                     playerLocked = false;
                     opponentLocked = false;
                     ChampionshipEdition::s_opponentLocked = false;
@@ -1119,14 +2084,14 @@ int main(int argc, char* argv[]) {
                     stageMgr.SetStage(currentStage);
                     gameState = STATE_SELECT_MAP;
                     stateTimer = 0.0f;
-                    AudioEngine::Instance().SetBgmTrack(0);
+                    AudioEngine::Instance().SetBgmTrack(BGM_CHAR_SELECT);
                 }
             } else {
                 if (stateTimer >= 5.0f || (actionPressed && stateTimer >= 0.35f)) {
                     continuesRemaining = 2;
                     ChampionshipEdition::s_continuesRemaining = 2;
                     matchesWon = 0;
-                    bonusStagePlayed = false;
+                    for (int b = 0; b < BONUS_STAGE_COUNT; b++) bonusStagesPlayed[b] = false;
                     playerLocked = false;
                     opponentLocked = false;
                     ChampionshipEdition::s_opponentLocked = false;
@@ -1139,11 +2104,12 @@ int main(int argc, char* argv[]) {
                     stageMgr.SetStage(currentStage);
                     gameState = STATE_SELECT_MAP;
                     stateTimer = 0.0f;
-                    AudioEngine::Instance().SetBgmTrack(0);
+                    AudioEngine::Instance().SetBgmTrack(BGM_CHAR_SELECT);
                 }
             }
             break;
         }
+
         case STATE_ENDING_CELEBRATION: {
             inputP1.Update(0, true);
             if (stateTimer >= 2.0f && (inputP1.IsButtonPressed(BTN_START) || inputP1.IsButtonPressed(BTN_LP) ||
@@ -1151,8 +2117,10 @@ int main(int argc, char* argv[]) {
                 inputP1.IsButtonPressed(BTN_HK) || IsKeyPressed(KEY_ENTER) || IsKeyPressed(KEY_SPACE))) {
 
                 matchesWon = 0;
-                bonusStagePlayed = false;
+                for (int b = 0; b < BONUS_STAGE_COUNT; b++) bonusStagesPlayed[b] = false;
                 playerLocked = false;
+                opponentLocked = false;
+                ChampionshipEdition::s_opponentLocked = false;
                 choosingOpponent = false;
                 for (int i = 0; i < CHARACTER_COUNT; i++) defeatedFighters[i] = false;
 
@@ -1163,10 +2131,11 @@ int main(int argc, char* argv[]) {
                 gameState = STATE_SPLASH;
                 stateTimer = 0.0f;
                 logoSlammed = false;
-                AudioEngine::Instance().SetBgmTrack(0);
+                AudioEngine::Instance().SetBgmTrack(BGM_MENU_SPLASH);
             }
             break;
         }
+
         case STATE_CTHULHU_ENDING: {
             static bool sharkSfxPlayed = false;
             static bool snoreSfxPlayed = false;
@@ -1183,41 +2152,42 @@ int main(int argc, char* argv[]) {
                 AudioEngine::Instance().PlaySfx(SFX_CTHULHU_SNORE);
             }
 
-                inputP1.Update(0, true);
-                bool skip = (stateTimer >= 12.0f && (inputP1.IsButtonPressed(BTN_START) || inputP1.IsButtonPressed(BTN_LP) ||
-                             inputP1.IsButtonPressed(BTN_HP) || inputP1.IsButtonPressed(BTN_LK) ||
-                             inputP1.IsButtonPressed(BTN_HK) || IsKeyPressed(KEY_ENTER) || IsKeyPressed(KEY_SPACE)));
-                if (stateTimer >= 18.0f || skip) {
+            inputP1.Update(0, true);
+            bool skip = (stateTimer >= 12.0f && (inputP1.IsButtonPressed(BTN_START) || inputP1.IsButtonPressed(BTN_LP) ||
+                         inputP1.IsButtonPressed(BTN_HP) || inputP1.IsButtonPressed(BTN_LK) ||
+                         inputP1.IsButtonPressed(BTN_HK) || IsKeyPressed(KEY_ENTER) || IsKeyPressed(KEY_SPACE)));
+            if (stateTimer >= 18.0f || skip) {
+                matchesWon = 0;
+                for (int b = 0; b < BONUS_STAGE_COUNT; b++) bonusStagesPlayed[b] = false;
+                playerLocked = false;
+                opponentLocked = false;
+                ChampionshipEdition::s_opponentLocked = false;
+                choosingOpponent = false;
+                for (int i = 0; i < CHARACTER_COUNT; i++) defeatedFighters[i] = false;
 
-                    matchesWon = 0;
-                    bonusStagePlayed = false;
-                    playerLocked = false;
-                    opponentLocked = false;
-                    ChampionshipEdition::s_opponentLocked = false;
-                    choosingOpponent = false;
-                    for (int i = 0; i < CHARACTER_COUNT; i++) defeatedFighters[i] = false;
-
-                    p1CharId = CHAR_COMMANDER;
-                    p2CharId = PickNextAvailableOpponent(1);
-                    currentStage = homeStages[(int)p2CharId];
-                    stageMgr.SetStage(currentStage);
-                    gameState = STATE_SPLASH;
-                    stateTimer = 0.0f;
-                    logoSlammed = false;
-                    AudioEngine::Instance().SetBgmTrack(0);
-                }
-
+                p1CharId = CHAR_COMMANDER;
+                p2CharId = PickNextAvailableOpponent(1);
+                currentStage = homeStages[(int)p2CharId];
+                stageMgr.SetStage(currentStage);
+                gameState = STATE_SPLASH;
+                stateTimer = 0.0f;
+                logoSlammed = false;
+                AudioEngine::Instance().SetBgmTrack(BGM_MENU_SPLASH);
+            }
             break;
         }
         }
 
         BeginTextureMode(screenTarget);
         ClearBackground(BLACK);
+        rlPushMatrix();
+        rlScalef((float)RENDER_SCALE, (float)RENDER_SCALE, 1.0f);
 
         float camRenderX = cameraX - SCREEN_WIDTH * 0.5f;
         if (cameraShake > 0.1f) {
             camRenderX += ((float)(rand() % 100) / 100.0f - 0.5f) * cameraShake * 2.0f;
         }
+        ChampionshipEdition::s_camRenderX = camRenderX;
 
         switch (gameState) {
         case STATE_SPLASH: {
@@ -1226,7 +2196,11 @@ int main(int argc, char* argv[]) {
             break;
         }
         case STATE_SELECT_MAP: {
-            VisualsEngine::DrawStageAndCharSelect((int)currentStage, (int)p1CharId, (int)p2CharId, stateTimer, defeatedFighters, playerLocked, (playerLocked || CountDefeatedOriginals() >= 7));
+            VisualsEngine::DrawStageAndCharSelect((int)currentStage, (int)p1CharId, (int)p2CharId, stateTimer, defeatedFighters, playerLocked, (playerLocked || CountDefeatedOriginals() >= (PLAYABLE_CHARACTER_COUNT - 1)));
+            break;
+        }
+        case STATE_WORLD_MAP: {
+            VisualsEngine::DrawWorldConflictMap(worldActIndex, (int)p1CharId, stateTimer, defeatedFighters);
             break;
         }
         case STATE_SECRET_SELECT: {
@@ -1238,35 +2212,36 @@ int main(int argc, char* argv[]) {
             break;
         }
         case STATE_VICTORY_SPLASH: {
-            int p1RoundsToWin = (p2CharId == CHAR_WAR_PIG || p2CharId == CHAR_PALM_BEACH_PETE) ? 1 : 2;
+            int p1RoundsToWin = (p2CharId == CHAR_WAR_PIG || p2CharId == CHAR_PALM_BEACH_PETE || p2CharId == CHAR_AYATOLLAH) ? 1 : 2;
             int winnerChar = (p1 && p1->GetRoundsWon() >= p1RoundsToWin) ? (int)p1CharId : (int)p2CharId;
             int loserChar = (winnerChar == (int)p1CharId) ? (int)p2CharId : (int)p1CharId;
             VisualsEngine::DrawVictorySplash(winnerChar, loserChar, stateTimer);
             break;
         }
         case STATE_BONUS_CAR: {
-            VisualsEngine::DrawBonusStage(bonusCarHp, BONUS_CAR_MAX_HP, bonusTimer, *p1, sparks);
+            VisualsEngine::DrawBonusStage(bonusState, *p1, sparks);
             if (isGamePaused) {
                 VisualsEngine::DrawPauseOverlay(stateTimer);
             }
             break;
         }
         case STATE_FIGHT: {
-
             stageMgr.DrawFarLayer(camRenderX, stateTimer);
-
             stageMgr.DrawMidLayer(camRenderX, stateTimer);
-
             stageMgr.DrawPlayfield(camRenderX, stateTimer);
 
             rlPushMatrix();
             rlTranslatef(-camRenderX, 0.0f, 0.0f);
+
+            VisualsEngine::DrawFinisherBackdrop(*p1, *p2, camRenderX);
 
             VisualsEngine::DrawDropShadow(*p1);
             VisualsEngine::DrawDropShadow(*p2);
 
             VisualsEngine::DrawFighterSprite(*p1);
             VisualsEngine::DrawFighterSprite(*p2);
+
+            VisualsEngine::DrawFinisherWorldFX(*p1, *p2);
 
             VisualsEngine::DrawProjectiles(*p1);
             VisualsEngine::DrawProjectiles(*p2);
@@ -1283,7 +2258,7 @@ int main(int argc, char* argv[]) {
 
             if (!fightActive && fightIntroTimer > 0) {
                 if (fightIntroTimer > 50) {
-                    if (roundNumber == 3) {
+                    if (roundNumber >= 3 && p1->GetRoundsWon() > 0 && p2->GetRoundsWon() > 0) {
                         int tw = MeasureText("FINAL ROUND", 22);
                         VisualsEngine::DrawPixelText("FINAL ROUND", (SCREEN_WIDTH - tw) / 2, (SCREEN_HEIGHT / 2) - 16, 22, Color{ 255, 230, 40, 255 });
                     } else {
@@ -1296,9 +2271,9 @@ int main(int argc, char* argv[]) {
                     int tw = MeasureText("FIGHT!", 28);
                     VisualsEngine::DrawPixelText("FIGHT!", (SCREEN_WIDTH - tw) / 2, (SCREEN_HEIGHT / 2) - 20, 28, Color{ 255, 50, 50, 255 });
                 }
-            } else if (p1->GetHealth() <= 0 || p2->GetHealth() <= 0 || roundSeconds <= 0) {
-                int tw = MeasureText("TOTAL VETO!", 26);
-                VisualsEngine::DrawPixelText("TOTAL VETO!", (SCREEN_WIDTH - tw) / 2, (SCREEN_HEIGHT / 2) - 18, 26, Color{ 255, 60, 60, 255 });
+            } else if (roundOver && !ChampionshipEdition::s_vetoedKoActive) {
+                int tw = MeasureText("TIME OVER!", 24);
+                VisualsEngine::DrawPixelText("TIME OVER!", (SCREEN_WIDTH - tw) / 2, (SCREEN_HEIGHT / 2) - 18, 24, Color{ 255, 210, 50, 255 });
             }
 
             if (isGamePaused) {
@@ -1319,7 +2294,7 @@ int main(int argc, char* argv[]) {
             VisualsEngine::DrawFighterSprite(*p2);
             rlPopMatrix();
 
-            int roundsToWin = (p2CharId == CHAR_WAR_PIG || p2CharId == CHAR_PALM_BEACH_PETE) ? 1 : 2;
+            int roundsToWin = (p2CharId == CHAR_WAR_PIG || p2CharId == CHAR_PALM_BEACH_PETE || p2CharId == CHAR_AYATOLLAH) ? 1 : 2;
             const Fighter& winner = (p1->GetRoundsWon() >= roundsToWin) ? *p1 : *p2;
             VisualsEngine::DrawMatchOver(winner, stateTimer);
             break;
@@ -1334,16 +2309,29 @@ int main(int argc, char* argv[]) {
         }
         }
 
+        rlPopMatrix();
         EndTextureMode();
 
         BeginDrawing();
         ClearBackground(BLACK);
 
-        float scale = std::min((float)GetScreenWidth() / (float)SCREEN_WIDTH, (float)GetScreenHeight() / (float)SCREEN_HEIGHT);
-        int scaledW = (int)(SCREEN_WIDTH * scale);
-        int scaledH = (int)(SCREEN_HEIGHT * scale);
-        int offsetX = (GetScreenWidth() - scaledW) / 2;
-        int offsetY = (GetScreenHeight() - scaledH) / 2;
+        int outW = GetRenderWidth();
+        int outH = GetRenderHeight();
+        if (outW <= 0) outW = GetScreenWidth();
+        if (outH <= 0) outH = GetScreenHeight();
+
+        rlViewport(0, 0, outW, outH);
+        rlMatrixMode(RL_PROJECTION);
+        rlLoadIdentity();
+        rlOrtho(0.0, (double)outW, (double)outH, 0.0, 0.0, 1.0);
+        rlMatrixMode(RL_MODELVIEW);
+        rlLoadIdentity();
+
+        float scale = std::min((float)outW / (float)SCREEN_WIDTH, (float)outH / (float)SCREEN_HEIGHT);
+        int scaledW = std::max(1, (int)roundf((float)SCREEN_WIDTH * scale));
+        int scaledH = std::max(1, (int)roundf((float)SCREEN_HEIGHT * scale));
+        int offsetX = (outW - scaledW) / 2;
+        int offsetY = (outH - scaledH) / 2;
 
         Rectangle srcRec = { 0.0f, 0.0f, (float)screenTarget.texture.width, -(float)screenTarget.texture.height };
         Rectangle dstRec = { (float)offsetX, (float)offsetY, (float)scaledW, (float)scaledH };

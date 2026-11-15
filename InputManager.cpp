@@ -11,6 +11,14 @@ RelativeDirection InputManager::ComputeRelativeDirection(const RawInputState& st
     bool left = state.left;
     bool right = state.right;
 
+    if (left && right) {
+        left = false;
+        right = false;
+    }
+    if (up && down) {
+        down = false;
+    }
+
     bool fwd = facingRight ? right : left;
     bool back = facingRight ? left : right;
 
@@ -54,7 +62,6 @@ RawInputState InputManager::PollRawInputs(int playerIndex) {
     RawInputState state{};
 
     if (playerIndex == 0) {
-
         if (IsKeyDown(KEY_W) || IsKeyDown(KEY_UP)) state.up = true;
         if (IsKeyDown(KEY_S) || IsKeyDown(KEY_DOWN)) state.down = true;
         if (IsKeyDown(KEY_A) || IsKeyDown(KEY_LEFT)) state.left = true;
@@ -62,20 +69,17 @@ RawInputState InputManager::PollRawInputs(int playerIndex) {
 
         if (IsKeyDown(KEY_U) || IsKeyDown(KEY_Z)) state.lp = true;
         if (IsKeyDown(KEY_I) || IsKeyDown(KEY_X)) state.hp = true;
-
         if (IsKeyDown(KEY_J) || IsKeyDown(KEY_C)) state.lk = true;
         if (IsKeyDown(KEY_K) || IsKeyDown(KEY_V)) state.hk = true;
 
         if (IsKeyDown(KEY_O) || IsKeyDown(KEY_E)) state.special = true;
-
         if (IsKeyDown(KEY_Y) || IsKeyDown(KEY_Q) || IsKeyDown(KEY_T)) state.taunt = true;
-
+        if (IsKeyDown(KEY_LEFT_CONTROL) || IsKeyDown(KEY_L)) state.block = true;
+        if (IsKeyDown(KEY_R)) state.finisher = true;
         if (IsKeyDown(KEY_TAB) || IsKeyDown(KEY_BACKSPACE) || IsKeyDown(KEY_ESCAPE)) state.select = true;
-
         if (IsKeyDown(KEY_ENTER) || IsKeyDown(KEY_ONE)) state.start = true;
         if (IsKeyDown(KEY_SPACE) || IsKeyDown(KEY_FIVE) || IsKeyDown(KEY_LEFT_SHIFT)) state.coin = true;
     } else {
-
         if (IsKeyDown(KEY_KP_8)) state.up = true;
         if (IsKeyDown(KEY_KP_2)) state.down = true;
         if (IsKeyDown(KEY_KP_4)) state.left = true;
@@ -83,13 +87,13 @@ RawInputState InputManager::PollRawInputs(int playerIndex) {
 
         if (IsKeyDown(KEY_KP_7)) state.lp = true;
         if (IsKeyDown(KEY_KP_9)) state.hp = true;
-
         if (IsKeyDown(KEY_KP_1)) state.lk = true;
         if (IsKeyDown(KEY_KP_3)) state.hk = true;
 
         if (IsKeyDown(KEY_KP_ADD)) state.special = true;
         if (IsKeyDown(KEY_KP_DECIMAL)) state.taunt = true;
-
+        if (IsKeyDown(KEY_RIGHT_CONTROL)) state.block = true;
+        if (IsKeyDown(KEY_KP_SUBTRACT)) state.finisher = true;
         if (IsKeyDown(KEY_KP_ENTER)) state.start = true;
     }
 
@@ -110,40 +114,30 @@ RawInputState InputManager::PollRawInputs(int playerIndex) {
         if (axisX < -STICK_HORIZ_THRESHOLD || IsGamepadButtonDown(pad, GAMEPAD_BUTTON_LEFT_FACE_LEFT)) state.left = true;
         if (axisX > STICK_HORIZ_THRESHOLD || IsGamepadButtonDown(pad, GAMEPAD_BUTTON_LEFT_FACE_RIGHT)) state.right = true;
 
-        if (IsGamepadButtonDown(pad, GAMEPAD_BUTTON_RIGHT_FACE_LEFT)) {
-            state.lp = true;
-        }
+        if (IsGamepadButtonDown(pad, GAMEPAD_BUTTON_RIGHT_FACE_LEFT)) state.lp = true;
+        if (IsGamepadButtonDown(pad, GAMEPAD_BUTTON_RIGHT_FACE_UP)) state.hp = true;
+        if (IsGamepadButtonDown(pad, GAMEPAD_BUTTON_RIGHT_FACE_DOWN)) state.lk = true;
+        if (IsGamepadButtonDown(pad, GAMEPAD_BUTTON_RIGHT_FACE_RIGHT)) state.hk = true;
 
-        if (IsGamepadButtonDown(pad, GAMEPAD_BUTTON_RIGHT_FACE_UP)) {
-            state.hp = true;
-        }
-
-        if (IsGamepadButtonDown(pad, GAMEPAD_BUTTON_RIGHT_FACE_DOWN)) {
-            state.lk = true;
-        }
-
-        if (IsGamepadButtonDown(pad, GAMEPAD_BUTTON_RIGHT_FACE_RIGHT)) {
-            state.hk = true;
-        }
-
-        if (IsGamepadButtonDown(pad, GAMEPAD_BUTTON_RIGHT_TRIGGER_1) ||
-            IsGamepadButtonDown(pad, GAMEPAD_BUTTON_RIGHT_TRIGGER_2) ||
-            GetGamepadAxisMovement(pad, GAMEPAD_AXIS_RIGHT_TRIGGER) > 0.35f) {
+        if (IsGamepadButtonDown(pad, GAMEPAD_BUTTON_RIGHT_TRIGGER_2) ||
+            GetGamepadAxisMovement(pad, GAMEPAD_AXIS_RIGHT_TRIGGER) > 0.30f) {
             state.special = true;
         }
+        if (IsGamepadButtonDown(pad, GAMEPAD_BUTTON_RIGHT_TRIGGER_1)) {
+            state.finisher = true;
+        }
 
-        if (IsGamepadButtonDown(pad, GAMEPAD_BUTTON_LEFT_TRIGGER_1) ||
-            IsGamepadButtonDown(pad, GAMEPAD_BUTTON_LEFT_TRIGGER_2) ||
-            GetGamepadAxisMovement(pad, GAMEPAD_AXIS_LEFT_TRIGGER) > 0.35f) {
+        bool l2Down = IsGamepadButtonDown(pad, GAMEPAD_BUTTON_LEFT_TRIGGER_2) ||
+                      (GetGamepadAxisMovement(pad, GAMEPAD_AXIS_LEFT_TRIGGER) > 0.30f);
+        if (l2Down) {
+            state.block = true;
+        }
+        if (IsGamepadButtonDown(pad, GAMEPAD_BUTTON_LEFT_TRIGGER_1)) {
             state.taunt = true;
         }
-
-        if (IsGamepadButtonDown(pad, GAMEPAD_BUTTON_MIDDLE_RIGHT)) {
-            state.start = true;
-        }
-
+        if (IsGamepadButtonDown(pad, GAMEPAD_BUTTON_MIDDLE_RIGHT)) state.start = true;
         if (IsGamepadButtonDown(pad, GAMEPAD_BUTTON_MIDDLE_LEFT) ||
-            IsGamepadButtonDown(pad, GAMEPAD_BUTTON_MIDDLE)) {
+            (!l2Down && IsGamepadButtonDown(pad, GAMEPAD_BUTTON_MIDDLE))) {
             state.coin = true;
             state.select = true;
         }
@@ -153,113 +147,129 @@ RawInputState InputManager::PollRawInputs(int playerIndex) {
 }
 
 bool InputManager::HasHumanInput(int playerIndex) {
-    if (playerIndex == 0) return true;
-    return false;
+    return (playerIndex == 0);
+}
+
+void InputManager::RecordFrame(const RawInputState& state, bool facingRight) {
+    m_head = (m_head + 1) % BUFFER_SIZE;
+    BufferedFrame& frame = m_history[m_head];
+
+    frame.rawDir = 0;
+    if (state.up) frame.rawDir |= 1;
+    if (state.down) frame.rawDir |= 2;
+    if (state.left) frame.rawDir |= 4;
+    if (state.right) frame.rawDir |= 8;
+
+    frame.relDir = ComputeRelativeDirection(state, facingRight);
+
+    frame.buttonsHeld = 0;
+    if (state.lp) frame.buttonsHeld |= BTN_LP;
+    if (state.hp) frame.buttonsHeld |= BTN_HP;
+    if (state.lk) frame.buttonsHeld |= BTN_LK;
+    if (state.hk) frame.buttonsHeld |= BTN_HK;
+    if (state.special) frame.buttonsHeld |= BTN_SPECIAL;
+    if (state.taunt) frame.buttonsHeld |= BTN_TAUNT;
+    if (state.block) frame.buttonsHeld |= BTN_BLOCK;
+    if (state.finisher) frame.buttonsHeld |= BTN_FINISHER;
+    if (state.select) frame.buttonsHeld |= BTN_SELECT;
+    if (state.start) frame.buttonsHeld |= BTN_START;
+    if (state.coin) frame.buttonsHeld |= BTN_COIN;
+
+    frame.buttonsPressed = 0;
+    if (state.lp && !m_prevState.lp) frame.buttonsPressed |= BTN_LP;
+    if (state.hp && !m_prevState.hp) frame.buttonsPressed |= BTN_HP;
+    if (state.lk && !m_prevState.lk) frame.buttonsPressed |= BTN_LK;
+    if (state.hk && !m_prevState.hk) frame.buttonsPressed |= BTN_HK;
+    if (state.special && !m_prevState.special) frame.buttonsPressed |= BTN_SPECIAL;
+    if (state.taunt && !m_prevState.taunt) frame.buttonsPressed |= BTN_TAUNT;
+    if (state.block && !m_prevState.block) frame.buttonsPressed |= BTN_BLOCK;
+    if (state.finisher && !m_prevState.finisher) frame.buttonsPressed |= BTN_FINISHER;
+    if (state.select && !m_prevState.select) frame.buttonsPressed |= BTN_SELECT;
+    if (state.start && !m_prevState.start) frame.buttonsPressed |= BTN_START;
+    if (state.coin && !m_prevState.coin) frame.buttonsPressed |= BTN_COIN;
+
+    frame.buttonsReleased = 0;
+    if (!state.lp && m_prevState.lp) frame.buttonsReleased |= BTN_LP;
+    if (!state.hp && m_prevState.hp) frame.buttonsReleased |= BTN_HP;
+    if (!state.lk && m_prevState.lk) frame.buttonsReleased |= BTN_LK;
+    if (!state.hk && m_prevState.hk) frame.buttonsReleased |= BTN_HK;
+
+    if (frame.relDir == DIR_REL_BACK || frame.relDir == DIR_REL_DOWN_BACK || frame.relDir == DIR_REL_UP_BACK) {
+        m_chargeBackFrames++;
+    } else {
+        m_chargeBackFrames = 0;
+    }
+
+    if (frame.relDir == DIR_REL_DOWN || frame.relDir == DIR_REL_DOWN_BACK || frame.relDir == DIR_REL_DOWN_FORWARD) {
+        m_chargeDownFrames++;
+    } else {
+        m_chargeDownFrames = 0;
+    }
 }
 
 void InputManager::Update(int playerIndex, bool facingRight) {
     m_prevState = m_currentState;
     m_currentState = PollRawInputs(playerIndex);
-
-    m_head = (m_head + 1) % BUFFER_SIZE;
-    BufferedFrame& frame = m_history[m_head];
-
-    frame.rawDir = 0;
-    if (m_currentState.up) frame.rawDir |= 1;
-    if (m_currentState.down) frame.rawDir |= 2;
-    if (m_currentState.left) frame.rawDir |= 4;
-    if (m_currentState.right) frame.rawDir |= 8;
-
-    frame.relDir = ComputeRelativeDirection(m_currentState, facingRight);
-
-    frame.buttonsHeld = 0;
-    if (m_currentState.lp) frame.buttonsHeld |= BTN_LP;
-    if (m_currentState.hp) frame.buttonsHeld |= BTN_HP;
-    if (m_currentState.lk) frame.buttonsHeld |= BTN_LK;
-    if (m_currentState.hk) frame.buttonsHeld |= BTN_HK;
-    if (m_currentState.special) frame.buttonsHeld |= BTN_SPECIAL;
-    if (m_currentState.taunt) frame.buttonsHeld |= BTN_TAUNT;
-    if (m_currentState.select) frame.buttonsHeld |= BTN_SELECT;
-    if (m_currentState.start) frame.buttonsHeld |= BTN_START;
-    if (m_currentState.coin) frame.buttonsHeld |= BTN_COIN;
-
-    frame.buttonsPressed = 0;
-    if (m_currentState.lp && !m_prevState.lp) frame.buttonsPressed |= BTN_LP;
-    if (m_currentState.hp && !m_prevState.hp) frame.buttonsPressed |= BTN_HP;
-    if (m_currentState.lk && !m_prevState.lk) frame.buttonsPressed |= BTN_LK;
-    if (m_currentState.hk && !m_prevState.hk) frame.buttonsPressed |= BTN_HK;
-    if (m_currentState.special && !m_prevState.special) frame.buttonsPressed |= BTN_SPECIAL;
-    if (m_currentState.taunt && !m_prevState.taunt) frame.buttonsPressed |= BTN_TAUNT;
-    if (m_currentState.select && !m_prevState.select) frame.buttonsPressed |= BTN_SELECT;
-    if (m_currentState.start && !m_prevState.start) frame.buttonsPressed |= BTN_START;
-    if (m_currentState.coin && !m_prevState.coin) frame.buttonsPressed |= BTN_COIN;
-
-    if (frame.relDir == DIR_REL_BACK || frame.relDir == DIR_REL_DOWN_BACK || frame.relDir == DIR_REL_UP_BACK) {
-        m_chargeBackFrames++;
-    } else {
-        m_chargeBackFrames = 0;
-    }
-
-    if (frame.relDir == DIR_REL_DOWN || frame.relDir == DIR_REL_DOWN_BACK || frame.relDir == DIR_REL_DOWN_FORWARD) {
-        m_chargeDownFrames++;
-    } else {
-        m_chargeDownFrames = 0;
-    }
+    RecordFrame(m_currentState, facingRight);
 }
 
 void InputManager::UpdateSimulated(const RawInputState& simState, bool facingRight) {
     m_prevState = m_currentState;
     m_currentState = simState;
-
-    m_head = (m_head + 1) % BUFFER_SIZE;
-    BufferedFrame& frame = m_history[m_head];
-
-    frame.rawDir = 0;
-    if (m_currentState.up) frame.rawDir |= 1;
-    if (m_currentState.down) frame.rawDir |= 2;
-    if (m_currentState.left) frame.rawDir |= 4;
-    if (m_currentState.right) frame.rawDir |= 8;
-
-    frame.relDir = ComputeRelativeDirection(m_currentState, facingRight);
-
-    frame.buttonsHeld = 0;
-    if (m_currentState.lp) frame.buttonsHeld |= BTN_LP;
-    if (m_currentState.hp) frame.buttonsHeld |= BTN_HP;
-    if (m_currentState.lk) frame.buttonsHeld |= BTN_LK;
-    if (m_currentState.hk) frame.buttonsHeld |= BTN_HK;
-    if (m_currentState.special) frame.buttonsHeld |= BTN_SPECIAL;
-    if (m_currentState.taunt) frame.buttonsHeld |= BTN_TAUNT;
-    if (m_currentState.select) frame.buttonsHeld |= BTN_SELECT;
-    if (m_currentState.start) frame.buttonsHeld |= BTN_START;
-    if (m_currentState.coin) frame.buttonsHeld |= BTN_COIN;
-
-    frame.buttonsPressed = 0;
-    if (m_currentState.lp && !m_prevState.lp) frame.buttonsPressed |= BTN_LP;
-    if (m_currentState.hp && !m_prevState.hp) frame.buttonsPressed |= BTN_HP;
-    if (m_currentState.lk && !m_prevState.lk) frame.buttonsPressed |= BTN_LK;
-    if (m_currentState.hk && !m_prevState.hk) frame.buttonsPressed |= BTN_HK;
-    if (m_currentState.special && !m_prevState.special) frame.buttonsPressed |= BTN_SPECIAL;
-    if (m_currentState.taunt && !m_prevState.taunt) frame.buttonsPressed |= BTN_TAUNT;
-    if (m_currentState.select && !m_prevState.select) frame.buttonsPressed |= BTN_SELECT;
-    if (m_currentState.start && !m_prevState.start) frame.buttonsPressed |= BTN_START;
-    if (m_currentState.coin && !m_prevState.coin) frame.buttonsPressed |= BTN_COIN;
-
-    if (frame.relDir == DIR_REL_BACK || frame.relDir == DIR_REL_DOWN_BACK || frame.relDir == DIR_REL_UP_BACK) {
-        m_chargeBackFrames++;
-    } else {
-        m_chargeBackFrames = 0;
-    }
-
-    if (frame.relDir == DIR_REL_DOWN || frame.relDir == DIR_REL_DOWN_BACK || frame.relDir == DIR_REL_DOWN_FORWARD) {
-        m_chargeDownFrames++;
-    } else {
-        m_chargeDownFrames = 0;
-    }
+    RecordFrame(m_currentState, facingRight);
 }
 
 void InputManager::InjectSpecialMotion(SpecialMotionType motion, uint16_t buttonMask) {
     m_injectedMotion = motion;
     m_injectedButton = buttonMask;
+}
+
+int InputManager::CheckDashInput() const {
+    const BufferedFrame& curr = m_history[m_head];
+    const BufferedFrame& prev = GetHistoryFrame(1);
+
+    if (curr.relDir == DIR_REL_FORWARD && prev.relDir != DIR_REL_FORWARD) {
+        bool sawNeutral = false;
+        for (int i = 1; i <= 12; i++) {
+            RelativeDirection d = GetHistoryFrame(i).relDir;
+            if (d == DIR_REL_NEUTRAL) sawNeutral = true;
+            else if (sawNeutral && d == DIR_REL_FORWARD) return 1;
+            else if (d == DIR_REL_BACK || d == DIR_REL_UP || d == DIR_REL_DOWN) break;
+        }
+    } else if (curr.relDir == DIR_REL_BACK && prev.relDir != DIR_REL_BACK) {
+        bool sawNeutral = false;
+        for (int i = 1; i <= 12; i++) {
+            RelativeDirection d = GetHistoryFrame(i).relDir;
+            if (d == DIR_REL_NEUTRAL) sawNeutral = true;
+            else if (sawNeutral && d == DIR_REL_BACK) return -1;
+            else if (d == DIR_REL_FORWARD || d == DIR_REL_UP || d == DIR_REL_DOWN) break;
+        }
+    }
+    return 0;
+}
+
+bool InputManager::IsThrowInputPressed() const {
+    const BufferedFrame& curr = m_history[m_head];
+    const BufferedFrame& prev = GetHistoryFrame(1);
+
+    uint16_t recentPress = curr.buttonsPressed | prev.buttonsPressed;
+    if ((curr.buttonsPressed & (BTN_LP | BTN_LK)) && ((recentPress & (BTN_LP | BTN_LK)) == (BTN_LP | BTN_LK))) {
+        return true;
+    }
+
+    return false;
+}
+
+bool InputManager::IsAlphaCounterPressed() const {
+    const BufferedFrame& curr = m_history[m_head];
+    if (curr.relDir == DIR_REL_FORWARD || curr.relDir == DIR_REL_DOWN_FORWARD) {
+        uint16_t both = (curr.buttonsPressed | curr.buttonsHeld);
+        if ((curr.buttonsPressed & (BTN_HP | BTN_HK | BTN_SPECIAL)) &&
+            (((both & (BTN_HP | BTN_HK)) == (BTN_HP | BTN_HK)) || (curr.buttonsPressed & BTN_SPECIAL))) {
+            return true;
+        }
+    }
+    return false;
 }
 
 SpecialMotionType InputManager::CheckSpecialMotion(int& outButtonUsed) {
@@ -272,17 +282,23 @@ SpecialMotionType InputManager::CheckSpecialMotion(int& outButtonUsed) {
     }
 
     const BufferedFrame& curr = m_history[m_head];
-    if (curr.buttonsPressed == 0) {
+
+    uint16_t trig = curr.buttonsPressed | (curr.buttonsReleased & (BTN_LP | BTN_HP | BTN_LK | BTN_HK));
+    if (trig == 0) {
         return MOTION_NONE;
     }
 
-    outButtonUsed = curr.buttonsPressed;
+    outButtonUsed = (curr.buttonsPressed != 0) ? curr.buttonsPressed : trig;
 
-    if (curr.buttonsPressed & (BTN_LP | BTN_HP | BTN_LK | BTN_HK)) {
+    auto GetPastFrame = [&](int framesAgo) -> const BufferedFrame& {
+        int idx = (m_head - framesAgo + BUFFER_SIZE) % BUFFER_SIZE;
+        return m_history[idx];
+    };
+
+    if (trig & (BTN_LP | BTN_HP | BTN_LK | BTN_HK | BTN_SPECIAL)) {
         int sStage = 0;
-        for (int i = 26; i >= 0; i--) {
-            int idx = (m_head - i + BUFFER_SIZE) % BUFFER_SIZE;
-            RelativeDirection d = m_history[idx].relDir;
+        for (int i = 28; i >= 0; i--) {
+            RelativeDirection d = GetPastFrame(i).relDir;
             if (sStage == 0 && d == DIR_REL_DOWN) sStage = 1;
             else if (sStage == 1 && (d == DIR_REL_DOWN_FORWARD || d == DIR_REL_FORWARD)) sStage = 2;
             else if (sStage == 2 && d == DIR_REL_DOWN) sStage = 3;
@@ -290,141 +306,123 @@ SpecialMotionType InputManager::CheckSpecialMotion(int& outButtonUsed) {
                 return MOTION_SUPER_OMNIBUS;
             }
         }
+
+        bool twoButtons = ((curr.buttonsHeld & (BTN_LP | BTN_HP)) == (BTN_LP | BTN_HP)) ||
+                          ((curr.buttonsHeld & (BTN_LK | BTN_HK)) == (BTN_LK | BTN_HK));
+        if (twoButtons && (curr.buttonsPressed & (BTN_LP | BTN_HP | BTN_LK | BTN_HK))) {
+            bool sawD = false, sawF = false;
+            for (int i = 14; i >= 0; i--) {
+                RelativeDirection d = GetPastFrame(i).relDir;
+                if (d == DIR_REL_DOWN) sawD = true;
+                else if (sawD && (d == DIR_REL_DOWN_FORWARD || d == DIR_REL_FORWARD)) sawF = true;
+            }
+            if (sawD && sawF) return MOTION_SUPER_OMNIBUS;
+        }
     }
 
-    auto GetPastFrame = [&](int framesAgo) -> const BufferedFrame& {
-        int idx = (m_head - framesAgo + BUFFER_SIZE) % BUFFER_SIZE;
-        return m_history[idx];
-    };
-
     if (curr.buttonsPressed & BTN_HP) {
-        bool sawForward = false;
-        bool sawDown = false;
-        bool sawBack = false;
-        for (int i = 0; i < 20; i++) {
+        bool sawForward = false, sawDown = false, sawBack = false;
+        for (int i = 0; i < 22; i++) {
             RelativeDirection d = GetPastFrame(i).relDir;
             if (d == DIR_REL_FORWARD || d == DIR_REL_DOWN_FORWARD) sawForward = true;
             if (sawForward && (d == DIR_REL_DOWN || d == DIR_REL_DOWN_BACK || d == DIR_REL_DOWN_FORWARD)) sawDown = true;
-            if (sawDown && (d == DIR_REL_BACK || d == DIR_REL_DOWN_BACK)) {
-                sawBack = true;
-                break;
-            }
+            if (sawDown && (d == DIR_REL_BACK || d == DIR_REL_DOWN_BACK)) { sawBack = true; break; }
         }
-        if (sawForward && sawDown && sawBack) {
-            return MOTION_COMMAND_GRAB;
-        }
+        if (sawForward && sawDown && sawBack) return MOTION_COMMAND_GRAB;
     }
 
-    if (curr.buttonsPressed & (BTN_LP | BTN_HP | BTN_LK | BTN_HK)) {
+    if (trig & (BTN_LP | BTN_HP | BTN_LK | BTN_HK)) {
         bool sawFwdOrDF = (curr.relDir == DIR_REL_FORWARD || curr.relDir == DIR_REL_DOWN_FORWARD);
         int step = sawFwdOrDF ? 1 : 0;
-        int dIndex = -1;
-
         for (int i = step; i < MOTION_WINDOW; i++) {
             RelativeDirection d = GetPastFrame(i).relDir;
             if (step == 0) {
-                if (d == DIR_REL_FORWARD || d == DIR_REL_DOWN_FORWARD) {
-                    step = 1;
-                }
+                if (d == DIR_REL_FORWARD || d == DIR_REL_DOWN_FORWARD) step = 1;
             } else if (step == 1) {
-                if (d == DIR_REL_DOWN || d == DIR_REL_DOWN_BACK || d == DIR_REL_DOWN_FORWARD) {
-                    step = 2;
-                    dIndex = i;
-                }
+                if (d == DIR_REL_DOWN || d == DIR_REL_DOWN_BACK) step = 2;
             } else if (step == 2) {
-                if (d == DIR_REL_FORWARD || d == DIR_REL_UP_FORWARD) {
-
-                    if (curr.buttonsPressed & (BTN_LP | BTN_HP)) return MOTION_DP_P;
-                    if (curr.buttonsPressed & (BTN_LK | BTN_HK)) return MOTION_DP_K;
+                if (d == DIR_REL_FORWARD || d == DIR_REL_DOWN_FORWARD || d == DIR_REL_UP_FORWARD) {
+                    if (trig & (BTN_LP | BTN_HP)) return MOTION_DP_P;
+                    if (trig & (BTN_LK | BTN_HK)) return MOTION_DP_K;
                 }
             }
         }
     }
 
-    if (curr.buttonsPressed & (BTN_LP | BTN_HP | BTN_LK | BTN_HK)) {
-        bool sawFwd = (curr.relDir == DIR_REL_FORWARD || curr.relDir == DIR_REL_DOWN_FORWARD);
-        int stage = sawFwd ? 1 : 0;
-
-        for (int i = (sawFwd ? 1 : 0); i < MOTION_WINDOW; i++) {
+    if (trig & (BTN_LP | BTN_HP | BTN_LK | BTN_HK)) {
+        bool sawEndF = false, sawStartD = false;
+        for (int i = 0; i < MOTION_WINDOW; i++) {
             RelativeDirection d = GetPastFrame(i).relDir;
-            if (stage == 0) {
-                if (d == DIR_REL_FORWARD) stage = 1;
-            } else if (stage == 1) {
-                if (d == DIR_REL_DOWN_FORWARD || d == DIR_REL_FORWARD) stage = 2;
-            } else if (stage == 2) {
-                if (d == DIR_REL_DOWN || d == DIR_REL_DOWN_FORWARD) {
-                    if (curr.buttonsPressed & (BTN_LP | BTN_HP)) return MOTION_QCF_P;
-                    if (curr.buttonsPressed & (BTN_LK | BTN_HK)) return MOTION_QCF_K;
-                }
+            if (!sawEndF) {
+                if (d == DIR_REL_FORWARD || d == DIR_REL_DOWN_FORWARD) sawEndF = true;
+            } else {
+                if (d == DIR_REL_DOWN) { sawStartD = true; break; }
             }
+        }
+        if (sawEndF && sawStartD) {
+            if (trig & (BTN_LP | BTN_HP)) return MOTION_QCF_P;
+            if (trig & (BTN_LK | BTN_HK)) return MOTION_QCF_K;
+        }
+    }
+
+    if (trig & (BTN_LP | BTN_HP | BTN_LK | BTN_HK)) {
+        bool sawEndB = false, sawStartD = false;
+        for (int i = 0; i < MOTION_WINDOW; i++) {
+            RelativeDirection d = GetPastFrame(i).relDir;
+            if (!sawEndB) {
+                if (d == DIR_REL_BACK || d == DIR_REL_DOWN_BACK) sawEndB = true;
+            } else {
+                if (d == DIR_REL_DOWN) { sawStartD = true; break; }
+            }
+        }
+        if (sawEndB && sawStartD) {
+            if (trig & (BTN_LP | BTN_HP)) return MOTION_QCB_P;
+            if (trig & (BTN_LK | BTN_HK)) return MOTION_QCB_K;
         }
     }
 
     if (curr.buttonsPressed & (BTN_LP | BTN_HP | BTN_LK | BTN_HK)) {
-        bool sawBack = (curr.relDir == DIR_REL_BACK || curr.relDir == DIR_REL_DOWN_BACK);
-        int stage = sawBack ? 1 : 0;
-
-        for (int i = (sawBack ? 1 : 0); i < MOTION_WINDOW; i++) {
-            RelativeDirection d = GetPastFrame(i).relDir;
-            if (stage == 0) {
-                if (d == DIR_REL_BACK) stage = 1;
-            } else if (stage == 1) {
-                if (d == DIR_REL_DOWN_BACK || d == DIR_REL_BACK) stage = 2;
-            } else if (stage == 2) {
-                if (d == DIR_REL_DOWN || d == DIR_REL_DOWN_BACK) {
-                    if (curr.buttonsPressed & (BTN_LP | BTN_HP)) return MOTION_QCB_P;
-                    if (curr.buttonsPressed & (BTN_LK | BTN_HK)) return MOTION_QCB_K;
-                }
+        if (curr.relDir == DIR_REL_DOWN) {
+            bool sawN = false;
+            for (int i = 1; i < 16; i++) {
+                RelativeDirection d = GetPastFrame(i).relDir;
+                if (d == DIR_REL_NEUTRAL) sawN = true;
+                else if (sawN && d == DIR_REL_DOWN) return MOTION_DOWN_DOWN;
             }
         }
     }
 
     if (curr.relDir == DIR_REL_FORWARD || curr.relDir == DIR_REL_DOWN_FORWARD) {
-
         bool hadCharge = false;
-        for (int i = 1; i <= 8; i++) {
-            int pastCharge = (m_head - i + BUFFER_SIZE) % BUFFER_SIZE;
-
+        for (int i = 1; i <= 10; i++) {
             int backCount = 0;
             for (int k = i; k < i + 50 && k < BUFFER_SIZE; k++) {
                 RelativeDirection d = GetPastFrame(k).relDir;
-                if (d == DIR_REL_BACK || d == DIR_REL_DOWN_BACK || d == DIR_REL_UP_BACK) {
-                    backCount++;
-                } else {
-                    break;
-                }
+                if (d == DIR_REL_BACK || d == DIR_REL_DOWN_BACK || d == DIR_REL_UP_BACK) backCount++;
+                else break;
             }
-            if (backCount >= CHARGE_REQUIRED_FRAMES - 5) {
-                hadCharge = true;
-                break;
-            }
+            if (backCount >= CHARGE_REQUIRED_FRAMES) { hadCharge = true; break; }
         }
         if (hadCharge) {
-            if (curr.buttonsPressed & (BTN_LP | BTN_HP)) return MOTION_CHARGE_B_F_P;
-            if (curr.buttonsPressed & (BTN_LK | BTN_HK)) return MOTION_CHARGE_B_F_K;
+            if (trig & (BTN_LP | BTN_HP)) return MOTION_CHARGE_B_F_P;
+            if (trig & (BTN_LK | BTN_HK)) return MOTION_CHARGE_B_F_K;
         }
     }
 
     if (curr.relDir == DIR_REL_UP || curr.relDir == DIR_REL_UP_FORWARD || curr.relDir == DIR_REL_UP_BACK) {
         bool hadCharge = false;
-        for (int i = 1; i <= 8; i++) {
+        for (int i = 1; i <= 10; i++) {
             int downCount = 0;
             for (int k = i; k < i + 50 && k < BUFFER_SIZE; k++) {
                 RelativeDirection d = GetPastFrame(k).relDir;
-                if (d == DIR_REL_DOWN || d == DIR_REL_DOWN_BACK || d == DIR_REL_DOWN_FORWARD) {
-                    downCount++;
-                } else {
-                    break;
-                }
+                if (d == DIR_REL_DOWN || d == DIR_REL_DOWN_BACK || d == DIR_REL_DOWN_FORWARD) downCount++;
+                else break;
             }
-            if (downCount >= CHARGE_REQUIRED_FRAMES - 5) {
-                hadCharge = true;
-                break;
-            }
+            if (downCount >= CHARGE_REQUIRED_FRAMES) { hadCharge = true; break; }
         }
         if (hadCharge) {
-            if (curr.buttonsPressed & (BTN_LK | BTN_HK)) return MOTION_CHARGE_D_U_K;
-            if (curr.buttonsPressed & (BTN_LP | BTN_HP)) return MOTION_CHARGE_B_F_P;
+            if (trig & (BTN_LK | BTN_HK)) return MOTION_CHARGE_D_U_K;
+            if (trig & (BTN_LP | BTN_HP)) return MOTION_CHARGE_B_F_P;
         }
     }
 
@@ -433,6 +431,7 @@ SpecialMotionType InputManager::CheckSpecialMotion(int& outButtonUsed) {
 
 void InputManager::ConsumeMotion() {
     m_history[m_head].buttonsPressed = 0;
+    m_history[m_head].buttonsReleased = 0;
     m_chargeBackFrames = 0;
     m_chargeDownFrames = 0;
 }
@@ -449,55 +448,42 @@ void InputManager::Reset() {
 }
 
 bool InputManager::IsTriggerEasterEggPressed() const {
-
-    if ((IsKeyDown(KEY_Q) && IsKeyDown(KEY_E)) ||
-        (IsKeyDown(KEY_LEFT_BRACKET) && IsKeyDown(KEY_RIGHT_BRACKET)) ||
-        IsKeyPressed(KEY_T) ||
-        (IsKeyDown(KEY_U) && IsKeyDown(KEY_O))) {
+    if (IsKeyPressed(KEY_F4) || (IsKeyDown(KEY_BACKSPACE) && IsKeyPressed(KEY_R))) {
         return true;
     }
-
     for (int pad = 0; pad < 4; pad++) {
         if (!IsGamepadAvailable(pad)) continue;
-
-        bool leftTrigger = IsGamepadButtonDown(pad, GAMEPAD_BUTTON_LEFT_TRIGGER_1) ||
-                           IsGamepadButtonDown(pad, GAMEPAD_BUTTON_LEFT_TRIGGER_2) ||
-                           (GetGamepadAxisMovement(pad, GAMEPAD_AXIS_LEFT_TRIGGER) > 0.3f);
-
-        bool rightTrigger = IsGamepadButtonDown(pad, GAMEPAD_BUTTON_RIGHT_TRIGGER_1) ||
-                            IsGamepadButtonDown(pad, GAMEPAD_BUTTON_RIGHT_TRIGGER_2) ||
-                            (GetGamepadAxisMovement(pad, GAMEPAD_AXIS_RIGHT_TRIGGER) > 0.3f);
-
-        if (leftTrigger && rightTrigger) {
+        if (IsGamepadButtonDown(pad, GAMEPAD_BUTTON_MIDDLE_LEFT) &&
+            IsGamepadButtonPressed(pad, GAMEPAD_BUTTON_RIGHT_TRIGGER_1)) {
             return true;
         }
     }
-
     return false;
 }
 
 bool InputManager::IsSecretMenuComboPressed() const {
-
-    if ((IsKeyDown(KEY_Q) && IsKeyDown(KEY_E)) ||
-        (IsKeyDown(KEY_LEFT_BRACKET) && IsKeyDown(KEY_RIGHT_BRACKET))) {
+    if (IsKeyPressed(KEY_F3) ||
+        (IsKeyDown(KEY_LEFT_BRACKET) && IsKeyDown(KEY_RIGHT_BRACKET)) ||
+        (IsKeyDown(KEY_L) && IsKeyPressed(KEY_O)) ||
+        (IsKeyDown(KEY_O) && IsKeyPressed(KEY_L)) ||
+        (IsKeyDown(KEY_BACKSPACE) && IsKeyPressed(KEY_Q))) {
         return true;
     }
-
     for (int pad = 0; pad < 4; pad++) {
         if (!IsGamepadAvailable(pad)) continue;
-
-        bool leftTrigger = IsGamepadButtonDown(pad, GAMEPAD_BUTTON_LEFT_TRIGGER_1) ||
-                           IsGamepadButtonDown(pad, GAMEPAD_BUTTON_LEFT_TRIGGER_2) ||
-                           (GetGamepadAxisMovement(pad, GAMEPAD_AXIS_LEFT_TRIGGER) > 0.4f);
-
-        bool rightTrigger = IsGamepadButtonDown(pad, GAMEPAD_BUTTON_RIGHT_TRIGGER_1) ||
-                            IsGamepadButtonDown(pad, GAMEPAD_BUTTON_RIGHT_TRIGGER_2) ||
-                            (GetGamepadAxisMovement(pad, GAMEPAD_AXIS_RIGHT_TRIGGER) > 0.4f);
-
-        if (leftTrigger && rightTrigger) {
+        if (IsGamepadButtonDown(pad, GAMEPAD_BUTTON_MIDDLE_LEFT) &&
+            IsGamepadButtonPressed(pad, GAMEPAD_BUTTON_LEFT_TRIGGER_1)) {
             return true;
         }
+        bool leftTrig = IsGamepadButtonDown(pad, GAMEPAD_BUTTON_LEFT_TRIGGER_2) ||
+                        (GetGamepadAxisMovement(pad, GAMEPAD_AXIS_LEFT_TRIGGER) > 0.4f);
+        bool rightTrig = IsGamepadButtonDown(pad, GAMEPAD_BUTTON_RIGHT_TRIGGER_2) ||
+                         (GetGamepadAxisMovement(pad, GAMEPAD_AXIS_RIGHT_TRIGGER) > 0.4f);
+        bool trigEdge = IsGamepadButtonPressed(pad, GAMEPAD_BUTTON_LEFT_TRIGGER_2) ||
+                        IsGamepadButtonPressed(pad, GAMEPAD_BUTTON_RIGHT_TRIGGER_2) ||
+                        (GetGamepadAxisMovement(pad, GAMEPAD_AXIS_LEFT_TRIGGER) > 0.4f &&
+                         GetGamepadAxisMovement(pad, GAMEPAD_AXIS_RIGHT_TRIGGER) > 0.4f);
+        if (leftTrig && rightTrig && trigEdge) return true;
     }
-
     return false;
 }

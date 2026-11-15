@@ -8,6 +8,8 @@ enum FighterState {
     FSTATE_IDLE,
     FSTATE_WALK_FWD,
     FSTATE_WALK_BACK,
+    FSTATE_DASH_FWD,
+    FSTATE_DASH_BACK,
     FSTATE_JUMP,
     FSTATE_CROUCH,
     FSTATE_BLOCK_HIGH,
@@ -20,6 +22,10 @@ enum FighterState {
     FSTATE_ATTACK,
     FSTATE_SPECIAL,
     FSTATE_TAUNT,
+    FSTATE_CALL_TO_PRAYER,
+    FSTATE_FINISH_HIM_DIZZY,
+    FSTATE_FINISHER,
+    FSTATE_FINISHER_VICTIM,
     FSTATE_VICTORY,
     FSTATE_DEFEAT
 };
@@ -28,6 +34,31 @@ enum HighBenchStage {
     HB_STAGE_THOMAS = 0,
     HB_STAGE_ROBERTS = 1,
     HB_STAGE_SOTOMAYOR = 2
+};
+
+enum ProjectileType {
+    PROJ_SPARK = 0,
+    PROJ_LEDGER = 1,
+    PROJ_ARC_BOMB = 2,
+    PROJ_TRAP_FIELD = 3,
+    PROJ_COKE_SPRAY = 4,
+    PROJ_GAVEL_WAVE = 5,
+    PROJ_DISSENT_FLAME = 6,
+    PROJ_SECRET_SERVICE = 7,
+    PROJ_SAX_NOTES = 8,
+    PROJ_POLLING_MAP = 9,
+    PROJ_HOPE_BASKETBALL = 10,
+
+    PROJ_SHAWARMA = 11,
+    PROJ_WHEELCHAIR = 12,
+    PROJ_ATM_HACK = 13,
+    PROJ_SUPREME_WAVE = 14,
+    PROJ_EYE_LASER = 15,
+    PROJ_HAMMER_SICKLE = 16,
+    PROJ_SPY_RADIO = 17,
+    PROJ_PAPER_PLANE = 18,
+    PROJ_SHOTGUN_BLAST = 19,
+    PROJ_HORMUZ_BLOCKADE = 20
 };
 
 struct AttackData {
@@ -49,6 +80,7 @@ struct AttackData {
     float boxH = 16.0f;
     bool isSpecial = false;
     AttackMoveType moveType = MOVE_LIGHT_PUNCH;
+    bool isLauncher = false;
 };
 
 struct Projectile {
@@ -58,6 +90,7 @@ struct Projectile {
     float height = 14.0f;
     int damage = 12;
     int lifetime = 180;
+    int age = 0;
     bool active = false;
     bool facingRight = true;
     int type = 0;
@@ -88,8 +121,9 @@ public:
     void UpdateAnimation();
 
     bool CheckCanBlock(AttackType type) const;
-    void ApplyHit(int damage, AttackType type, int hitstop, int hitstun, float pushback, bool knockdown);
+    void ApplyHit(int damage, AttackType type, int hitstop, int hitstun, float pushback, bool knockdown, bool launcher = false);
     void ApplyBlock(int damage, int blockstop, int blockstun, float pushback);
+    void ApplyThrowTech(bool pushRight);
 
     Rectangle GetPushbox() const;
     std::vector<Rectangle> GetHurtboxes() const;
@@ -126,6 +160,7 @@ public:
     void SetState(FighterState st) { m_state = st; m_stateFrame = 0; }
     void TickWakeup() { if (m_state == FSTATE_WAKEUP) { m_stateFrame++; if (m_stateFrame >= 24) { m_state = FSTATE_IDLE; m_stateFrame = 0; } } }
     int GetHealth() const { return m_health; }
+    void SetHealth(int hp) { m_health = std::clamp(hp, 0, 100); }
     int GetRefillCount() const { return m_refillCount; }
     int GetRoundsWon() const { return m_roundsWon; }
     void AddRoundWin() { m_roundsWon++; }
@@ -142,20 +177,49 @@ public:
     const AttackData& GetCurrentAttack() const { return m_currentAttack; }
     int GetSpecialIndex() const { return m_specialIndex; }
     int GetComboCount() const { return m_comboCount; }
-    void AddComboHit() { m_comboCount++; m_comboResetTimer = 50; }
+    void AddComboHit() { m_comboCount++; m_comboResetTimer = 55; }
     void ResetCombo() { m_comboCount = 0; m_comboResetTimer = 0; }
     int GetLastFrameAdvantage() const { return m_lastFrameAdvantage; }
     void SetLastFrameAdvantage(int adv) { m_lastFrameAdvantage = adv; }
+
+    int GetSuperMeter() const { return m_superMeter; }
+    void AddSuperMeter(int amount) { m_superMeter = std::clamp(m_superMeter + amount, 0, 300); }
+    bool CanUseSuper() const { return m_superMeter >= 100 || (!m_desperationSuperUsed && m_health > 0 && m_health <= 22); }
+
+    bool CanTechThrow() const { return m_throwTechWindow > 0; }
+    int GetJuggleHits() const { return m_juggleHits; }
+    int GetStarBurstTimer() const { return m_starBurstTimer; }
+    void TriggerStarBurst(int frames = 55) { m_starBurstTimer = frames; }
+    int GetElectroShockTimer() const { return m_electroShockTimer; }
+    void TriggerElectroShock(int frames = 62) { m_electroShockTimer = frames; }
+    int GetJengaTimer() const { return m_jengaTimer; }
+    void TriggerJengaCollapse(int frames = 68) { m_jengaTimer = frames; }
+    int GetLaughTimer() const { return m_laughTimer; }
+    bool IsLaughingAtCamera() const { return m_charId == CHAR_DICK && m_laughTimer > 0; }
+    void TriggerCameraLaugh(int frames = 40);
+    void SetActiveTaunt(const std::string& text, int frames = 90) { m_activeTaunt = text; m_tauntTimer = frames; }
+    void EnterFinishHimDizzy();
+    void TriggerVetoedKO();
+    void StartFinisher(Fighter& victim);
+    void EnterFinisherVictim();
+    bool IsPerformingFinisher() const { return m_state == FSTATE_FINISHER; }
+    bool DidExecuteFinisher() const { return m_executedFinisher; }
+    static const char* GetFinisherName(CharacterId id);
+    static int GetFinisherPropIndex(CharacterId id);
+    bool IsSpiderHoleHidden() const { return m_charId == CHAR_THE_DICTATOR && m_state == FSTATE_SPECIAL && m_specialIndex == 1; }
+    float GetDamageMultiplier() const { return m_damageScale; }
+
     bool IsSuperMoveActive() const { return m_isSuperMove; }
     bool PopSuperFlashTrigger() { bool v = m_triggerSuperFlash; m_triggerSuperFlash = false; return v; }
     bool PopCancelCallout() { bool v = m_justCanceled; m_justCanceled = false; return v; }
     bool PopReversalCallout() { bool v = m_justReversal; m_justReversal = false; return v; }
+    bool PopAlphaCounterCallout() { bool v = m_justAlphaCounter; m_justAlphaCounter = false; return v; }
+    bool PopThrowTechCallout() { bool v = m_justThrowTeched; m_justThrowTeched = false; return v; }
 
     Color GetPrimaryColor() const { return m_color1; }
     Color GetSecondaryColor() const { return m_color2; }
     Color GetSkinColor() const { return m_colorSkin; }
 
-public:
     void StartNormalAttack(AttackMoveType moveType, const char* name, int startup, int active, int recovery,
                            int damage, AttackType type, int hitstop, int hitstun,
                            int blockstun, float push, bool heavy, float reachX, float reachY, float bw, float bh);
@@ -175,8 +239,9 @@ public:
 
 private:
     void InitCharacterProfile();
-    void SpawnProjectile(int type, float vx, float vy, int damage);
+    void SpawnProjectile(int type, float vx, float vy, int damage, float overrideX = -9999.0f, float overrideY = -9999.0f);
     bool TryExecuteBufferedMove(const Fighter& opponent);
+    bool TryTriggerAyatollahPrayer();
 
     int m_playerIndex = 0;
     CharacterId m_charId = CHAR_COMMANDER;
@@ -198,14 +263,27 @@ private:
     int m_comboResetTimer = 0;
     int m_lastFrameAdvantage = 0;
     int m_invincibleFrames = 0;
+    int m_superMeter = 0;
+    bool m_desperationSuperUsed = false;
+    int m_throwTechWindow = 0;
+    int m_juggleHits = 0;
+    int m_starBurstTimer = 0;
+    int m_electroShockTimer = 0;
+    int m_jengaTimer = 0;
+    int m_laughTimer = 0;
     bool m_isSuperMove = false;
     bool m_triggerSuperFlash = false;
     bool m_justCanceled = false;
     bool m_justReversal = false;
+    bool m_justAlphaCounter = false;
+    bool m_justThrowTeched = false;
     int m_multiHitsRemaining = 0;
+    mutable int m_tauntCycle = 0;
 
     bool m_isHoldingBack = false;
     bool m_isHoldingDownBack = false;
+    bool m_isHoldingBlockButton = false;
+    bool m_executedFinisher = false;
     BufferedInput m_buffer{};
 
     int m_health = 100;
@@ -223,8 +301,10 @@ private:
     float m_walkFwdSpeed = 2.30f;
     float m_walkBackSpeed = 1.70f;
     float m_jumpSpeedY = -9.2f;
-    float m_jumpSpeedX = 2.3f;
+    float m_jumpSpeedX = 2.4f;
     float m_gravity = 0.48f;
+    float m_damageScale = 1.0f;
+    float m_defenseScale = 1.0f;
 
     Color m_color1{ 20, 40, 140, 255 };
     Color m_color2{ 180, 20, 20, 255 };

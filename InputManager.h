@@ -27,6 +27,7 @@ enum SpecialMotionType {
     MOTION_CHARGE_B_F_K,
     MOTION_CHARGE_D_U_K,
     MOTION_COMMAND_GRAB,
+    MOTION_DOWN_DOWN,
     MOTION_SUPER_OMNIBUS
 };
 
@@ -41,6 +42,8 @@ struct RawInputState {
     bool hk = false;
     bool special = false;
     bool taunt = false;
+    bool block = false;
+    bool finisher = false;
     bool select = false;
     bool start = false;
     bool coin = false;
@@ -51,13 +54,14 @@ struct BufferedFrame {
     RelativeDirection relDir = DIR_REL_NEUTRAL;
     uint16_t buttonsHeld = 0;
     uint16_t buttonsPressed = 0;
+    uint16_t buttonsReleased = 0;
 };
 
 class InputManager {
 public:
     static constexpr int BUFFER_SIZE = 60;
-    static constexpr int MOTION_WINDOW = 15;
-    static constexpr int CHARGE_REQUIRED_FRAMES = 45;
+    static constexpr int MOTION_WINDOW = 18;
+    static constexpr int CHARGE_REQUIRED_FRAMES = 36;
 
     InputManager();
     void Update(int playerIndex, bool facingRight);
@@ -76,10 +80,13 @@ public:
     bool IsRightPressed() const { return m_currentState.right && !m_prevState.right; }
 
     bool IsTriggerEasterEggPressed() const;
-
     bool IsSecretMenuComboPressed() const;
 
     SpecialMotionType CheckSpecialMotion(int& outButtonUsed);
+
+    int CheckDashInput() const;
+    bool IsThrowInputPressed() const;
+    bool IsAlphaCounterPressed() const;
 
     int GetChargeBackFrames() const { return m_chargeBackFrames; }
     int GetChargeDownFrames() const { return m_chargeDownFrames; }
@@ -95,6 +102,7 @@ public:
 private:
     RawInputState PollRawInputs(int playerIndex);
     RelativeDirection ComputeRelativeDirection(const RawInputState& state, bool facingRight);
+    void RecordFrame(const RawInputState& state, bool facingRight);
 
     RawInputState m_currentState{};
     RawInputState m_prevState{};
