@@ -1,6 +1,28 @@
 #include "InputManager.h"
 #include <cmath>
 
+namespace {
+bool s_queuedKeyPress[512] = { false };
+}
+
+void InputManager::BeginRenderFrame() {
+    for (int i = 0; i < 512; ++i) {
+        s_queuedKeyPress[i] = false;
+    }
+    int k = GetKeyPressed();
+    while (k > 0) {
+        if (k < 512) {
+            s_queuedKeyPress[k] = true;
+        }
+        k = GetKeyPressed();
+    }
+}
+
+bool InputManager::WasKeyPressed(int key) {
+    if (key <= 0 || key >= 512) return false;
+    return IsKeyPressed(key) || s_queuedKeyPress[key];
+}
+
 InputManager::InputManager() {
     m_history.fill(BufferedFrame{});
 }
@@ -60,41 +82,45 @@ int InputManager::GetGamepadSlotForPlayer(int playerIndex) {
 
 RawInputState InputManager::PollRawInputs(int playerIndex) {
     RawInputState state{};
+    bool altHeld = IsKeyDown(KEY_LEFT_ALT) || IsKeyDown(KEY_RIGHT_ALT);
+    auto KeyActive = [](int key) -> bool {
+        return IsKeyDown(key) || WasKeyPressed(key);
+    };
 
     if (playerIndex == 0) {
-        if (IsKeyDown(KEY_W) || IsKeyDown(KEY_UP)) state.up = true;
-        if (IsKeyDown(KEY_S) || IsKeyDown(KEY_DOWN)) state.down = true;
-        if (IsKeyDown(KEY_A) || IsKeyDown(KEY_LEFT)) state.left = true;
-        if (IsKeyDown(KEY_D) || IsKeyDown(KEY_RIGHT)) state.right = true;
+        if (KeyActive(KEY_W) || KeyActive(KEY_UP)) state.up = true;
+        if (KeyActive(KEY_S) || KeyActive(KEY_DOWN)) state.down = true;
+        if (KeyActive(KEY_A) || KeyActive(KEY_LEFT)) state.left = true;
+        if (KeyActive(KEY_D) || KeyActive(KEY_RIGHT)) state.right = true;
 
-        if (IsKeyDown(KEY_U) || IsKeyDown(KEY_Z)) state.lp = true;
-        if (IsKeyDown(KEY_I) || IsKeyDown(KEY_X)) state.hp = true;
-        if (IsKeyDown(KEY_J) || IsKeyDown(KEY_C)) state.lk = true;
-        if (IsKeyDown(KEY_K) || IsKeyDown(KEY_V)) state.hk = true;
+        if (KeyActive(KEY_U) || KeyActive(KEY_Z)) state.lp = true;
+        if (KeyActive(KEY_I) || KeyActive(KEY_X)) state.hp = true;
+        if (KeyActive(KEY_J) || KeyActive(KEY_C)) state.lk = true;
+        if (KeyActive(KEY_K) || KeyActive(KEY_V)) state.hk = true;
 
-        if (IsKeyDown(KEY_O) || IsKeyDown(KEY_E)) state.special = true;
-        if (IsKeyDown(KEY_Y) || IsKeyDown(KEY_Q) || IsKeyDown(KEY_T)) state.taunt = true;
-        if (IsKeyDown(KEY_LEFT_CONTROL) || IsKeyDown(KEY_L)) state.block = true;
-        if (IsKeyDown(KEY_R)) state.finisher = true;
-        if (IsKeyDown(KEY_TAB) || IsKeyDown(KEY_BACKSPACE) || IsKeyDown(KEY_ESCAPE)) state.select = true;
-        if (IsKeyDown(KEY_ENTER) || IsKeyDown(KEY_ONE)) state.start = true;
-        if (IsKeyDown(KEY_SPACE) || IsKeyDown(KEY_FIVE) || IsKeyDown(KEY_LEFT_SHIFT)) state.coin = true;
+        if (KeyActive(KEY_O) || KeyActive(KEY_E)) state.special = true;
+        if (KeyActive(KEY_Y) || KeyActive(KEY_Q) || KeyActive(KEY_T)) state.taunt = true;
+        if (KeyActive(KEY_L) || KeyActive(KEY_LEFT_SHIFT) || KeyActive(KEY_RIGHT_SHIFT) ||
+            KeyActive(KEY_LEFT_CONTROL) || KeyActive(KEY_RIGHT_CONTROL)) state.block = true;
+        if (KeyActive(KEY_R)) state.finisher = true;
+        if (KeyActive(KEY_BACKSPACE)) state.select = true;
+        if (!altHeld && (KeyActive(KEY_ENTER) || KeyActive(KEY_KP_ENTER) || KeyActive(KEY_ONE))) state.start = true;
+        if (KeyActive(KEY_SPACE) || KeyActive(KEY_FIVE)) state.coin = true;
     } else {
-        if (IsKeyDown(KEY_KP_8)) state.up = true;
-        if (IsKeyDown(KEY_KP_2)) state.down = true;
-        if (IsKeyDown(KEY_KP_4)) state.left = true;
-        if (IsKeyDown(KEY_KP_6)) state.right = true;
+        if (KeyActive(KEY_KP_8)) state.up = true;
+        if (KeyActive(KEY_KP_2)) state.down = true;
+        if (KeyActive(KEY_KP_4)) state.left = true;
+        if (KeyActive(KEY_KP_6)) state.right = true;
 
-        if (IsKeyDown(KEY_KP_7)) state.lp = true;
-        if (IsKeyDown(KEY_KP_9)) state.hp = true;
-        if (IsKeyDown(KEY_KP_1)) state.lk = true;
-        if (IsKeyDown(KEY_KP_3)) state.hk = true;
+        if (KeyActive(KEY_KP_7)) state.lp = true;
+        if (KeyActive(KEY_KP_9)) state.hp = true;
+        if (KeyActive(KEY_KP_1)) state.lk = true;
+        if (KeyActive(KEY_KP_3)) state.hk = true;
 
-        if (IsKeyDown(KEY_KP_ADD)) state.special = true;
-        if (IsKeyDown(KEY_KP_DECIMAL)) state.taunt = true;
-        if (IsKeyDown(KEY_RIGHT_CONTROL)) state.block = true;
-        if (IsKeyDown(KEY_KP_SUBTRACT)) state.finisher = true;
-        if (IsKeyDown(KEY_KP_ENTER)) state.start = true;
+        if (KeyActive(KEY_KP_ADD)) state.special = true;
+        if (KeyActive(KEY_KP_DECIMAL)) state.taunt = true;
+        if (KeyActive(KEY_KP_0)) state.block = true;
+        if (KeyActive(KEY_KP_SUBTRACT)) state.finisher = true;
     }
 
     int startPad = (playerIndex == 0) ? 0 : GetGamepadSlotForPlayer(playerIndex);
@@ -207,9 +233,47 @@ void InputManager::RecordFrame(const RawInputState& state, bool facingRight) {
     }
 }
 
-void InputManager::Update(int playerIndex, bool facingRight) {
+void InputManager::LatchRenderFrame(int playerIndex) {
+    RawInputState s = PollRawInputs(playerIndex);
+    if (s.up) m_latchedPress.up = true;
+    if (s.down) m_latchedPress.down = true;
+    if (s.left) m_latchedPress.left = true;
+    if (s.right) m_latchedPress.right = true;
+    if (s.lp) m_latchedPress.lp = true;
+    if (s.hp) m_latchedPress.hp = true;
+    if (s.lk) m_latchedPress.lk = true;
+    if (s.hk) m_latchedPress.hk = true;
+    if (s.special) m_latchedPress.special = true;
+    if (s.taunt) m_latchedPress.taunt = true;
+    if (s.block) m_latchedPress.block = true;
+    if (s.finisher) m_latchedPress.finisher = true;
+    if (s.select) m_latchedPress.select = true;
+    if (s.start) m_latchedPress.start = true;
+    if (s.coin) m_latchedPress.coin = true;
+}
+
+void InputManager::Update(int playerIndex, bool facingRight, bool isExtraTurboSubstep) {
     m_prevState = m_currentState;
-    m_currentState = PollRawInputs(playerIndex);
+    RawInputState polled = PollRawInputs(playerIndex);
+    if (!isExtraTurboSubstep) {
+        polled.up = polled.up || m_latchedPress.up;
+        polled.down = polled.down || m_latchedPress.down;
+        polled.left = polled.left || m_latchedPress.left;
+        polled.right = polled.right || m_latchedPress.right;
+        polled.lp = polled.lp || m_latchedPress.lp;
+        polled.hp = polled.hp || m_latchedPress.hp;
+        polled.lk = polled.lk || m_latchedPress.lk;
+        polled.hk = polled.hk || m_latchedPress.hk;
+        polled.special = polled.special || m_latchedPress.special;
+        polled.taunt = polled.taunt || m_latchedPress.taunt;
+        polled.block = polled.block || m_latchedPress.block;
+        polled.finisher = polled.finisher || m_latchedPress.finisher;
+        polled.select = polled.select || m_latchedPress.select;
+        polled.start = polled.start || m_latchedPress.start;
+        polled.coin = polled.coin || m_latchedPress.coin;
+        m_latchedPress = RawInputState{};
+    }
+    m_currentState = polled;
     RecordFrame(m_currentState, facingRight);
 }
 
@@ -439,6 +503,7 @@ void InputManager::ConsumeMotion() {
 void InputManager::Reset() {
     m_currentState = RawInputState{};
     m_prevState = RawInputState{};
+    m_latchedPress = RawInputState{};
     m_history.fill(BufferedFrame{});
     m_head = 0;
     m_chargeBackFrames = 0;
@@ -448,7 +513,7 @@ void InputManager::Reset() {
 }
 
 bool InputManager::IsTriggerEasterEggPressed() const {
-    if (IsKeyPressed(KEY_F4) || (IsKeyDown(KEY_BACKSPACE) && IsKeyPressed(KEY_R))) {
+    if (WasKeyPressed(KEY_F4)) {
         return true;
     }
     for (int pad = 0; pad < 4; pad++) {
@@ -462,11 +527,8 @@ bool InputManager::IsTriggerEasterEggPressed() const {
 }
 
 bool InputManager::IsSecretMenuComboPressed() const {
-    if (IsKeyPressed(KEY_F3) ||
-        (IsKeyDown(KEY_LEFT_BRACKET) && IsKeyDown(KEY_RIGHT_BRACKET)) ||
-        (IsKeyDown(KEY_L) && IsKeyPressed(KEY_O)) ||
-        (IsKeyDown(KEY_O) && IsKeyPressed(KEY_L)) ||
-        (IsKeyDown(KEY_BACKSPACE) && IsKeyPressed(KEY_Q))) {
+    if (WasKeyPressed(KEY_F3) ||
+        (IsKeyDown(KEY_LEFT_BRACKET) && IsKeyDown(KEY_RIGHT_BRACKET))) {
         return true;
     }
     for (int pad = 0; pad < 4; pad++) {

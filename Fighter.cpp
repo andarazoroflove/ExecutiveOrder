@@ -1383,6 +1383,16 @@ bool Fighter::TryExecuteBufferedMove(const Fighter& opponent) {
                 StartNormalAttack(MOVE_HEAVY_KICK, "Stand Roundhouse", 6, 4, 12, 18, ATTACK_MID, 11, 25, 15, 4.4f, true, 38.0f, -38.0f, 32.0f, 22.0f);
             }
             return true;
+        } else if (btn == BTN_SPECIAL) {
+            bool wantSuper = crouch && CanUseSuper() && m_charId != CHAR_COUCHIE;
+            if (wantSuper) ExecuteSpecial(MOTION_SUPER_OMNIBUS, BTN_HP, opponent);
+            else TriggerSignatureSpecial(opponent);
+            return true;
+        } else if (btn == BTN_TAUNT) {
+            if (!IsAirborne()) {
+                TriggerTaunt();
+                return true;
+            }
         }
     }
     return false;
@@ -1534,7 +1544,7 @@ void Fighter::ApplyBlock(int chipDamage, int blockstop, int blockstun, float pus
 }
 
 void Fighter::UpdatePhysics(const InputManager& input, const Fighter& opponent) {
-    if (m_buffer.timer > 0) {
+    if (m_hitstopFrames <= 0 && m_buffer.timer > 0) {
         m_buffer.timer--;
         if (m_buffer.timer <= 0) m_buffer = BufferedInput{};
     }
@@ -1547,6 +1557,43 @@ void Fighter::UpdatePhysics(const InputManager& input, const Fighter& opponent) 
     if (m_tauntTimer > 0) {
         m_tauntTimer--;
         if (m_tauntTimer <= 0) m_activeTaunt = "";
+    }
+
+    RelativeDirection rel = input.GetCurrentRelDir();
+    m_isHoldingBack = (rel == DIR_REL_BACK || rel == DIR_REL_UP_BACK);
+    m_isHoldingDownBack = (rel == DIR_REL_DOWN_BACK);
+    m_isHoldingBlockButton = input.IsButtonHeld(BTN_BLOCK);
+    bool crouching = (rel == DIR_REL_DOWN || rel == DIR_REL_DOWN_BACK || rel == DIR_REL_DOWN_FORWARD);
+
+    if (input.IsThrowInputPressed()) {
+        m_throwTechWindow = 8;
+    }
+
+    int specialButton = 0;
+    SpecialMotionType motion = const_cast<InputManager&>(input).CheckSpecialMotion(specialButton);
+    if (motion != MOTION_NONE) {
+        const_cast<InputManager&>(input).ConsumeMotion();
+        m_buffer.motion = motion;
+        m_buffer.motionButton = specialButton;
+        m_buffer.timer = 12;
+    }
+
+    if (input.IsThrowInputPressed()) {
+        m_buffer.button = (BTN_LP | BTN_LK);
+        m_buffer.isCrouch = false;
+        m_buffer.timer = 10;
+    } else if (input.IsButtonPressed(BTN_SPECIAL)) {
+        m_buffer.button = BTN_SPECIAL; m_buffer.isCrouch = crouching; m_buffer.timer = 12;
+    } else if (input.IsButtonPressed(BTN_LP)) {
+        m_buffer.button = BTN_LP; m_buffer.isCrouch = crouching; m_buffer.timer = 10;
+    } else if (input.IsButtonPressed(BTN_HP)) {
+        m_buffer.button = BTN_HP; m_buffer.isCrouch = crouching; m_buffer.timer = 10;
+    } else if (input.IsButtonPressed(BTN_LK)) {
+        m_buffer.button = BTN_LK; m_buffer.isCrouch = crouching; m_buffer.timer = 10;
+    } else if (input.IsButtonPressed(BTN_HK)) {
+        m_buffer.button = BTN_HK; m_buffer.isCrouch = crouching; m_buffer.timer = 10;
+    } else if (input.IsButtonPressed(BTN_TAUNT)) {
+        m_buffer.button = BTN_TAUNT; m_buffer.isCrouch = false; m_buffer.timer = 10;
     }
 
     for (auto& p : m_projectiles) {
@@ -1665,60 +1712,25 @@ void Fighter::UpdatePhysics(const InputManager& input, const Fighter& opponent) 
         return;
     }
 
-    RelativeDirection rel = input.GetCurrentRelDir();
-    m_isHoldingBack = (rel == DIR_REL_BACK || rel == DIR_REL_UP_BACK);
-    m_isHoldingDownBack = (rel == DIR_REL_DOWN_BACK);
-    m_isHoldingBlockButton = input.IsButtonHeld(BTN_BLOCK);
-    bool crouching = (rel == DIR_REL_DOWN || rel == DIR_REL_DOWN_BACK || rel == DIR_REL_DOWN_FORWARD);
-
-    if (input.IsThrowInputPressed()) {
-        m_throwTechWindow = 8;
-    }
-
-    int specialButton = 0;
-    SpecialMotionType motion = const_cast<InputManager&>(input).CheckSpecialMotion(specialButton);
-    if (motion != MOTION_NONE) {
-        const_cast<InputManager&>(input).ConsumeMotion();
-        m_buffer.motion = motion;
-        m_buffer.motionButton = specialButton;
-        m_buffer.timer = 12;
-    }
-
     if (m_invincibleFrames > 0) m_invincibleFrames--;
     if (m_comboResetTimer > 0) {
         m_comboResetTimer--;
         if (m_comboResetTimer <= 0) m_comboCount = 0;
     }
 
-    if (input.IsThrowInputPressed()) {
-        m_buffer.button = (BTN_LP | BTN_LK);
-        m_buffer.isCrouch = false;
-        m_buffer.timer = 10;
-    } else if (input.IsButtonPressed(BTN_LP)) {
-        m_buffer.button = BTN_LP; m_buffer.isCrouch = crouching; m_buffer.timer = 10;
-    } else if (input.IsButtonPressed(BTN_HP)) {
-        m_buffer.button = BTN_HP; m_buffer.isCrouch = crouching; m_buffer.timer = 10;
-    } else if (input.IsButtonPressed(BTN_LK)) {
-        m_buffer.button = BTN_LK; m_buffer.isCrouch = crouching; m_buffer.timer = 10;
-    } else if (input.IsButtonPressed(BTN_HK)) {
-        m_buffer.button = BTN_HK; m_buffer.isCrouch = crouching; m_buffer.timer = 10;
-    }
-
-    if (input.IsButtonPressed(BTN_SPECIAL)) {
-        bool wantSuper = crouching && CanUseSuper() && m_charId != CHAR_COUCHIE;
-        if (grounded && (m_state == FSTATE_IDLE || m_state == FSTATE_WALK_FWD || m_state == FSTATE_WALK_BACK || m_state == FSTATE_CROUCH || m_state == FSTATE_DASH_FWD)) {
+    if (m_buffer.button == BTN_SPECIAL && m_buffer.timer > 0) {
+        bool wantSuper = m_buffer.isCrouch && CanUseSuper() && m_charId != CHAR_COUCHIE;
+        bool idleGuard = ((m_state == FSTATE_BLOCK_HIGH || m_state == FSTATE_BLOCK_LOW) && m_blockstunFrames <= 0);
+        if (grounded && (m_state == FSTATE_IDLE || m_state == FSTATE_WALK_FWD || m_state == FSTATE_WALK_BACK ||
+                         m_state == FSTATE_CROUCH || m_state == FSTATE_DASH_FWD || idleGuard)) {
+            m_buffer = BufferedInput{};
             if (wantSuper) ExecuteSpecial(MOTION_SUPER_OMNIBUS, BTN_HP, opponent);
             else TriggerSignatureSpecial(opponent);
-        } else if (m_state == FSTATE_ATTACK && (m_hitConnected || m_stateFrame < m_currentAttack.startupFrames + m_currentAttack.activeFrames + 5)) {
+        } else if (grounded && m_state == FSTATE_ATTACK && (m_hitConnected || m_stateFrame < m_currentAttack.startupFrames + m_currentAttack.activeFrames + 5)) {
+            m_buffer = BufferedInput{};
             m_justCanceled = true;
             if (wantSuper) ExecuteSpecial(MOTION_SUPER_OMNIBUS, BTN_HP, opponent);
             else TriggerSignatureSpecial(opponent);
-        }
-    }
-
-    if (input.IsButtonPressed(BTN_TAUNT)) {
-        if (grounded && (m_state == FSTATE_IDLE || m_state == FSTATE_WALK_FWD || m_state == FSTATE_WALK_BACK || m_state == FSTATE_CROUCH)) {
-            TriggerTaunt();
         }
     }
 
@@ -1821,10 +1833,10 @@ void Fighter::UpdatePhysics(const InputManager& input, const Fighter& opponent) 
     }
 
     case FSTATE_JUMP: {
-        if (m_buffer.button != 0) {
-            bool heavy = (m_buffer.button == BTN_HP || m_buffer.button == BTN_HK);
+        if (m_buffer.button != 0 && m_buffer.button != BTN_TAUNT) {
+            bool heavy = (m_buffer.button == BTN_HP || m_buffer.button == BTN_HK || m_buffer.button == BTN_SPECIAL);
             AttackMoveType mtype = MOVE_LIGHT_PUNCH;
-            if (m_buffer.button == BTN_HP) mtype = MOVE_HEAVY_PUNCH;
+            if (m_buffer.button == BTN_HP || m_buffer.button == BTN_SPECIAL) mtype = MOVE_HEAVY_PUNCH;
             else if (m_buffer.button == BTN_LK) mtype = MOVE_LIGHT_KICK;
             else if (m_buffer.button == BTN_HK) mtype = MOVE_HEAVY_KICK;
 
@@ -1927,7 +1939,7 @@ void Fighter::UpdatePhysics(const InputManager& input, const Fighter& opponent) 
     case FSTATE_BLOCK_LOW:
     case FSTATE_BLOCKSTUN: {
 
-        if (m_superMeter >= 100 && input.IsAlphaCounterPressed()) {
+        if (m_blockstunFrames > 0 && m_superMeter >= 100 && input.IsAlphaCounterPressed()) {
             m_superMeter -= 100;
             m_justAlphaCounter = true;
             m_invincibleFrames = 16;
@@ -1941,12 +1953,43 @@ void Fighter::UpdatePhysics(const InputManager& input, const Fighter& opponent) 
             break;
         }
         if (m_stateFrame >= m_blockstunFrames) {
+            m_blockstunFrames = 0;
+            int dashDir = input.CheckDashInput();
+            if (dashDir == 1 && !crouching) {
+                m_state = FSTATE_DASH_FWD;
+                m_stateFrame = 0;
+                m_vel.x = m_facingRight ? 5.0f : -5.0f;
+                AudioEngine::Instance().PlaySfxPan(SFX_DASH, 1.05f, 0.9f, m_pos.x);
+                break;
+            } else if (dashDir == -1 && !crouching) {
+                m_state = FSTATE_DASH_BACK;
+                m_stateFrame = 0;
+                m_invincibleFrames = 8;
+                m_vel.x = m_facingRight ? -4.8f : 4.8f;
+                m_vel.y = -2.8f;
+                m_pos.y += m_vel.y;
+                AudioEngine::Instance().PlaySfxPan(SFX_DASH, 0.92f, 0.9f, m_pos.x);
+                break;
+            }
+            bool rawUp = input.GetCurrentState().up;
+            if (rel == DIR_REL_UP || rel == DIR_REL_UP_FORWARD || rel == DIR_REL_UP_BACK || rawUp) {
+                bool rawFwd = m_facingRight ? input.GetCurrentState().right : input.GetCurrentState().left;
+                bool rawBack = m_facingRight ? input.GetCurrentState().left : input.GetCurrentState().right;
+                m_state = FSTATE_JUMP;
+                m_stateFrame = 0;
+                m_vel.y = m_jumpSpeedY;
+                m_vel.x = rawFwd ? (m_facingRight ? m_jumpSpeedX : -m_jumpSpeedX)
+                                 : (rawBack ? (m_facingRight ? -m_jumpSpeedX : m_jumpSpeedX) : 0.0f);
+                m_pos.y += m_vel.y;
+                m_pos.x += m_vel.x;
+                AudioEngine::Instance().PlaySfxPan(SFX_WHOOSH_LIGHT, 1.25f, 0.85f, m_pos.x);
+                break;
+            }
             if (TryExecuteBufferedMove(opponent)) {
                 break;
             }
             if (m_isHoldingBlockButton) {
                 m_state = crouching ? FSTATE_BLOCK_LOW : FSTATE_BLOCK_HIGH;
-                m_blockstunFrames = 0;
                 m_vel.x = 0.0f;
             } else {
                 m_state = crouching ? FSTATE_CROUCH : FSTATE_IDLE;

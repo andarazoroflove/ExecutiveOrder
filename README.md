@@ -49,9 +49,9 @@ Supports both **Keyboard** and **Gamepad** (Xbox / PlayStation / XInput / SDL co
 | **Light Kick** | `J` or `C` | `A` / Cross |
 | **Heavy Kick** | `K` or `V` | `B` / Circle |
 | **Signature Special** | `O` or `E` | `RT` / `R2` |
-| **Block** | Hold Back or `L` | Hold Back or `LT` / `L2` |
+| **Block** | Hold Back, `L`, or `Shift` | Hold Back or `LT` / `L2` |
 | **Taunt** | `Y` or `Q` | `LB` / `L1` |
-| **Turbo Speed** | `Tab` | `Select` (Title Screen) |
+| **Turbo Speed** | `Tab` | `Select` (Title / Select) |
 | **Start / Pause** | `Enter` | `Start` |
 | **Fullscreen Toggle** | `F11` or `Alt+Enter` | — |
 | **CRT Filter Toggle** | `F1` / `F2` | `R3` |

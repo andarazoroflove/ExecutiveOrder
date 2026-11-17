@@ -90,6 +90,7 @@ int main(int argc, char* argv[]) {
         TraceLog(LOG_FATAL, "ExecutiveVetoTurbo: Failed to initialize window / graphics context.");
         return 1;
     }
+    SetExitKey(KEY_NULL);
     SetTargetFPS(TARGET_FPS);
 #if !defined(GRAPHICS_API_OPENGL_ES2) && !defined(__aarch64__)
     SetWindowMinSize(1280, 720);
@@ -205,9 +206,9 @@ int main(int argc, char* argv[]) {
     int curvatureLoc = (crtShader.id > 0) ? GetShaderLocation(crtShader, "curvature") : -1;
     int bloomLoc = (crtShader.id > 0) ? GetShaderLocation(crtShader, "bloom") : -1;
 
-    float scanlineVal = 0.12f;
-    float curvatureVal = 0.0f;
-    float bloomVal = 0.05f;
+    float scanlineVal = 0.28f;
+    float curvatureVal = 0.03f;
+    float bloomVal = 0.22f;
     if (crtShader.id > 0) {
         if (scanlineLoc >= 0) SetShaderValue(crtShader, scanlineLoc, &scanlineVal, SHADER_UNIFORM_FLOAT);
         if (curvatureLoc >= 0) SetShaderValue(crtShader, curvatureLoc, &curvatureVal, SHADER_UNIFORM_FLOAT);
@@ -533,6 +534,13 @@ int main(int argc, char* argv[]) {
                 }
                 Rectangle carHurtbox = { (float)SCREEN_WIDTH * 0.5f - 88.0f, GROUND_Y - 72.0f, 176.0f, 72.0f };
                 Fighter carDummy(1, CHAR_TECH_VISIONARY, SCREEN_WIDTH * 0.5f);
+                if (inputP1.IsButtonPressed(BTN_SPECIAL) &&
+                    (p1->GetCharacterId() == CHAR_SLEEPY_JOE || p1->GetCharacterId() == CHAR_COUCHIE || p1->GetCharacterId() == CHAR_THE_DICTATOR)) {
+                    RawInputState smashSim = raw;
+                    smashSim.special = false;
+                    smashSim.hp = true;
+                    inputP1.UpdateSimulated(smashSim, p1->IsFacingRight());
+                }
                 p1->UpdatePhysics(inputP1, carDummy);
                 p1->SetPositionX(std::clamp(p1->GetPosition().x, 26.0f, (float)SCREEN_WIDTH - 26.0f));
 
@@ -881,6 +889,13 @@ int main(int argc, char* argv[]) {
                 float wallCenterX = (float)SCREEN_WIDTH * 0.5f + 16.0f;
                 Rectangle wallHurtbox = { wallCenterX - 74.0f, GROUND_Y - 102.0f, 148.0f, 102.0f };
                 Fighter wallDummy(1, CHAR_TECH_VISIONARY, wallCenterX);
+                if (inputP1.IsButtonPressed(BTN_SPECIAL) &&
+                    (p1->GetCharacterId() == CHAR_SLEEPY_JOE || p1->GetCharacterId() == CHAR_COUCHIE || p1->GetCharacterId() == CHAR_THE_DICTATOR)) {
+                    RawInputState smashSim = raw;
+                    smashSim.special = false;
+                    smashSim.hk = true;
+                    inputP1.UpdateSimulated(smashSim, p1->IsFacingRight());
+                }
                 p1->UpdatePhysics(inputP1, wallDummy);
                 p1->SetPositionX(std::clamp(p1->GetPosition().x, 26.0f, (float)SCREEN_WIDTH - 26.0f));
 
@@ -1081,22 +1096,29 @@ int main(int argc, char* argv[]) {
     };
 
     while (!WindowShouldClose() && !s_quitRequested) {
+        InputManager::BeginRenderFrame();
         float dt = GetFrameTime();
-        bool crtTogglePressed = IsKeyPressed(KEY_F1) || IsKeyPressed(KEY_F2);
+        bool altHeld = IsKeyDown(KEY_LEFT_ALT) || IsKeyDown(KEY_RIGHT_ALT);
+        bool enterPressed = !altHeld && (InputManager::WasKeyPressed(KEY_ENTER) || InputManager::WasKeyPressed(KEY_KP_ENTER));
+
+        bool crtTogglePressed = InputManager::WasKeyPressed(KEY_F1) || InputManager::WasKeyPressed(KEY_F2);
         for (int pad = 0; pad < 4; pad++) {
             if (IsGamepadAvailable(pad) && IsGamepadButtonPressed(pad, GAMEPAD_BUTTON_RIGHT_THUMB)) {
                 crtTogglePressed = true;
             }
         }
-        if (crtTogglePressed) enableCrt = !enableCrt;
+        if (crtTogglePressed) {
+            enableCrt = !enableCrt;
+            AudioEngine::Instance().PlaySfx(SFX_SELECT_CURSOR, enableCrt ? 1.25f : 0.90f, 0.85f);
+        }
         stateTimer += dt;
         AudioEngine::Instance().Update();
 
         bool killRequested = WindowShouldClose() || (s_quitRequested != 0);
-        if (IsKeyPressed(KEY_ESCAPE) && gameState != STATE_SECRET_SELECT) {
+        if (InputManager::WasKeyPressed(KEY_ESCAPE) && gameState != STATE_SECRET_SELECT) {
             killRequested = true;
         }
-        if (IsKeyDown(KEY_BACKSPACE) && IsKeyDown(KEY_ENTER)) {
+        if (!altHeld && IsKeyDown(KEY_BACKSPACE) && (IsKeyDown(KEY_ENTER) || IsKeyDown(KEY_KP_ENTER))) {
             killRequested = true;
         }
         for (int pad = 0; pad < 4; pad++) {
@@ -1114,18 +1136,19 @@ int main(int argc, char* argv[]) {
 #if !defined(GRAPHICS_API_OPENGL_ES2) && !defined(__aarch64__)
         mainLoopStarted = true;
 #endif
-        if (IsKeyPressed(KEY_F11) || ((IsKeyDown(KEY_LEFT_ALT) || IsKeyDown(KEY_RIGHT_ALT)) && IsKeyPressed(KEY_ENTER))) {
+        if (InputManager::WasKeyPressed(KEY_F11) ||
+            (altHeld && (InputManager::WasKeyPressed(KEY_ENTER) || InputManager::WasKeyPressed(KEY_KP_ENTER)))) {
             ToggleAppFullscreen();
         }
 
-        if (IsKeyPressed(KEY_F12)) {
+        if (InputManager::WasKeyPressed(KEY_F12)) {
             TakeScreenshot("screenshot.png");
         }
 
         static bool s_selectTapPending = false;
-        bool anySelectPressed = IsKeyPressed(KEY_BACKSPACE);
-        bool anySelectDown = IsKeyDown(KEY_BACKSPACE);
-        bool anySelectChordModifier = IsKeyDown(KEY_ENTER) || IsKeyDown(KEY_Q) || IsKeyDown(KEY_R);
+        bool anySelectPressed = false;
+        bool anySelectDown = false;
+        bool anySelectChordModifier = false;
         for (int pad = 0; pad < 4; pad++) {
             if (!IsGamepadAvailable(pad)) continue;
             if (IsGamepadButtonPressed(pad, GAMEPAD_BUTTON_MIDDLE_LEFT)) anySelectPressed = true;
@@ -1142,12 +1165,13 @@ int main(int argc, char* argv[]) {
         if (anySelectDown && anySelectChordModifier) {
             s_selectTapPending = false;
         }
-        bool cycleTurbo = IsKeyPressed(KEY_TAB);
+        bool tabTurbo = InputManager::WasKeyPressed(KEY_TAB);
+        bool padTurbo = false;
         if (!anySelectDown && s_selectTapPending) {
             s_selectTapPending = false;
-            cycleTurbo = true;
+            padTurbo = true;
         }
-        if ((gameState == STATE_SPLASH || gameState == STATE_SELECT_MAP) && cycleTurbo) {
+        if (tabTurbo || ((gameState == STATE_SPLASH || gameState == STATE_SELECT_MAP) && padTurbo)) {
             ChampionshipEdition::s_turboSpeed = (TurboSpeed)(((int)ChampionshipEdition::s_turboSpeed + 1) % 3);
             AudioEngine::Instance().PlaySfx(SFX_SELECT_CURSOR, 1.15f, 1.0f);
         }
@@ -1189,8 +1213,13 @@ int main(int argc, char* argv[]) {
             inputP1.Update(0, true);
 
             bool startPressed = false;
-            if (IsKeyPressed(KEY_ENTER) || IsKeyPressed(KEY_SPACE) || IsKeyPressed(KEY_ONE) || IsKeyPressed(KEY_FIVE) ||
-                IsKeyPressed(KEY_U) || IsKeyPressed(KEY_I) || IsKeyPressed(KEY_C) || IsKeyPressed(KEY_V)) {
+            if (enterPressed || InputManager::WasKeyPressed(KEY_SPACE) ||
+                InputManager::WasKeyPressed(KEY_ONE) || InputManager::WasKeyPressed(KEY_FIVE) ||
+                InputManager::WasKeyPressed(KEY_U) || InputManager::WasKeyPressed(KEY_Z) ||
+                InputManager::WasKeyPressed(KEY_I) || InputManager::WasKeyPressed(KEY_X) ||
+                InputManager::WasKeyPressed(KEY_J) || InputManager::WasKeyPressed(KEY_C) ||
+                InputManager::WasKeyPressed(KEY_K) || InputManager::WasKeyPressed(KEY_V) ||
+                InputManager::WasKeyPressed(KEY_O) || InputManager::WasKeyPressed(KEY_E)) {
                 startPressed = true;
             }
             for (int pad = 0; pad < 4; pad++) {
@@ -1206,7 +1235,8 @@ int main(int argc, char* argv[]) {
             }
             if (inputP1.IsButtonPressed(BTN_START) ||
                 inputP1.IsButtonPressed(BTN_LP) || inputP1.IsButtonPressed(BTN_HP) ||
-                inputP1.IsButtonPressed(BTN_LK) || inputP1.IsButtonPressed(BTN_HK)) {
+                inputP1.IsButtonPressed(BTN_LK) || inputP1.IsButtonPressed(BTN_HK) ||
+                inputP1.IsButtonPressed(BTN_SPECIAL)) {
                 startPressed = true;
             }
 
@@ -1302,16 +1332,15 @@ int main(int argc, char* argv[]) {
                 int p1Row = slot / 8;
                 bool p1Changed = false;
 
-                if (IsKeyPressed(KEY_LEFT) || IsKeyPressed(KEY_A) || inputP1.IsLeftPressed()) {
+                if (InputManager::WasKeyPressed(KEY_LEFT) || InputManager::WasKeyPressed(KEY_A) || inputP1.IsLeftPressed()) {
                     p1Col = (p1Col + 7) % 8;
                     p1Changed = true;
-                }
-                if (IsKeyPressed(KEY_RIGHT) || IsKeyPressed(KEY_D) || inputP1.IsRightPressed()) {
+                } else if (InputManager::WasKeyPressed(KEY_RIGHT) || InputManager::WasKeyPressed(KEY_D) || inputP1.IsRightPressed()) {
                     p1Col = (p1Col + 1) % 8;
                     p1Changed = true;
                 }
-                if (IsKeyPressed(KEY_UP) || IsKeyPressed(KEY_W) || inputP1.IsUpPressed() ||
-                    IsKeyPressed(KEY_DOWN) || IsKeyPressed(KEY_S) || inputP1.IsDownPressed()) {
+                if (InputManager::WasKeyPressed(KEY_UP) || InputManager::WasKeyPressed(KEY_W) || inputP1.IsUpPressed() ||
+                    InputManager::WasKeyPressed(KEY_DOWN) || InputManager::WasKeyPressed(KEY_S) || inputP1.IsDownPressed()) {
                     p1Row = 1 - p1Row;
                     p1Changed = true;
                 }
@@ -1326,10 +1355,21 @@ int main(int argc, char* argv[]) {
                 opponentLocked = false;
                 ChampionshipEdition::s_opponentLocked = false;
                 AudioEngine::Instance().SetBgmTrack(BGM_CHAR_SELECT);
+
+                if (matchesWon == 0 && InputManager::WasKeyPressed(KEY_BACKSPACE)) {
+                    playerLocked = false;
+                    choosingOpponent = false;
+                    currentStage = homeStages[(int)p1CharId];
+                    stageMgr.SetStage(currentStage);
+                    AudioEngine::Instance().PlaySfx(SFX_BLOCK, 1.0f);
+                    stateTimer = 0.0f;
+                    break;
+                }
+
                 bool p2Changed = false;
                 int curSlot = GetPlayableSlotForChar((int)p2CharId);
 
-                if (IsKeyPressed(KEY_RIGHT) || IsKeyPressed(KEY_D) || inputP1.IsRightPressed()) {
+                if (InputManager::WasKeyPressed(KEY_RIGHT) || InputManager::WasKeyPressed(KEY_D) || inputP1.IsRightPressed()) {
                     for (int step = 1; step < PLAYABLE_CHARACTER_COUNT; step++) {
                         int nextCid = PLAYABLE_ROSTER[(curSlot + step) % PLAYABLE_CHARACTER_COUNT];
                         if (nextCid != (int)p1CharId && !defeatedFighters[nextCid]) {
@@ -1338,8 +1378,7 @@ int main(int argc, char* argv[]) {
                             break;
                         }
                     }
-                }
-                if (IsKeyPressed(KEY_LEFT) || IsKeyPressed(KEY_A) || inputP1.IsLeftPressed()) {
+                } else if (InputManager::WasKeyPressed(KEY_LEFT) || InputManager::WasKeyPressed(KEY_A) || inputP1.IsLeftPressed()) {
                     for (int step = 1; step < PLAYABLE_CHARACTER_COUNT; step++) {
                         int prevCid = PLAYABLE_ROSTER[(curSlot - step + PLAYABLE_CHARACTER_COUNT) % PLAYABLE_CHARACTER_COUNT];
                         if (prevCid != (int)p1CharId && !defeatedFighters[prevCid]) {
@@ -1349,8 +1388,8 @@ int main(int argc, char* argv[]) {
                         }
                     }
                 }
-                if (IsKeyPressed(KEY_UP) || IsKeyPressed(KEY_W) || inputP1.IsUpPressed() ||
-                    IsKeyPressed(KEY_DOWN) || IsKeyPressed(KEY_S) || inputP1.IsDownPressed()) {
+                if (InputManager::WasKeyPressed(KEY_UP) || InputManager::WasKeyPressed(KEY_W) || inputP1.IsUpPressed() ||
+                    InputManager::WasKeyPressed(KEY_DOWN) || InputManager::WasKeyPressed(KEY_S) || inputP1.IsDownPressed()) {
                     int targetSlot = (curSlot + 8) % PLAYABLE_CHARACTER_COUNT;
                     for (int step = 0; step < PLAYABLE_CHARACTER_COUNT; step++) {
                         int candCid = PLAYABLE_ROSTER[(targetSlot + step) % PLAYABLE_CHARACTER_COUNT];
@@ -1409,9 +1448,11 @@ int main(int argc, char* argv[]) {
                 }
             }
 
-            if (canConfirm && (padConfirm || inputP1.IsButtonPressed(BTN_START) || inputP1.IsButtonPressed(BTN_LP) ||
+            bool specialConfirm = (!playerLocked || opponentLocked) && inputP1.IsButtonPressed(BTN_SPECIAL);
+            if (canConfirm && (padConfirm || enterPressed || InputManager::WasKeyPressed(KEY_SPACE) ||
+                inputP1.IsButtonPressed(BTN_START) || inputP1.IsButtonPressed(BTN_LP) ||
                 inputP1.IsButtonPressed(BTN_HP) || inputP1.IsButtonPressed(BTN_LK) ||
-                inputP1.IsButtonPressed(BTN_HK) || IsKeyPressed(KEY_ENTER) || IsKeyPressed(KEY_SPACE))) {
+                inputP1.IsButtonPressed(BTN_HK) || specialConfirm)) {
 
                 if (!playerLocked) {
                     playerLocked = true;
@@ -1482,10 +1523,10 @@ int main(int argc, char* argv[]) {
             currentStage = worldStageOrder[worldActIndex];
             stageMgr.SetStage(currentStage);
 
-            bool confirmPressed = (IsKeyPressed(KEY_ENTER) || IsKeyPressed(KEY_SPACE) ||
+            bool confirmPressed = (enterPressed || InputManager::WasKeyPressed(KEY_SPACE) ||
                 inputP1.IsButtonPressed(BTN_START) || inputP1.IsButtonPressed(BTN_LP) ||
                 inputP1.IsButtonPressed(BTN_HP) || inputP1.IsButtonPressed(BTN_LK) ||
-                inputP1.IsButtonPressed(BTN_HK));
+                inputP1.IsButtonPressed(BTN_HK) || inputP1.IsButtonPressed(BTN_SPECIAL));
 
             if (stateTimer >= 3.8f || (stateTimer >= 0.75f && confirmPressed)) {
                 AudioEngine::Instance().PlaySfx(SFX_SELECT_CONFIRM);
@@ -1509,7 +1550,7 @@ int main(int argc, char* argv[]) {
         case STATE_SECRET_SELECT: {
             inputP1.Update(0, true);
 
-            if (inputP1.IsButtonPressed(BTN_SELECT) || IsKeyPressed(KEY_ESCAPE) || IsKeyPressed(KEY_BACKSPACE)) {
+            if (inputP1.IsButtonPressed(BTN_SELECT) || InputManager::WasKeyPressed(KEY_ESCAPE) || InputManager::WasKeyPressed(KEY_BACKSPACE)) {
                 AudioEngine::Instance().PlaySfx(SFX_BLOCK, 1.0f);
                 AudioEngine::Instance().SetBgmTrack(BGM_MENU_SPLASH);
                 gameState = STATE_SPLASH;
@@ -1520,23 +1561,24 @@ int main(int argc, char* argv[]) {
 
             if (secretStep == 0 || secretStep == 1) {
                 int& curChar = (secretStep == 0) ? secretP1 : secretP2;
-                if (inputP1.IsLeftPressed() || IsKeyPressed(KEY_LEFT) || IsKeyPressed(KEY_A)) {
+                if (inputP1.IsLeftPressed() || InputManager::WasKeyPressed(KEY_LEFT) || InputManager::WasKeyPressed(KEY_A)) {
                     curChar = MoveSecretCharCursor(curChar, -1, 0);
                     AudioEngine::Instance().PlaySfx(SFX_SELECT_CURSOR);
-                } else if (inputP1.IsRightPressed() || IsKeyPressed(KEY_RIGHT) || IsKeyPressed(KEY_D)) {
+                } else if (inputP1.IsRightPressed() || InputManager::WasKeyPressed(KEY_RIGHT) || InputManager::WasKeyPressed(KEY_D)) {
                     curChar = MoveSecretCharCursor(curChar, +1, 0);
                     AudioEngine::Instance().PlaySfx(SFX_SELECT_CURSOR);
-                } else if (inputP1.IsUpPressed() || IsKeyPressed(KEY_UP) || IsKeyPressed(KEY_W)) {
+                } else if (inputP1.IsUpPressed() || InputManager::WasKeyPressed(KEY_UP) || InputManager::WasKeyPressed(KEY_W)) {
                     curChar = MoveSecretCharCursor(curChar, 0, -1);
                     AudioEngine::Instance().PlaySfx(SFX_SELECT_CURSOR);
-                } else if (inputP1.IsDownPressed() || IsKeyPressed(KEY_DOWN) || IsKeyPressed(KEY_S)) {
+                } else if (inputP1.IsDownPressed() || InputManager::WasKeyPressed(KEY_DOWN) || InputManager::WasKeyPressed(KEY_S)) {
                     curChar = MoveSecretCharCursor(curChar, 0, +1);
                     AudioEngine::Instance().PlaySfx(SFX_SELECT_CURSOR);
                 }
 
-                if (inputP1.IsButtonPressed(BTN_START) || inputP1.IsButtonPressed(BTN_LP) ||
+                if (enterPressed || InputManager::WasKeyPressed(KEY_SPACE) ||
+                    inputP1.IsButtonPressed(BTN_START) || inputP1.IsButtonPressed(BTN_LP) ||
                     inputP1.IsButtonPressed(BTN_HP) || inputP1.IsButtonPressed(BTN_LK) ||
-                    inputP1.IsButtonPressed(BTN_HK) || IsKeyPressed(KEY_ENTER) || IsKeyPressed(KEY_SPACE)) {
+                    inputP1.IsButtonPressed(BTN_HK) || inputP1.IsButtonPressed(BTN_SPECIAL)) {
                     AudioEngine::Instance().PlaySfx(SFX_SELECT_CONFIRM);
                     if (secretStep == 1) {
                         secretStage = (int)GetStageForOpponent((CharacterId)secretP2);
@@ -1545,39 +1587,41 @@ int main(int argc, char* argv[]) {
                     stateTimer = 0.0f;
                 }
             } else if (secretStep == 2) {
-                if (inputP1.IsLeftPressed() || IsKeyPressed(KEY_LEFT) || IsKeyPressed(KEY_A)) {
+                if (inputP1.IsLeftPressed() || InputManager::WasKeyPressed(KEY_LEFT) || InputManager::WasKeyPressed(KEY_A)) {
                     secretStage = (secretStage - 1 + STAGE_COUNT) % STAGE_COUNT;
                     AudioEngine::Instance().PlaySfx(SFX_SELECT_CURSOR);
-                } else if (inputP1.IsRightPressed() || IsKeyPressed(KEY_RIGHT) || IsKeyPressed(KEY_D)) {
+                } else if (inputP1.IsRightPressed() || InputManager::WasKeyPressed(KEY_RIGHT) || InputManager::WasKeyPressed(KEY_D)) {
                     secretStage = (secretStage + 1) % STAGE_COUNT;
                     AudioEngine::Instance().PlaySfx(SFX_SELECT_CURSOR);
-                } else if (inputP1.IsUpPressed() || IsKeyPressed(KEY_UP) || IsKeyPressed(KEY_W)) {
+                } else if (inputP1.IsUpPressed() || InputManager::WasKeyPressed(KEY_UP) || InputManager::WasKeyPressed(KEY_W)) {
                     secretStage = (secretStage - 6 + STAGE_COUNT) % STAGE_COUNT;
                     AudioEngine::Instance().PlaySfx(SFX_SELECT_CURSOR);
-                } else if (inputP1.IsDownPressed() || IsKeyPressed(KEY_DOWN) || IsKeyPressed(KEY_S)) {
+                } else if (inputP1.IsDownPressed() || InputManager::WasKeyPressed(KEY_DOWN) || InputManager::WasKeyPressed(KEY_S)) {
                     secretStage = (secretStage + 6) % STAGE_COUNT;
                     AudioEngine::Instance().PlaySfx(SFX_SELECT_CURSOR);
                 }
 
-                if (inputP1.IsButtonPressed(BTN_START) || inputP1.IsButtonPressed(BTN_LP) ||
+                if (enterPressed || InputManager::WasKeyPressed(KEY_SPACE) ||
+                    inputP1.IsButtonPressed(BTN_START) || inputP1.IsButtonPressed(BTN_LP) ||
                     inputP1.IsButtonPressed(BTN_HP) || inputP1.IsButtonPressed(BTN_LK) ||
-                    inputP1.IsButtonPressed(BTN_HK) || IsKeyPressed(KEY_ENTER) || IsKeyPressed(KEY_SPACE)) {
+                    inputP1.IsButtonPressed(BTN_HK) || inputP1.IsButtonPressed(BTN_SPECIAL)) {
                     AudioEngine::Instance().PlaySfx(SFX_SELECT_CONFIRM);
                     secretStep = 3;
                     stateTimer = 0.0f;
                 }
             } else if (secretStep == 3) {
-                if (inputP1.IsUpPressed() || IsKeyPressed(KEY_UP) || IsKeyPressed(KEY_W)) {
+                if (inputP1.IsUpPressed() || InputManager::WasKeyPressed(KEY_UP) || InputManager::WasKeyPressed(KEY_W)) {
                     secretDifficulty = (secretDifficulty - 1 + 3) % 3;
                     AudioEngine::Instance().PlaySfx(SFX_SELECT_CURSOR);
-                } else if (inputP1.IsDownPressed() || IsKeyPressed(KEY_DOWN) || IsKeyPressed(KEY_S)) {
+                } else if (inputP1.IsDownPressed() || InputManager::WasKeyPressed(KEY_DOWN) || InputManager::WasKeyPressed(KEY_S)) {
                     secretDifficulty = (secretDifficulty + 1) % 3;
                     AudioEngine::Instance().PlaySfx(SFX_SELECT_CURSOR);
                 }
 
-                if (inputP1.IsButtonPressed(BTN_START) || inputP1.IsButtonPressed(BTN_LP) ||
+                if (enterPressed || InputManager::WasKeyPressed(KEY_SPACE) ||
+                    inputP1.IsButtonPressed(BTN_START) || inputP1.IsButtonPressed(BTN_LP) ||
                     inputP1.IsButtonPressed(BTN_HP) || inputP1.IsButtonPressed(BTN_LK) ||
-                    inputP1.IsButtonPressed(BTN_HK) || IsKeyPressed(KEY_ENTER) || IsKeyPressed(KEY_SPACE)) {
+                    inputP1.IsButtonPressed(BTN_HK) || inputP1.IsButtonPressed(BTN_SPECIAL)) {
                     AudioEngine::Instance().PlaySfx(SFX_MATCH_START_FANFARE);
 
                     p1CharId = (CharacterId)secretP1;
@@ -1626,7 +1670,7 @@ int main(int argc, char* argv[]) {
 
         case STATE_FIGHT: {
             bool pausePressed = false;
-            if (IsKeyPressed(KEY_ENTER) || IsKeyPressed(KEY_P)) {
+            if (enterPressed || InputManager::WasKeyPressed(KEY_P)) {
                 pausePressed = true;
             }
             for (int pad = 0; pad < 2; pad++) {
@@ -1635,7 +1679,7 @@ int main(int argc, char* argv[]) {
                 }
             }
 
-            if (pausePressed && fightIntroTimer <= 0 && !roundOver) {
+            if (pausePressed && !roundOver) {
                 isGamePaused = !isGamePaused;
                 AudioEngine::Instance().PlaySfx(SFX_SELECT_CONFIRM);
             }
@@ -1643,6 +1687,8 @@ int main(int argc, char* argv[]) {
             if (isGamePaused) {
                 break;
             }
+
+            inputP1.LatchRenderFrame(0);
 
             if (!fightActive && !roundOver) {
                 fightIntroTimer--;
@@ -1682,15 +1728,16 @@ int main(int argc, char* argv[]) {
                 );
 
                 float turboMult = 1.0f + 0.15f * (float)std::clamp((int)ChampionshipEdition::s_turboSpeed, 0, 2);
-                simAccum += std::min(dt, 0.05f) * turboMult * 60.0f;
-                int simSteps = std::clamp((int)simAccum, 0, 3);
-                simAccum -= (float)simSteps;
+                float frameUnits = (dt >= 0.012f && dt <= 0.022f) ? 1.0f : (std::min(dt, 0.05f) * 60.0f);
+                simAccum += frameUnits * turboMult;
+                int simSteps = std::clamp((int)(simAccum + 0.0001f), 0, 3);
+                simAccum = std::max(0.0f, simAccum - (float)simSteps);
 
                 int p1RoundsNeeded = (p2CharId == CHAR_WAR_PIG || p2CharId == CHAR_PALM_BEACH_PETE || p2CharId == CHAR_AYATOLLAH) ? 1 : 2;
                 int p2RoundsNeeded = 2;
 
                 for (int stepIdx = 0; stepIdx < simSteps && fightActive; stepIdx++) {
-                    inputP1.Update(0, p1->IsFacingRight());
+                    inputP1.Update(0, p1->IsFacingRight(), stepIdx > 0);
                     cpuAI.Update(inputP2, *p2, *p1, FIXED_DT);
 
                     if (ChampionshipEdition::s_finishHimActive) {
@@ -1919,7 +1966,7 @@ int main(int argc, char* argv[]) {
             }
             bool wantAdvance = (stateTimer >= 6.5f) ||
                 (stateTimer >= 0.40f && (padConfirm ||
-                 IsKeyPressed(KEY_ENTER) || IsKeyPressed(KEY_SPACE) ||
+                 enterPressed || InputManager::WasKeyPressed(KEY_SPACE) ||
                  inputP1.IsButtonPressed(BTN_START) || inputP1.IsButtonPressed(BTN_LP) ||
                  inputP1.IsButtonPressed(BTN_HP) || inputP1.IsButtonPressed(BTN_LK) ||
                  inputP1.IsButtonPressed(BTN_HK) || inputP1.IsButtonPressed(BTN_SPECIAL) ||
@@ -1986,7 +2033,7 @@ int main(int argc, char* argv[]) {
             inputP1.Update(0, useFreeDir ? bonusFreeFacingRight : p1->IsFacingRight());
 
             bool pausePressed = false;
-            if (IsKeyPressed(KEY_ENTER) || IsKeyPressed(KEY_P)) {
+            if (enterPressed || InputManager::WasKeyPressed(KEY_P)) {
                 pausePressed = true;
             }
             for (int pad = 0; pad < 2; pad++) {
@@ -2034,10 +2081,11 @@ int main(int argc, char* argv[]) {
             ChampionshipEdition::s_continuesRemaining = continuesRemaining;
             ChampionshipEdition::s_isSecretMatch = isSecretMode;
 
-            bool actionPressed = (IsKeyPressed(KEY_ENTER) || IsKeyPressed(KEY_SPACE) ||
+            bool actionPressed = (enterPressed || InputManager::WasKeyPressed(KEY_SPACE) ||
                 inputP1.IsButtonPressed(BTN_START) || inputP1.IsButtonPressed(BTN_COIN) ||
                 inputP1.IsButtonPressed(BTN_LP) || inputP1.IsButtonPressed(BTN_HP) ||
-                inputP1.IsButtonPressed(BTN_LK) || inputP1.IsButtonPressed(BTN_HK));
+                inputP1.IsButtonPressed(BTN_LK) || inputP1.IsButtonPressed(BTN_HK) ||
+                inputP1.IsButtonPressed(BTN_SPECIAL));
 
             if (isSecretMode) {
                 if (stateTimer >= 5.0f || actionPressed) {
@@ -2112,9 +2160,10 @@ int main(int argc, char* argv[]) {
 
         case STATE_ENDING_CELEBRATION: {
             inputP1.Update(0, true);
-            if (stateTimer >= 2.0f && (inputP1.IsButtonPressed(BTN_START) || inputP1.IsButtonPressed(BTN_LP) ||
+            if (stateTimer >= 2.0f && (enterPressed || InputManager::WasKeyPressed(KEY_SPACE) ||
+                inputP1.IsButtonPressed(BTN_START) || inputP1.IsButtonPressed(BTN_LP) ||
                 inputP1.IsButtonPressed(BTN_HP) || inputP1.IsButtonPressed(BTN_LK) ||
-                inputP1.IsButtonPressed(BTN_HK) || IsKeyPressed(KEY_ENTER) || IsKeyPressed(KEY_SPACE))) {
+                inputP1.IsButtonPressed(BTN_HK) || inputP1.IsButtonPressed(BTN_SPECIAL))) {
 
                 matchesWon = 0;
                 for (int b = 0; b < BONUS_STAGE_COUNT; b++) bonusStagesPlayed[b] = false;
@@ -2153,9 +2202,10 @@ int main(int argc, char* argv[]) {
             }
 
             inputP1.Update(0, true);
-            bool skip = (stateTimer >= 12.0f && (inputP1.IsButtonPressed(BTN_START) || inputP1.IsButtonPressed(BTN_LP) ||
+            bool skip = (stateTimer >= 12.0f && (enterPressed || InputManager::WasKeyPressed(KEY_SPACE) ||
+                         inputP1.IsButtonPressed(BTN_START) || inputP1.IsButtonPressed(BTN_LP) ||
                          inputP1.IsButtonPressed(BTN_HP) || inputP1.IsButtonPressed(BTN_LK) ||
-                         inputP1.IsButtonPressed(BTN_HK) || IsKeyPressed(KEY_ENTER) || IsKeyPressed(KEY_SPACE)));
+                         inputP1.IsButtonPressed(BTN_HK) || inputP1.IsButtonPressed(BTN_SPECIAL)));
             if (stateTimer >= 18.0f || skip) {
                 matchesWon = 0;
                 for (int b = 0; b < BONUS_STAGE_COUNT; b++) bonusStagesPlayed[b] = false;

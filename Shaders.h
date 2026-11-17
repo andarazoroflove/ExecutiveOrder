@@ -103,15 +103,15 @@ void main()
 
     vec4 col = texture(texture0, uv);
 
-    float scanline = sin(uv.y * 560.0 * 3.14159265 * 2.0);
+    float scanline = sin(uv.y * 224.0 * 3.14159265 * 2.0);
     float scanMod = 1.0 - (scanlineIntensity * (0.5 + 0.5 * scanline));
     col.rgb *= scanMod;
 
-    float subpixel = mod(floor(uv.x * 1920.0 * 3.0), 3.0);
+    float subpixel = mod(floor(uv.x * 384.0 * 3.0), 3.0);
     vec3 mask = vec3(0.9, 0.9, 0.9);
-    if (subpixel < 1.0) mask = vec3(1.15, 0.88, 0.88);
-    else if (subpixel < 2.0) mask = vec3(0.88, 1.15, 0.88);
-    else mask = vec3(0.88, 0.88, 1.15);
+    if (subpixel < 1.0) mask = vec3(1.18, 0.86, 0.86);
+    else if (subpixel < 2.0) mask = vec3(0.86, 1.18, 0.86);
+    else mask = vec3(0.86, 0.86, 1.18);
     col.rgb *= mix(vec3(1.0), mask, bloom);
 
     float vx = uv.x * (1.0 - uv.x);

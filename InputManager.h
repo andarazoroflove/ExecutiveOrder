@@ -64,7 +64,10 @@ public:
     static constexpr int CHARGE_REQUIRED_FRAMES = 36;
 
     InputManager();
-    void Update(int playerIndex, bool facingRight);
+    static void BeginRenderFrame();
+    static bool WasKeyPressed(int key);
+    void LatchRenderFrame(int playerIndex);
+    void Update(int playerIndex, bool facingRight, bool isExtraTurboSubstep = false);
     void UpdateSimulated(const RawInputState& simState, bool facingRight);
     void InjectSpecialMotion(SpecialMotionType motion, uint16_t buttonMask);
     static bool HasHumanInput(int playerIndex);
@@ -106,6 +109,7 @@ private:
 
     RawInputState m_currentState{};
     RawInputState m_prevState{};
+    RawInputState m_latchedPress{};
     std::array<BufferedFrame, BUFFER_SIZE> m_history{};
     int m_head = 0;
 
